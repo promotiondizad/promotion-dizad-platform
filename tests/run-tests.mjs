@@ -342,6 +342,21 @@ try {
   const ascPrices = (await anon.get('/api/products?sort=price_asc')).data.products.map((p) => p.customer_price);
   ok(ascPrices.every((v, i, a) => i === 0 || a[i - 1] <= v), 'الأسعار مرتبة تصاعدياً فعلاً');
 
+  console.log('— مطابقة سوقلي: إشعارات داخلية وأسعار توصيل ومعلومات الدفع —');
+  r = await mkMail.req('PATCH', '/api/me', { paymentMethod: 'بريدي موب', paymentDetails: '0021456789' });
+  ok(r.status === 200 && r.data.user.payment_method === 'بريدي موب' && r.data.user.payment_details === '0021456789', 'المسوق يحفظ معلومات دفع أرباحه');
+  r = await mkMail.get('/api/my/notifications');
+  ok(r.status === 200 && r.data.notifications.length >= 1 && r.data.notifications.every((n) => typeof n.text === 'string'), 'الإشعارات الداخلية تعرض سجل المستخدم نفسه');
+  r = await anon.get('/api/my/notifications');
+  ok(r.status === 401, 'الزائر ممنوع من الإشعارات الداخلية');
+  r = await anon.get('/api/delivery-coverage');
+  ok(r.status === 200 && r.data.coverage.some((c) => c.wilaya_code === 16 && c.min_fee === 500 && c.suppliers >= 1), 'صفحة أسعار التوصيل تعرض أرخص رسم لكل ولاية');
+  r = await anon.get('/api/products');
+  ok(r.data.products.find((p) => p.id === prodId).sold >= 1, 'بطاقة المنتج تعرض عدد مرات البيع');
+  await marketer.req('PATCH', '/api/me', { paymentMethod: 'CCP', paymentDetails: '3030303030' });
+  const admSettlements = await admin.get('/api/admin/settlements');
+  ok(admSettlements.data.settlements.length === 0 || admSettlements.data.settlements.every((s) => 'marketer_payment_method' in s), 'تسويات المدير تحمل معلومات دفع المسوق');
+
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;
 } catch (e) {

@@ -260,13 +260,15 @@ const server = http.createServer(async (req, res) => {
         emailChanged = ne !== me.email;
         email = ne;
       }
-      db.prepare('UPDATE users SET name = ?, email = ?, email_verified = ?, wilaya = ?, commune = ?, address = ?, business_name = ?, telegram_chat_id = ? WHERE id = ?')
+      db.prepare('UPDATE users SET name = ?, email = ?, email_verified = ?, wilaya = ?, commune = ?, address = ?, business_name = ?, telegram_chat_id = ?, payment_method = ?, payment_details = ? WHERE id = ?')
         .run(name, email, emailChanged ? (email ? 0 : 1) : me.email_verified,
           b.wilaya !== undefined ? (b.wilaya ? Number(b.wilaya) : null) : me.wilaya,
           b.commune !== undefined ? (b.commune || null) : me.commune,
           b.address !== undefined ? (b.address || null) : me.address,
           b.businessName !== undefined ? (b.businessName || null) : me.business_name,
           b.telegramChatId !== undefined ? (b.telegramChatId || null) : me.telegram_chat_id,
+          b.paymentMethod !== undefined ? (b.paymentMethod || null) : me.payment_method,
+          b.paymentDetails !== undefined ? (b.paymentDetails || null) : me.payment_details,
           me.id);
       audit(me.id, 'profile_update', 'user', me.id, emailChanged ? 'email_changed' : null);
       let verificationRequired = false;
@@ -302,7 +304,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/products' && req.method === 'GET') {
       const q = (url.searchParams.get('search') || '').trim();
       const cat = url.searchParams.get('category');
-      let sql = `SELECT p.*, c.name AS category_name, u.business_name, u.name AS supplier_name
+      let sql = `SELECT p.*, c.name AS category_name, u.business_name, u.name AS supplier_name,
+        (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status NOT IN ('cancelled','rejected','returned','failed_delivery')) AS sold
         FROM products p LEFT JOIN categories c ON c.id = p.category_id JOIN users u ON u.id = p.supplier_id
         WHERE p.status = 'approved' AND u.status = 'active'`;
       const args = [];
@@ -525,6 +528,21 @@ const server = http.createServer(async (req, res) => {
         },
         items, history: hist
       });
+    }
+    // إشعارات المستخدم داخل التطبيق (سجل ما وصله عبر القنوات)
+    if (p === '/api/my/notifications' && req.method === 'GET') {
+      const s = sessionOf(req);
+      if (!s) return send(res, 401, { error: 'يجب تسجيل الدخول أولاً' });
+      const rows = db.prepare('SELECT id, channel, type, payload, status, created_at FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 30').all(s.userId)
+        .map((n) => { let text = ''; try { text = JSON.parse(n.payload).text || ''; } catch {} return { id: n.id, channel: n.channel, type: n.type, text, status: n.status, created_at: n.created_at }; });
+      return send(res, 200, { notifications: rows });
+    }
+    // أسعار التوصيل العامة: أرخص رسم لكل ولاية عبر الموردين النشطين (لصفحة أسعار التوصيل)
+    if (p === '/api/delivery-coverage' && req.method === 'GET') {
+      const rows = db.prepare(`SELECT sc.wilaya_code, MIN(sc.delivery_fee) AS min_fee, COUNT(DISTINCT sc.supplier_id) AS suppliers, w.name_ar
+        FROM supplier_coverage sc JOIN users u ON u.id = sc.supplier_id AND u.status = 'active' JOIN wilayas w ON w.code = sc.wilaya_code
+        GROUP BY sc.wilaya_code ORDER BY sc.wilaya_code`).all();
+      return send(res, 200, { coverage: rows });
     }
     if (p === '/api/my/orders' && req.method === 'GET') {
       const s = requireAuth(req, res, ['buyer']); if (!s) return;
@@ -789,7 +807,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/admin/settlements' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
-      const rows = db.prepare(`SELECT st.*, u.name AS marketer_name, u.phone AS marketer_phone FROM settlements st JOIN users u ON u.id = st.marketer_id ORDER BY st.id DESC`).all();
+      const rows = db.prepare(`SELECT st.*, u.name AS marketer_name, u.phone AS marketer_phone, u.payment_method AS marketer_payment_method, u.payment_details AS marketer_payment_details FROM settlements st JOIN users u ON u.id = st.marketer_id ORDER BY st.id DESC`).all();
       return send(res, 200, { settlements: rows });
     }
     const settleM = p.match(/^\/api\/admin\/settlements\/(\d+)\/action$/);

@@ -31,11 +31,13 @@
       <a href="#" data-nav="home">الرئيسية</a>
       <a href="#products" data-nav="home">المنتجات</a>
       <a href="#" data-nav="track">تتبّع طلبك</a>
-      <a href="#" data-nav="how">كيف نعمل</a>
+      <a href="#" data-nav="delivery">أسعار التوصيل</a>
       <a href="#" data-nav="terms">الشروط</a>
       <a href="#" data-nav="contact">تواصل معنا</a>
     </nav>
     <div class="topbar-actions">
+      <button class="icon-btn" id="themeBtn" type="button" title="الوضع المظلم / الفاتح">🌙</button>
+      <span style="position:relative"><button class="icon-btn" id="bellBtn" type="button" hidden title="إشعاراتي">🔔</button><span id="bellPanel" hidden></span></span>
       <button class="icon-btn" id="cartBtn" type="button">🛒 السلة <span class="cart-count" id="cartCount" hidden>0</span></button>
       <button class="icon-btn gold" id="authBtn" type="button">دخول / تسجيل</button>
       <button class="icon-btn" id="dashBtn" type="button" hidden>لوحتي</button>
@@ -58,9 +60,20 @@
     </div>
   </section>
 
+  <section class="wrap" id="secNew" hidden>
+    <div class="section-head"><h2>🆕 وصل حديثاً</h2></div>
+    <div id="railNew" class="grid"></div>
+  </section>
+
+  <section class="wrap" id="secTop" hidden>
+    <div class="section-head"><h2>🔥 الأكثر طلباً</h2></div>
+    <div id="railTop" class="grid"></div>
+  </section>
+
   <section class="wrap" id="products">
     <div class="section-head">
-      <h2>المنتجات المعتمدة</h2>
+      <h2>كل المنتجات المعتمدة</h2>
+      <div class="chips" id="catChips"></div>
       <div class="filters">
         <input id="searchInput" type="search" placeholder="ابحث عن منتج…">
         <select id="catFilter"><option value="">كل التصنيفات</option></select>
@@ -76,6 +89,7 @@
           <option value="price_asc">السعر: من الأقل</option>
           <option value="price_desc">السعر: من الأعلى</option>
         </select>
+        <button class="btn light" id="favToggle" type="button">🤍 مفضلتي</button>
       </div>
     </div>
     <div id="productGrid" class="grid"><p class="muted">جارٍ تحميل المنتجات…</p></div>
@@ -211,6 +225,7 @@
   <section class="wrap">
     <h2 id="dashTitle">لوحتي</h2>
     <p class="muted" id="dashUser"></p>
+    <nav id="dashNav" class="dash-nav" hidden></nav>
     <div id="dashSettings"></div>
     <div id="dashContent"></div>
   </section>
@@ -246,10 +261,9 @@
   <div class="wrap foot-in">
     <div>
       <strong>Promotion Dizad</strong>
-      <p class="muted">منصة وسيطة تنظم الطلبات والإحالات والعمولات. المنصة لا تبيع مخزوناً ولا تستلم أموال الزبائن ولا تدير التوصيل بنفسها — المورد يجهز الطلب ويتعامل مع شركة التوصيل التي يتعاقد معها.</p>
+      <p class="muted">منصة جزائرية للتجارة والتسويق بالعمولة: منتجات مختارة من موردين موثوقين، دفع عند الاستلام، وتتبّع مباشر لطلبك خطوة بخطوة.</p>
     </div>
     <div class="foot-links">
-      <a href="#" data-nav="how">كيف تتحرك الأموال؟</a>
       <a href="#" data-nav="terms">الشروط والأحكام</a>
       <a href="#" data-nav="privacy">سياسة الخصوصية</a>
       <a href="#" data-nav="contact">الدعم والتواصل</a>

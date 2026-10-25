@@ -180,6 +180,8 @@ const WILAYAS = [
 
 // ترقية: تأكيد البريد الإلكتروني ورموز المصادقة (تأكيد الحساب + استعادة كلمة المرور)
 try { db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE users ADD COLUMN payment_method TEXT'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE users ADD COLUMN payment_details TEXT'); } catch { /* العمود موجود */ }
 db.exec(`CREATE TABLE IF NOT EXISTS auth_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -73,18 +73,6 @@ async function openTrack() {
 
 // ---------- صفحات ثابتة ----------
 const PAGES = {
-  how: `<h2>كيف نعمل — وكيف تتحرك الأموال بوضوح</h2>
-  <p><strong>الأدوار:</strong> المورد يوفّر المنتج والمخزون ويجهّز الطلبية، والمسوق يجلب الطلبات عبر روابط إحالته مقابل عمولة، والمشتري يطلب ويدفع عند الاستلام، والمنصة تدير العرض والطلبات والإحالات وحساب العمولات آلياً.</p>
-  <h3>مسار الأموال (اتفاق موثق)</h3>
-  <ol>
-    <li>الزبون يدفع المبلغ الإجمالي <strong>نقداً عند الاستلام</strong> لشركة التوصيل المتعاقدة مع المورد — <strong>المنصة لا تستلم أموال الزبائن أبداً</strong>.</li>
-    <li>المورد يستلم مستحقاته من شركة توصيله حسب اتفاقه معها.</li>
-    <li>المنصة تسجّل لكل طلب: سعر الجملة للمورد، هامش المنصة، وعمولة المسوق — كما كانت وقت إنشاء الطلب (لا تتغير بتغيّر الأسعار لاحقاً).</li>
-    <li>عمولة المسوق تبقى «متوقعة» ولا تصبح مستحقة إلا بعد <strong>التسليم والتحصيل الفعلي</strong>، ثم تُسوّى بطلب تسوية يوافق عليه صاحب المنصة ويوثَّق بطريقة الدفع ومرجعه.</li>
-    <li>حصة المنصة (الهامش ناقص عمولة المسوق) التزام مسجل على المورد يُسوّى معه دورياً وفق الاتفاق الثنائي بينهما — التسجيل في المنصة هو المرجع القابل للمراجعة للطرفين.</li>
-  </ol>
-  <h3>التوصيل</h3>
-  <p>المورد مسؤول عن التجهيز والتنسيق مع شركة التوصيل التي يتعامل معها. المنصة تنظّم الطلبات وتعرض حالاتها، ولا تدّعي وجود عقد توصيل أو تكامل غير موجود.</p>`,
   terms: `<h2>الشروط والأحكام</h2>
   <h3>قواعد الإحالة والعمولات</h3>
   <ul>
@@ -121,7 +109,18 @@ const PAGES = {
     <button class="btn gold" type="submit">إرسال</button>
   </form>`
 };
-function openPage(key) {
+async function openPage(key) {
+  if (key === 'delivery') {
+    show('page');
+    $('#pageContent').innerHTML = '<h2>أسعار التوصيل</h2><p class="muted">جارٍ التحميل…</p>';
+    try {
+      const { coverage } = await api('/api/delivery-coverage');
+      $('#pageContent').innerHTML = `<h2>أسعار التوصيل حسب الولاية</h2>
+      <p>الجدول يعرض <strong>أرخص رسم توصيل متاح</strong> لكل ولاية عبر موردينا النشطين. الرسم الدقيق لطلبك يظهر في صفحة كل منتج وفي سلة الطلب قبل التأكيد، لأنه يختلف حسب المورد.</p>
+      ${coverage.length ? `<div class="tablewrap"><table><tr><th>الولاية</th><th>أرخص توصيل</th><th>موردون يغطونها</th></tr>${coverage.map((c) => `<tr><td>${c.wilaya_code} — ${esc(c.name_ar)}</td><td>${fmt(c.min_fee)}</td><td>${c.suppliers}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد تغطية مضبوطة بعد — تُبنى القائمة تلقائياً من تغطية الموردين.</p>'}`;
+    } catch (e) { $('#pageContent').innerHTML = '<h2>أسعار التوصيل</h2><p class="muted">تعذر التحميل الآن.</p>'; }
+    return;
+  }
   $('#pageContent').innerHTML = PAGES[key] || '';
   show('page');
   if (key === 'contact') {
@@ -136,13 +135,11 @@ function openPage(key) {
 }
 
 // ---------- المنتجات ----------
-async function loadProducts() {
-  const q = $('#searchInput').value.trim(), cat = $('#catFilter').value;
-  const data = await api('/api/products?' + new URLSearchParams({ search: q, category: cat, sort: $('#sortSel').value }));
-  PRODUCTS = data.products;
-  const [min, max] = ($('#priceFilter').value || '-').split('-').map(Number);
-  const list = PRODUCTS.filter((p) => !$('#priceFilter').value || (p.customer_price >= min && p.customer_price <= max));
-  $('#productGrid').innerHTML = list.length ? list.map((p) => `
+let FAVS = new Set(JSON.parse(localStorage.getItem('pd_favs') || '[]'));
+let FAV_ONLY = false;
+function saveFavs() { localStorage.setItem('pd_favs', JSON.stringify([...FAVS])); }
+function productCard(p) {
+  return `
     <article class="pcard">
       ${p.images && p.images.length ? `<img src="${esc(p.images[0])}" alt="${esc(p.name)}" loading="lazy">` : '<div class="noimg">📦</div>'}
       <div class="pcard-body">
@@ -150,12 +147,46 @@ async function loadProducts() {
         <span class="muted small">${esc(p.category_name || '')}</span>
         <span class="price">${fmt(p.customer_price)}</span>
         ${p.stock > 0 ? '<span class="badge">متوفر</span>' + (p.stock <= 3 ? ' <span class="badge out">بقي ' + p.stock + ' فقط</span>' : '') : '<span class="badge out">نفد المخزون</span>'}
+        ${p.sold > 0 ? `<span class="badge">بيعت ${p.sold} مرة</span>` : ''}
         <button class="btn" data-view="${p.id}">عرض التفاصيل</button>
         <button class="btn gold" data-add="${p.id}" ${p.stock <= 0 ? 'disabled' : ''}>أضف إلى السلة</button>
+        <button class="btn light" data-fav="${p.id}">${FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'}</button>
       </div>
-    </article>`).join('') : '<p class="muted">لا توجد منتجات معتمدة معروضة حالياً. المنتجات تظهر هنا بعد مراجعة الإدارة للموردين ومنتجاتهم.</p>';
-  $$('#productGrid [data-view]').forEach((b) => b.addEventListener('click', () => openProduct(Number(b.dataset.view))));
-  $$('#productGrid [data-add]').forEach((b) => b.addEventListener('click', () => { addToCart(Number(b.dataset.add), 1); }));
+    </article>`;
+}
+function wireCards(root) {
+  $$('#' + root + ' [data-view]').forEach((b) => b.addEventListener('click', () => openProduct(Number(b.dataset.view))));
+  $$('#' + root + ' [data-add]').forEach((b) => b.addEventListener('click', () => { addToCart(Number(b.dataset.add), 1); }));
+  $$('#' + root + ' [data-fav]').forEach((b) => b.addEventListener('click', () => {
+    const id = Number(b.dataset.fav);
+    if (FAVS.has(id)) { FAVS.delete(id); toast('أُزيل من المفضلة'); } else { FAVS.add(id); toast('أُضيف إلى المفضلة ❤️'); }
+    saveFavs(); loadProducts().catch(() => {});
+  }));
+}
+async function loadProducts() {
+  const q = $('#searchInput').value.trim(), cat = $('#catFilter').value;
+  const data = await api('/api/products?' + new URLSearchParams({ search: q, category: cat, sort: $('#sortSel').value }));
+  PRODUCTS = data.products;
+  const [min, max] = ($('#priceFilter').value || '-').split('-').map(Number);
+  let list = PRODUCTS.filter((p) => !$('#priceFilter').value || (p.customer_price >= min && p.customer_price <= max));
+  if (FAV_ONLY) list = list.filter((p) => FAVS.has(p.id));
+  $('#productGrid').innerHTML = list.length ? list.map(productCard).join('') : '<p class="muted">' + (FAV_ONLY ? 'مفضلتك فارغة — اضغط 🤍 على أي منتج لإضافته هنا.' : 'لا توجد منتجات معتمدة معروضة حالياً. المنتجات تظهر هنا بعد مراجعة الإدارة للموردين ومنتجاتهم.') + '</p>';
+  wireCards('productGrid');
+  // أقسام الرئيسية + شرائح الفئات — تظهر في العرض الافتراضي فقط (بلا بحث/فلترة)
+  const plain = !q && !cat && !$('#priceFilter').value && !FAV_ONLY;
+  const newest = [...PRODUCTS].sort((a, b) => b.id - a.id).slice(0, 4);
+  const top = [...PRODUCTS].filter((p) => p.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 4);
+  $('#secNew').hidden = !(plain && newest.length);
+  $('#secTop').hidden = !(plain && top.length);
+  if (plain) {
+    $('#railNew').innerHTML = newest.map(productCard).join(''); wireCards('railNew');
+    $('#railTop').innerHTML = top.map(productCard).join(''); wireCards('railTop');
+    $('#catChips').innerHTML = CATEGORIES.map((c) => {
+      const n = PRODUCTS.filter((p) => p.category_id === c.id).length;
+      return n ? `<button class="chip" data-chip="${c.id}" type="button">${esc(c.name)} (${n})</button>` : '';
+    }).join('');
+    $$('#catChips [data-chip]').forEach((b) => b.addEventListener('click', () => { $('#catFilter').value = b.dataset.chip; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
+  } else $('#catChips').innerHTML = '';
 }
 async function openProduct(id) {
   const { product: p } = await api('/api/products/' + id);
@@ -346,7 +377,7 @@ async function refreshMe() {
   const data = await api('/api/me');
   ME = data.user; CSRF = data.csrf || CSRF;
   $('#authBtn').hidden = !!ME;
-  $('#dashBtn').hidden = !ME; $('#logoutBtn').hidden = !ME;
+  $('#dashBtn').hidden = !ME; $('#logoutBtn').hidden = !ME; $('#bellBtn').hidden = !ME;
   if (ME) { $('#dashTitle').textContent = 'لوحة ' + ({ admin: 'الإدارة العامة', supplier: 'المورد', marketer: 'المسوق', buyer: 'المشتري' }[ME.role] || ''); $('#dashUser').textContent = ME.name + ' · ' + ME.phone + ' · ' + ME.role; }
   return ME;
 }
@@ -368,6 +399,11 @@ function renderSettings() {
       <input id="pfAddress" value="${esc(ME.address || '')}" placeholder="العنوان">
       ${ME.role === 'supplier' ? `<input id="pfBusiness" value="${esc(ME.business_name || '')}" placeholder="اسم النشاط/المتجر">` : ''}
       <input id="pfTelegram" value="${esc(ME.telegram_chat_id || '')}" placeholder="معرّف تيليغرام الرقمي (لإشعارات فورية — اختياري)">
+      ${ME.role === 'marketer' ? `<select id="pfPayMethod">
+        <option value="">— طريقة استلام أرباحك —</option>
+        ${['بريدي موب', 'CCP', 'Flexy', 'نقداً عند الاستلام من الإدارة', 'أخرى'].map((m) => `<option ${ME.payment_method === m ? 'selected' : ''}>${m}</option>`).join('')}
+      </select>
+      <input id="pfPayDetails" value="${esc(ME.payment_details || '')}" placeholder="تفاصيل الدفع (رقم الحساب/الهاتف المرتبط…)">` : ''}
       <button class="btn" type="submit">حفظ البيانات</button>
       <p class="muted small">رقم الهاتف هو معرّف الدخول ولا يتغير من هنا. تغيير البريد يتطلب تأكيده برمز جديد.</p>
     </form>
@@ -382,7 +418,7 @@ function renderSettings() {
   $('#profileForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
-      const r = await api('/api/me', { method: 'PATCH', body: { name: $('#pfName').value, email: $('#pfEmail').value, wilaya: $('#pfWilaya').value, commune: $('#pfCommune').value, address: $('#pfAddress').value, businessName: $('#pfBusiness') ? $('#pfBusiness').value : undefined, telegramChatId: $('#pfTelegram').value } });
+      const r = await api('/api/me', { method: 'PATCH', body: { name: $('#pfName').value, email: $('#pfEmail').value, wilaya: $('#pfWilaya').value, commune: $('#pfCommune').value, address: $('#pfAddress').value, businessName: $('#pfBusiness') ? $('#pfBusiness').value : undefined, telegramChatId: $('#pfTelegram').value, paymentMethod: $('#pfPayMethod') ? $('#pfPayMethod').value : undefined, paymentDetails: $('#pfPayDetails') ? $('#pfPayDetails').value : undefined } });
       toast(r.message); await refreshMe(); renderDash();
       if (r.verificationRequired) openAuth('verify', null, ME.phone);
     } catch (err) { toast(err.message, true); }
@@ -395,15 +431,31 @@ function renderSettings() {
     } catch (err) { toast(err.message, true); }
   });
 }
+function sectionNav() {
+  const nav = $('#dashNav');
+  const cards = $$('#dashContent > .card, #dashContent > .stat-grid');
+  if (cards.length < 3) { nav.hidden = true; nav.innerHTML = ''; return; }
+  nav.innerHTML = cards.map((c, i) => {
+    if (!c.id) c.id = 'dsec-' + i;
+    const title = c.classList.contains('stat-grid') ? '📊 نظرة عامة' : ((c.querySelector('h3') || {}).textContent || 'قسم ' + (i + 1)).trim();
+    return `<button class="chip" data-sec="${c.id}" type="button">${esc(title)}</button>`;
+  }).join('');
+  nav.hidden = false;
+  $$('#dashNav [data-sec]').forEach((b) => b.addEventListener('click', () => {
+    const el = document.getElementById(b.dataset.sec);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); }
+  }));
+}
 async function renderDash() {
   if (!ME) return openAuth('login');
   show('dash');
   renderSettings();
   const box = $('#dashContent');
-  if (ME.role === 'buyer') return renderBuyer(box);
-  if (ME.role === 'marketer') return renderMarketer(box);
-  if (ME.role === 'supplier') return renderSupplier(box);
-  if (ME.role === 'admin') return renderAdmin(box);
+  if (ME.role === 'buyer') await renderBuyer(box);
+  else if (ME.role === 'marketer') await renderMarketer(box);
+  else if (ME.role === 'supplier') await renderSupplier(box);
+  else if (ME.role === 'admin') await renderAdmin(box);
+  sectionNav();
 }
 async function renderBuyer(box) {
   const { orders } = await api('/api/my/orders');
@@ -428,11 +480,12 @@ async function renderMarketer(box) {
     <div class="stat">طلبات جلبتها<b>${orders.length}</b></div>
   </div>
   <div class="card"><h3>منتجات متاحة للتسويق</h3><div class="tablewrap"><table>
-    <tr><th>المنتج</th><th>سعر الزبون</th><th>هامش المنصة</th><th>عمولتك</th><th>المخزون</th><th>رابطك</th><th>مشاركة</th></tr>
+    <tr><th>المنتج</th><th>سعر الزبون</th><th>هامش المنصة</th><th>عمولتك</th><th>المخزون</th><th>رابطك</th><th>مشاركة</th><th>مواد التسويق</th></tr>
     ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${fmt(p.customer_price)}</td><td>${fmt(p.platform_margin)}</td><td><strong>${fmt(p.marketer_commission)}</strong></td>
       <td>${p.stock > 0 ? p.stock : '<span class="badge out">نافد</span>'}</td>
       <td><button class="btn small" data-link="${p.id}">إنشاء / نسخ رابط الإحالة</button></td>
-      <td><button class="btn small light" data-share="${p.id}">مشاركة</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
+      <td><button class="btn small light" data-share="${p.id}">مشاركة</button></td>
+      <td><button class="btn small light" data-copydesc="${p.id}">📋 نسخ الوصف</button> <button class="btn small light" data-dlimgs="${p.id}">⬇️ الصور</button></td></tr>`).join('') || '<tr><td colspan="8" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
     <p class="muted small">قاعدة الإحالة: آخر رابط صالح نقره المشتري خلال 30 يوماً هو المعتمد.</p></div>
   <div class="card"><h3>روابطي ونقراتها</h3>${links.length ? links.map((l) => `<p><code>${location.origin}/r/${l.code}</code> — ${l.product_id ? 'منتج #' + l.product_id : 'رابط عام'} — نقرات: ${l.clicks} ${l.product_id ? `<button class="btn small light" data-copymsg="${l.id}">📋 نسخ رسالة مشاركة جاهزة</button>` : ''}</p>`).join('') : '<p class="muted">لا روابط بعد.</p>'}</div>
   <div class="card"><h3>طلباتي وحالاتها</h3>${orders.length ? `<div class="tablewrap"><table><tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th><th></th></tr>${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
@@ -457,6 +510,20 @@ async function renderMarketer(box) {
     const msg = `🔥 ${p ? p.name : 'منتج مميز'} — ${p ? fmt(p.customer_price) : ''}\nجودة مضمونة والدفع عند الاستلام 🚚💵\nاطلب من هنا: ${full}`;
     await navigator.clipboard.writeText(msg).catch(() => {});
     toast('نُسخت الرسالة الجاهزة مع رابطك — الصقها أين تشاء');
+  }));
+  $$('#dashContent [data-copydesc]').forEach((b) => b.addEventListener('click', async () => {
+    const p = products.find((x) => x.id === Number(b.dataset.copydesc));
+    const r = await api('/api/marketer/links', { method: 'POST', body: { productId: p.id } });
+    const full = location.origin + r.link.path;
+    const txt = `${p.name}\n${p.description || ''}\n💰 السعر: ${fmt(p.customer_price)} — الدفع عند الاستلام\nاطلب من هنا: ${full}`;
+    await navigator.clipboard.writeText(txt).catch(() => {});
+    toast('نُسخ الوصف التسويقي مع رابطك');
+  }));
+  $$('#dashContent [data-dlimgs]').forEach((b) => b.addEventListener('click', () => {
+    const p = products.find((x) => x.id === Number(b.dataset.dlimgs));
+    if (!p.images || !p.images.length) return toast('لا صور لهذا المنتج', true);
+    p.images.forEach((im, i) => setTimeout(() => { const a = document.createElement('a'); a.href = im; a.target = '_blank'; a.rel = 'noopener'; a.click(); }, i * 350));
+    toast('تُفتح ' + p.images.length + ' صورة — احفظ ما تحتاجه لإعلانك');
   }));
   $$('#dashContent [data-share]').forEach((b) => b.addEventListener('click', async () => {
     const p = products.find((x) => x.id === Number(b.dataset.share));
@@ -600,7 +667,7 @@ async function renderAdmin(box) {
   <div class="card"><h3>كل الطلبات ومصادرها</h3><input id="admOrderQ" type="search" placeholder="🔍 ابحث برقم الطلبية…" style="margin-bottom:10px"><div class="tablewrap"><table id="admOrdersTable"><tr><th>الرقم</th><th>الحالة</th><th>المورد</th><th>المسوق</th><th>الإجمالي</th><th></th></tr>
     ${orders.orders.slice(0, 60).map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>#${o.supplier_id}</td><td>${o.marketer_id ? '#' + o.marketer_id + ' (' + esc(o.ref_code || '') + ')' : 'مباشر'}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div></div>
   <div class="card"><h3>تسويات المسوقين</h3>${settlements.settlements.length ? settlements.settlements.map((s) => `
-    <p>#${s.id} — ${esc(s.marketer_name)} — ${fmt(s.amount)} — ${esc(s.state)} ${s.state === 'requested' || s.state === 'approved' ? `
+    <p>#${s.id} — ${esc(s.marketer_name)} — ${fmt(s.amount)} — ${esc(s.state)}${s.marketer_payment_method ? `<br><span class="muted small">💳 طريقة دفع المسوق: ${esc(s.marketer_payment_method)} — ${esc(s.marketer_payment_details || '')}</span>` : ''} ${s.state === 'requested' || s.state === 'approved' ? `
     <input placeholder="طريقة الدفع" id="sm-${s.id}" style="width:110px"> <input placeholder="المرجع" id="sr-${s.id}" style="width:110px">
     <button class="btn small gold" data-spaid="${s.id}">تأكيد الدفع الفعلي</button> <button class="btn small danger" data-sreject="${s.id}">رفض</button>` : ''}</p>`).join('') : '<p class="muted">لا طلبات تسوية.</p>'}
     <p class="muted small">الدفع الفعلي يتم خارج المنصة (CCP/Flexy…) حسب الاتفاق — زر التأكيد يوثّق فقط ما حدث فعلاً بطريقته ومرجعه.</p></div>
@@ -695,6 +762,32 @@ $('#searchInput').addEventListener('input', () => loadProducts().catch(() => {})
 $('#catFilter').addEventListener('change', () => loadProducts().catch(() => {}));
 $('#priceFilter').addEventListener('change', () => loadProducts().catch(() => {}));
 $('#sortSel').addEventListener('change', () => loadProducts().catch(() => {}));
+$('#favToggle').addEventListener('click', () => {
+  FAV_ONLY = !FAV_ONLY;
+  $('#favToggle').textContent = FAV_ONLY ? '❤️ مفضلتي (معروضة)' : '🤍 مفضلتي';
+  loadProducts().catch(() => {});
+});
+// الوضع المظلم
+if (localStorage.getItem('pd_theme') === 'dark') document.documentElement.dataset.theme = 'dark';
+$('#themeBtn').textContent = document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙';
+$('#themeBtn').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : '';
+  localStorage.setItem('pd_theme', dark ? 'dark' : 'light');
+  $('#themeBtn').textContent = dark ? '☀️' : '🌙';
+});
+// جرس الإشعارات داخل التطبيق
+$('#bellBtn').addEventListener('click', async () => {
+  const panel = $('#bellPanel');
+  if (!panel.hidden) { panel.hidden = true; return; }
+  panel.innerHTML = '<div class="bell-box"><p class="muted">جارٍ التحميل…</p></div>';
+  panel.hidden = false;
+  try {
+    const { notifications } = await api('/api/my/notifications');
+    panel.innerHTML = `<div class="bell-box"><h4>🔔 إشعاراتي</h4>${notifications.length ? notifications.map((n) => `<div class="bell-item"><p>${esc(n.text)}</p><span class="muted small">${new Date(n.created_at).toLocaleString('ar-DZ')} · ${esc(n.channel)} · ${esc(n.status)}</span></div>`).join('') : '<p class="muted">لا إشعارات بعد.</p>'}</div>`;
+  } catch (e) { panel.innerHTML = '<div class="bell-box"><p class="muted">تعذر التحميل.</p></div>'; }
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('#bellBtn') && !e.target.closest('#bellPanel')) $('#bellPanel').hidden = true; });
 
 $('#checkoutForm').addEventListener('submit', async (e) => {
   e.preventDefault();
