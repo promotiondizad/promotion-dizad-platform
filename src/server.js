@@ -275,7 +275,9 @@ const server = http.createServer(async (req, res) => {
       const q = (url.searchParams.get('search') || '').trim();
       const cat = url.searchParams.get('category');
       let sql = `SELECT p.*, c.name AS category_name, u.business_name, u.name AS supplier_name,
-        (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status NOT IN ('cancelled','rejected','returned','failed_delivery')) AS sold
+        (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status NOT IN ('cancelled','rejected','returned','failed_delivery')) AS sold,
+        (SELECT AVG(stars) FROM product_reviews WHERE product_id = p.id) AS rating_avg,
+        (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.id) AS rating_count
         FROM products p LEFT JOIN categories c ON c.id = p.category_id JOIN users u ON u.id = p.supplier_id
         WHERE p.status = 'approved' AND u.status = 'active'`;
       const args = [];
@@ -285,7 +287,7 @@ const server = http.createServer(async (req, res) => {
       sql += sort === 'price_asc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) ASC' : sort === 'price_desc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) DESC' : ' ORDER BY p.id DESC';
       const rows = db.prepare(sql).all(...args).map((r) => ({
         id: r.id, supplier_id: r.supplier_id, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name,
-        supplier_name: r.supplier_name, business_name: r.business_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sold: r.sold, created_at: r.created_at,
+        supplier_name: r.supplier_name, business_name: r.business_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sold: r.sold, rating_avg: r.rating_avg, rating_count: r.rating_count, created_at: r.created_at,
         sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images),
         in_stock: r.stock > 0
       }));
@@ -296,7 +298,27 @@ const server = http.createServer(async (req, res) => {
       const r = db.prepare(`SELECT p.*, c.name AS category_name, u.business_name, u.name AS supplier_name FROM products p LEFT JOIN categories c ON c.id = p.category_id JOIN users u ON u.id = p.supplier_id WHERE p.id = ?`).get(Number(pm[1]));
       if (!r || r.status !== 'approved') return send(res, 404, { error: 'المنتج غير موجود أو غير متاح' });
       const coverage = db.prepare('SELECT wilaya_code, delivery_fee, fee_office, duration FROM supplier_coverage WHERE supplier_id = ? ORDER BY wilaya_code').all(r.supplier_id);
-      return send(res, 200, { product: { id: r.id, supplier_id: r.supplier_id, supplier_name: r.supplier_name, business_name: r.business_name, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), coverage } });
+      const rating = db.prepare('SELECT AVG(stars) a, COUNT(*) c FROM product_reviews WHERE product_id = ?').get(r.id);
+      const reviews = db.prepare('SELECT pr.stars, pr.comment, pr.created_at, u.name AS user_name FROM product_reviews pr JOIN users u ON u.id = pr.user_id WHERE pr.product_id = ? ORDER BY pr.id DESC LIMIT 20').all(r.id);
+      return send(res, 200, { product: { id: r.id, supplier_id: r.supplier_id, supplier_name: r.supplier_name, business_name: r.business_name, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), coverage, rating_avg: rating.a, rating_count: rating.c, reviews } });
+    }
+    const revM = p.match(/^\/api\/products\/(\d+)\/reviews$/);
+    if (revM && req.method === 'POST') {
+      const s = requireAuth(req, res); if (!s) return;
+      const pid = Number(revM[1]);
+      const prod = db.prepare("SELECT id FROM products WHERE id = ? AND status = 'approved'").get(pid);
+      if (!prod) return send(res, 404, { error: 'المنتج غير موجود' });
+      const b = await readBody(req);
+      const stars = Math.round(Number(b.stars));
+      if (!stars || stars < 1 || stars > 5) return send(res, 400, { error: 'اختر تقييماً من 1 إلى 5 نجوم' });
+      const eligible = db.prepare(`SELECT 1 FROM order_items oi JOIN orders o ON o.id = oi.order_id
+        WHERE oi.product_id = ? AND o.buyer_id = ? AND o.status = 'delivered_collected' LIMIT 1`).get(pid, s.userId);
+      if (!eligible) return send(res, 403, { error: 'يمكنك تقييم المنتج بعد استلام طلبٍ فيه — التقييمات للمشترين الفعليين فقط' });
+      db.prepare(`INSERT INTO product_reviews(product_id,user_id,stars,comment,created_at) VALUES(?,?,?,?,?)
+        ON CONFLICT(product_id,user_id) DO UPDATE SET stars = excluded.stars, comment = excluded.comment, created_at = excluded.created_at`)
+        .run(pid, s.userId, stars, String(b.comment || '').slice(0, 1000), Date.now());
+      const rating = db.prepare('SELECT AVG(stars) a, COUNT(*) c FROM product_reviews WHERE product_id = ?').get(pid);
+      return send(res, 200, { ok: true, rating_avg: rating.a, rating_count: rating.c });
     }
     // صفحة متجر المورد العامة (كيما نموذج التصميم: متجر بمنتجاته ومعلوماته)
     const storeM = p.match(/^\/api\/suppliers\/(\d+)\/public$/);
@@ -304,7 +326,9 @@ const server = http.createServer(async (req, res) => {
       const sup = getUser(Number(storeM[1]));
       if (!sup || sup.role !== 'supplier' || sup.status !== 'active') return send(res, 404, { error: 'المتجر غير موجود' });
       const rows = db.prepare(`SELECT p.*, c.name AS category_name,
-        (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status NOT IN ('cancelled','rejected','returned','failed_delivery')) AS sold
+        (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status NOT IN ('cancelled','rejected','returned','failed_delivery')) AS sold,
+        (SELECT AVG(stars) FROM product_reviews WHERE product_id = p.id) AS rating_avg,
+        (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.id) AS rating_count
         FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.supplier_id = ? AND p.status = 'approved' ORDER BY p.id DESC`).all(sup.id)
         .map((r) => ({ id: r.id, supplier_id: r.supplier_id, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sold: r.sold, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), in_stock: r.stock > 0 }));
       const wilayaRow = sup.wilaya ? db.prepare('SELECT name_ar FROM wilayas WHERE code = ?').get(sup.wilaya) : null;

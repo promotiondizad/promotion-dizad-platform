@@ -405,6 +405,40 @@ try {
   const pubJs = await (await fetch(BASE + '/app.js')).text();
   ok(!pubJs.includes('renderAdmin') && !pubJs.includes('/api/admin/overview'), 'التطبيق العام لا يحتوي أي كود لواجهة الإدارة');
 
+
+  console.log('— تقييمات المنتجات: للمشترين المستلمين فقط —');
+  r = await supplier.post('/api/supplier/products', { name: 'منتج التقييم', description: 'للمراجعات', wholesalePrice: 1000, stock: 5 });
+  ok(r.status === 201, 'منتج التقييم أُضيف');
+  const rvProdId = r.data.id;
+  r = await admin.post(`/api/admin/products/${rvProdId}/review`, { action: 'approve', platformMargin: 200 });
+  ok(r.status === 200, 'منتج التقييم اعتُمد (سعر أساسي 1200)');
+  const stranger = new Client();
+  r = await stranger.post('/api/auth/register', { role: 'buyer', name: 'غريب', phone: '0600000051', password: 'stranger123', passwordConfirm: 'stranger123', terms: true });
+  await stranger.post('/api/auth/login', { phone: '0600000051', password: 'stranger123' });
+  r = await stranger.post(`/api/products/${rvProdId}/reviews`, { stars: 5, comment: 'رائع' });
+  ok(r.status === 403, 'التقييم ممنوع قبل الشراء والاستلام');
+  const rvBuyer = new Client();
+  r = await rvBuyer.post('/api/auth/register', { role: 'buyer', name: 'مشتري مقيم', phone: '0600000052', password: 'rvbuyer123', passwordConfirm: 'rvbuyer123', terms: true });
+  await rvBuyer.post('/api/auth/login', { phone: '0600000052', password: 'rvbuyer123' });
+  r = await rvBuyer.post('/api/orders', { customer: { name: 'مشتري مقيم', phone: '0600000052', wilaya: 16, commune: 'باب الزوار', address: 'حي 1' }, items: [{ productId: rvProdId, qty: 1 }], idempotencyKey: 'test-key-rev-1' });
+  ok(r.status === 201, 'طلب المشتري المقيم أُنشئ');
+  const rvRef = r.data.orders[0].ref;
+  const supOrdersRv = await supplier.get('/api/supplier/orders');
+  const rvOrderId = supOrdersRv.data.orders.find((o) => o.ref === rvRef).id;
+  for (const st of ['confirmed', 'preparing', 'handed', 'out_for_delivery', 'delivered_collected']) {
+    r = await supplier.post(`/api/supplier/orders/${rvOrderId}/status`, { status: st });
+    if (r.status !== 200) break;
+  }
+  ok(r.status === 200, 'طلب المقيم وصل للتسليم');
+  r = await rvBuyer.post(`/api/products/${rvProdId}/reviews`, { stars: 5, comment: 'منتج ممتاز' });
+  ok(r.status === 200 && r.data.rating_count === 1, 'تقييم المستلم يُقبل ويُحتسب');
+  r = await rvBuyer.post(`/api/products/${rvProdId}/reviews`, { stars: 3, comment: 'جيد' });
+  ok(r.status === 200 && Math.abs(r.data.rating_avg - 3) < 0.01 && r.data.rating_count === 1, 'تحديث التقييم يستبدل ولا يضاعف');
+  r = await anon.get(`/api/products/${rvProdId}`);
+  ok(r.data.product.rating_count === 1 && Array.isArray(r.data.product.reviews) && r.data.product.reviews.length === 1, 'التفاصيل تعرض التقييمات');
+  r = await rvBuyer.post(`/api/products/${rvProdId}/reviews`, { stars: 9 });
+  ok(r.status === 400, 'نجوم خارج النطاق تُرفض');
+
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;
 } catch (e) {
@@ -413,3 +447,4 @@ try {
 } finally {
   srv.kill();
 }
+

@@ -211,3 +211,15 @@ function audit(actorId, action, entity, entityId, details) {
 
 module.exports = { db, DATA_DIR, audit };
 try { db.exec('ALTER TABLE products ADD COLUMN compare_price INTEGER'); } catch { /* العمود موجود */ }
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS product_reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  stars INTEGER NOT NULL CHECK(stars BETWEEN 1 AND 5),
+  comment TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  UNIQUE(product_id, user_id)
+);
+`);

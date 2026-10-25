@@ -12,6 +12,15 @@
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+<div id="splash" hidden>
+  <div class="sp-box">
+    <div class="sp-logo">S<span>OUQAR</span></div>
+    <p class="sp-tag">سوقك في الجزائر</p>
+    <p class="sp-sub">تسوّق .. سوّق .. واربح — سوق واحد، تجارة تجمع الجميع</p>
+    <button class="btn gold" id="spStart" type="button">ابدأ الآن</button>
+    <button class="sp-login" id="spLogin" type="button">لديك حساب؟ تسجيل الدخول</button>
+  </div>
+</div>
 <header class="topbar">
   <div class="topbar-in">
     <a class="logo" href="#" data-nav="home" aria-label="SOUQAR">
@@ -175,10 +184,11 @@
     </div>
 
     <div class="card" id="pane-register" hidden>
+      <p style="margin:6px 0 2px"><strong>اختر نوع الحساب</strong></p>
       <div class="role-tabs">
-        <button class="tab" data-role="buyer" type="button">🛍️ مشتري</button>
-        <button class="tab" data-role="marketer" type="button">📣 مسوق</button>
-        <button class="tab" data-role="supplier" type="button">🏭 مورد</button>
+        <button class="tab" data-role="buyer" type="button"><span class="role-ic">🛍️</span><span><b>زبون</b><small>تسوّق من منتجات المورّدين وتابع طلباتك</small></span></button>
+        <button class="tab" data-role="marketer" type="button"><span class="role-ic">📣</span><span><b>مسوّق</b><small>سوّق المنتجات واربح عمولات حرة</small></span></button>
+        <button class="tab" data-role="supplier" type="button"><span class="role-ic">🏭</span><span><b>مورّد</b><small>اعرض منتجاتك وطوّر عملك</small></span></button>
       </div>
       <p class="muted" id="roleHint"></p>
       <form id="registerForm" class="stack">

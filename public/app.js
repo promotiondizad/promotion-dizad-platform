@@ -180,6 +180,15 @@ async function openPage(key) {
 let FAVS = new Set(JSON.parse(localStorage.getItem('pd_favs') || '[]'));
 let FAV_ONLY = false;
 function saveFavs() { localStorage.setItem('pd_favs', JSON.stringify([...FAVS])); }
+function starsHtml(avg, count) {
+  if (!count) return '';
+  const full = Math.max(0, Math.min(5, Math.round(avg || 0)));
+  return `<span class="stars">${'★'.repeat(full)}<span class="off">${'★'.repeat(5 - full)}</span></span> <span class="small">${(avg || 0).toFixed(1)} (${count})</span>`;
+}
+function starsOnly(n) {
+  const full = Math.max(0, Math.min(5, Math.round(n || 0)));
+  return `<span class="stars">${'★'.repeat(full)}<span class="off">${'★'.repeat(5 - full)}</span></span>`;
+}
 function priceHtml(p) {
   if (p.compare_price && p.compare_price > p.customer_price) {
     const off = Math.round((1 - p.customer_price / p.compare_price) * 100);
@@ -195,6 +204,7 @@ function productCard(p) {
         <h3>${esc(p.name)}</h3>
         <span class="muted small">${esc(p.category_name || '')}</span>
         ${priceHtml(p)}
+        ${starsHtml(p.rating_avg, p.rating_count)}
         ${p.stock > 0 ? '<span class="badge">متوفر</span>' + (p.stock <= 3 ? ' <span class="badge out">بقي ' + p.stock + ' فقط</span>' : '') : '<span class="badge out">نفد المخزون</span>'}
         ${p.sold >= 3 ? `<span class="badge">🔥 الأكثر مبيعاً · بيعت ${p.sold} مرة</span>` : (p.sold > 0 ? `<span class="badge">بيعت ${p.sold} مرة</span>` : '')}
         <button class="btn" data-view="${p.id}">عرض التفاصيل</button>
@@ -267,6 +277,7 @@ async function openProduct(id) {
       ${p.images.length ? `<button class="btn light small" id="pmDlImgs" type="button">⬇️ تحميل الصور</button>` : ''}
       <button class="btn light small" id="pmFav" type="button">${FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'}</button>
     </div>
+    <div id="pmReviews"></div>
     <div id="pmSimilar"></div>
     <div class="share-row">
       <a class="btn light small" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(p.name + ' — ' + fmt(p.customer_price) + ' ' + pageUrl)}">مشاركة واتساب</a>
@@ -287,6 +298,24 @@ async function openProduct(id) {
   $$('#pmSizes [data-size]').forEach((b) => b.addEventListener('click', () => { selSize = b.dataset.size; $$('#pmSizes [data-size]').forEach((x) => x.classList.toggle('sel', x === b)); }));
   $$('#pmColors [data-color]').forEach((b) => b.addEventListener('click', () => { selColor = b.dataset.color; $$('#pmColors [data-color]').forEach((x) => x.classList.toggle('sel', x === b)); }));
   $('#pmStore').addEventListener('click', (e) => { e.preventDefault(); $('#productModal').hidden = true; openStore(p.supplier_id); });
+  const rvBox = $('#pmReviews');
+  if (rvBox) {
+    const revs = p.reviews || [];
+    rvBox.innerHTML = '<h4>⭐ تقييمات المشترين ' + (p.rating_count ? '(' + p.rating_count + ')' : '') + '</h4>' +
+      (p.rating_count ? '<p>' + starsHtml(p.rating_avg, p.rating_count) + '</p>' : '<p class="muted">لا تقييمات بعد — كن أول من يقيّم بعد الشراء والاستلام.</p>') +
+      revs.map((r) => '<div class="rev"><b>' + esc(r.user_name) + '</b> ' + starsOnly(r.stars) + '<br><span class="muted small">' + new Date(r.created_at).toLocaleDateString('ar-DZ') + '</span>' + (r.comment ? '<p>' + esc(r.comment) + '</p>' : '') + '</div>').join('') +
+      (ME ? '<form id="rateForm" class="rate-form stack"><div class="star-pick" id="starPick">' + [1, 2, 3, 4, 5].map((n) => '<button type="button" data-star="' + n + '">★</button>').join('') + '</div><textarea id="rateComment" rows="2" placeholder="رأيك في المنتج (اختياري)"></textarea><button class="btn small" type="submit">نشر التقييم</button><p class="muted small">التقييم متاح لمن استلم طلباً فيه هذا المنتج.</p></form>' : '<p class="muted small">سجّل الدخول واشترِ المنتج لتقييمه بعد الاستلام.</p>');
+    if (ME) {
+      let myStars = 0;
+      $$('#starPick button').forEach((b) => b.addEventListener('click', () => { myStars = Number(b.dataset.star); $$('#starPick button').forEach((x) => x.classList.toggle('on', Number(x.dataset.star) <= myStars)); }));
+      $('#rateForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!myStars) return toast('اختر عدد النجوم أولاً', true);
+        try { await api('/api/products/' + p.id + '/reviews', { method: 'POST', body: { stars: myStars, comment: $('#rateComment').value } }); toast('شكراً! نُشر تقييمك ✓'); openProduct(p.id); }
+        catch (err) { toast(err.message, true); }
+      });
+    }
+  }
   $('#pmAdd').addEventListener('click', () => {
     addToCart(p.id, Number($('#pmQty').value) || 1, selSize, selColor);
     $('#productModal').hidden = true;
@@ -655,7 +684,7 @@ async function renderMarketer(box) {
       <td><button class="btn small light" data-copydesc="${p.id}">📋 نسخ الوصف</button> <button class="btn small light" data-dlimgs="${p.id}">⬇️ الصور</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
     <p class="muted small">قاعدة الإحالة: آخر رابط صالح نقره المشتري خلال 30 يوماً هو المعتمد.</p></div>
   <div class="card"><h3>روابطي ونقراتها</h3>${links.length ? links.map((l) => `<p><code>${location.origin}/r/${l.code}</code> — ${l.product_id ? 'منتج #' + l.product_id : 'رابط عام'} — نقرات: ${l.clicks} ${l.product_id ? `<button class="btn small light" data-copymsg="${l.id}">📋 نسخ رسالة مشاركة جاهزة</button>` : ''}</p>`).join('') : '<p class="muted">لا روابط بعد.</p>'}</div>
-  <div class="card" id="sec-orders"><h3>طلباتي وحالات أرباحها</h3>${orders.length ? `<div class="tablewrap"><table><tr><th>الرقم</th><th>حالة الطلب</th><th>الإجمالي</th><th>عمولتي</th><th>حالة العمولة</th><th></th></tr>${orders.map((o) => { const c = commByRef[o.ref]; return `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td>${c ? fmt(c.amount) : '—'}</td><td>${c ? COMM_STATE_AR(c, o.status) : '—'}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`; }).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
+  <div class="card" id="sec-orders"><h3>طلباتي وحالات أرباحها</h3>${orders.length ? `<div class="chip-row" id="mkOrderChips"><button class="chip on" data-ofilter="all" type="button">الكل</button><button class="chip" data-ofilter="progress" type="button">قيد التوصيل</button><button class="chip" data-ofilter="delivered" type="button">تم التسليم</button><button class="chip" data-ofilter="bad" type="button">ملغاة / مرتجعة</button></div><div class="tablewrap"><table><tr><th>الرقم</th><th>حالة الطلب</th><th>الإجمالي</th><th>عمولتي</th><th>حالة العمولة</th><th></th></tr>${orders.map((o) => { const c = commByRef[o.ref]; return `<tr data-ostatus="${o.status}"><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td>${c ? fmt(c.amount) : '—'}</td><td>${c ? COMM_STATE_AR(c, o.status) : '—'}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`; }).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
   <div class="card" id="sec-invite"><h3>🎁 ادعو أصدقائك</h3>
     <p>ادعُ أصدقاءك للانضمام كمسوقين: عندما تبلغ الأرباح المؤكدة لأي صديق دعوتَه <strong>5000 دج</strong>، تربح أنت مكافأة <strong>500 دج</strong> تُضاف إلى رصيدك.</p>
     <p>رابط دعوتك: <code>${invLink}</code> <button class="btn small" id="copyInv" type="button">نسخ الرابط</button>
@@ -664,6 +693,15 @@ async function renderMarketer(box) {
     <p>أصدقاء انضموا بدعوتك: <strong>${invite.invitedCount}</strong> · مكافآت ربحتها: <strong>${fmt(invite.bonusesEarned)}</strong></p>
     ${invite.invited.length ? invite.invited.map((u) => `<p class="small">${esc(u.name)} — أرباحه المؤكدة: ${fmt(u.earned)}${u.bonusPaid ? ' — 🎉 جلب لك ' + fmt(u.bonusPaid) : ' — بقي له ' + fmt(u.remaining) + ' ليجلب لك 500 دج'}</p>`).join('') : '<p class="muted small">لا مدعوين بعد — شارك رابطك وابدأ.</p>'}
   </div>`;
+  $$('#mkOrderChips .chip').forEach((ch) => ch.addEventListener('click', () => {
+    $$('#mkOrderChips .chip').forEach((x) => x.classList.toggle('on', x === ch));
+    const f = ch.dataset.ofilter;
+    $$('#sec-orders tr[data-ostatus]').forEach((tr) => {
+      const st = tr.dataset.ostatus;
+      const show = f === 'all' || (f === 'progress' && ['pending_supplier', 'confirmed', 'preparing', 'handed', 'out_for_delivery'].includes(st)) || (f === 'delivered' && st === 'delivered_collected') || (f === 'bad' && ['cancelled', 'rejected', 'returned', 'failed_delivery'].includes(st));
+      tr.style.display = show ? '' : 'none';
+    });
+  }));
   $$('#dashContent [data-link]').forEach((b) => b.addEventListener('click', async () => {
     try {
       const r = await api('/api/marketer/links', { method: 'POST', body: { productId: Number(b.dataset.link) } });
@@ -704,7 +742,8 @@ async function renderMarketer(box) {
   }));
   const rs = $('#reqSettle');
   if (rs) rs.addEventListener('click', async () => {
-    try { const r = await api('/api/marketer/settlements', { method: 'POST', body: {} }); toast('أُنشئ طلب الدفع #' + r.settlementId + ' بمبلغ ' + fmt(r.amount)); renderDash(); }
+    try { if (!ME.payment_method || !ME.payment_details) { toast('أضف طريقة الدفع ورقم حسابك في إعدادات حسابك أولاً، ثم اطلب السحب', true); return; }
+    const r = await api('/api/marketer/settlements', { method: 'POST', body: {} }); toast('أُنشئ طلب الدفع #' + r.settlementId + ' بمبلغ ' + fmt(r.amount) + ' — يُراجع خلال 24 ساعة'); renderDash(); }
     catch (e) { toast(e.message, true); }
   });
   const ci = $('#copyInv');
@@ -876,14 +915,22 @@ $('#themeBtn').addEventListener('click', () => {
   $('#themeBtn').textContent = dark ? '☀️' : '🌙';
 });
 // جرس الإشعارات داخل التطبيق
-$('#bellBtn').addEventListener('click', async () => {
+function bindBellChips() {
+    $$('#bellChips .chip').forEach((ch) => ch.addEventListener('click', () => {
+      $$('#bellChips .chip').forEach((x) => x.classList.toggle('on', x === ch));
+      const f = ch.dataset.bfilter;
+      $$('#bellPanel .bell-item').forEach((it) => { it.style.display = f === 'all' || it.dataset.btype === f ? '' : 'none'; });
+    }));
+  }
+  $('#bellBtn').addEventListener('click', async () => {
   const panel = $('#bellPanel');
   if (!panel.hidden) { panel.hidden = true; return; }
   panel.innerHTML = '<div class="bell-box"><p class="muted">جارٍ التحميل…</p></div>';
   panel.hidden = false;
   try {
     const { notifications } = await api('/api/my/notifications');
-    panel.innerHTML = `<div class="bell-box"><h4>🔔 إشعاراتي</h4>${notifications.length ? notifications.map((n) => `<div class="bell-item"><p>${esc(n.text)}</p><span class="muted small">${new Date(n.created_at).toLocaleString('ar-DZ')} · ${esc(n.channel)} · ${esc(n.status)}</span></div>`).join('') : '<p class="muted">لا إشعارات بعد.</p>'}</div>`;
+    panel.innerHTML = `<div class="bell-box"><h4>🔔 إشعاراتي</h4><div class="chip-row" id="bellChips"><button class="chip on" data-bfilter="all" type="button">الكل</button><button class="chip" data-bfilter="order" type="button">الطلبات</button><button class="chip" data-bfilter="money" type="button">العمولات</button><button class="chip" data-bfilter="other" type="button">أخرى</button></div>${notifications.length ? notifications.map((n) => `<div class="bell-item" data-btype="${String(n.type || '').startsWith('order') ? 'order' : /commission|settlement|invite/.test(String(n.type || '')) ? 'money' : 'other'}"><p>${esc(n.text)}</p><span class="muted small">${new Date(n.created_at).toLocaleString('ar-DZ')} · ${esc(n.channel)} · ${esc(n.status)}</span></div>`).join('') : '<p class="muted">لا إشعارات بعد.</p>'}</div>`;
+    bindBellChips();
   } catch (e) { panel.innerHTML = '<div class="bell-box"><p class="muted">تعذر التحميل.</p></div>'; }
 });
 document.addEventListener('click', (e) => { if (!e.target.closest('#bellBtn') && !e.target.closest('#bellPanel')) $('#bellPanel').hidden = true; });
@@ -974,6 +1021,18 @@ $('#setupForm').addEventListener('submit', async (e) => {
 // ---------- تشغيل ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 (async function init() {
+  // شاشة الترحيب: أول زيارة فقط
+  try {
+    if (!localStorage.getItem('pd_seen')) {
+      const sp = $('#splash');
+      if (sp) {
+        sp.hidden = false;
+        const closeSplash = (login) => { localStorage.setItem('pd_seen', '1'); sp.hidden = true; if (login) openAuth('login'); };
+        $('#spStart').addEventListener('click', () => closeSplash(false));
+        $('#spLogin').addEventListener('click', () => closeSplash(true));
+      }
+    }
+  } catch (e) { /* بيئة بلا تخزين محلي */ }
   const params = new URLSearchParams(location.search);
   if (params.get('ref')) {
     localStorage.setItem('pd_ref', JSON.stringify({ code: params.get('ref'), at: Date.now() }));

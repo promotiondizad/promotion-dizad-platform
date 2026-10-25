@@ -188,3 +188,30 @@ summary{cursor:pointer;font-weight:700}
 .stages-strip{display:flex;gap:8px;flex-wrap:wrap}
 .stage-pill{flex:1;min-width:150px;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:9px 11px;font-size:13px}
 .stage-pill b{background:var(--navy);color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none}
+
+/* بطاقات اختيار نوع الحساب */
+.role-tabs{flex-direction:column}
+.role-tabs .tab{display:flex;align-items:center;gap:12px;text-align:right;padding:13px 15px;border-radius:14px;width:100%}
+.role-tabs .tab .role-ic{font-size:26px}
+.role-tabs .tab b{display:block;font-size:15.5px}
+.role-tabs .tab small{display:block;color:var(--ink2);font-weight:400;margin-top:1px}
+.role-tabs .tab.active{border-color:var(--gold);background:var(--navy);color:#fff}
+.role-tabs .tab.active small{color:#bfe9d2}
+/* شاشة الترحيب الأولى */
+#splash{position:fixed;inset:0;z-index:200;background:linear-gradient(180deg,#0d5a41,#042a1f);color:#fff;display:flex;align-items:center;justify-content:center;padding:22px}
+#splash .sp-box{text-align:center;max-width:420px;width:100%}
+#splash .sp-logo{font-size:64px;font-weight:900;letter-spacing:1px}
+#splash .sp-logo span{color:var(--gold2)}
+#splash .sp-tag{font-size:19px;margin:8px 0 4px}
+#splash .sp-sub{color:#bfe9d2;margin-bottom:26px}
+#splash .btn{width:100%;margin-top:10px;padding:14px;font-size:16.5px}
+#splash .sp-login{color:#fff;text-decoration:underline;background:none;border:none;font-size:15px;margin-top:14px;cursor:pointer}
+/* نجوم التقييم */
+.stars{color:#f5a623;font-size:13.5px;letter-spacing:1px}
+.stars .off{color:var(--line)}
+.rate-form .star-pick button{background:none;border:none;font-size:26px;cursor:pointer;color:var(--line);padding:2px}
+.rate-form .star-pick button.on{color:#f5a623}
+/* تبويبات فلترة */
+.chip-row{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.chip{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 14px;font-size:13.5px;font-weight:700;cursor:pointer}
+.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
