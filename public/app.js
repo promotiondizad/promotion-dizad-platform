@@ -299,7 +299,7 @@ async function loadProducts() {
 async function openProduct(id) {
   const { product: p } = await api('/api/products/' + id);
   const box = $('#productModalBox');
-  const pageUrl = location.origin + '/?product=' + p.id + (currentRef() ? '&ref=' + currentRef() : '');
+  const pageUrl = location.origin + '/?product=' + p.id;
   box.innerHTML = `
     <div class="drawer-head"><h3>${esc(p.name)}</h3><button class="icon-btn dark" id="pmClose" type="button">✕</button></div>
     ${p.images.length ? `<img class="main-img" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}">
