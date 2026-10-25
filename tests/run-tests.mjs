@@ -106,12 +106,13 @@ try {
   const prodId = r.data.id;
   let pub = await anon.get('/api/products');
   ok(pub.data.products.length === 0, 'المنتج غير المعتمد لا يظهر للزبائن');
-  r = await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500, marketerCommission: 200 });
-  ok(r.status === 200, 'الإدارة تعتمد المنتج بهامش 500 وعمولة 200');
+  r = await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500 });
+  ok(r.status === 200, 'الإدارة تعتمد المنتج بهامش 500 (العمولة حرة كيما سوقلي)');
   pub = await anon.get('/api/products');
-  ok(pub.data.products.length === 1 && pub.data.products[0].customer_price === 3500, 'سعر الزبون = 3000 + 500 = 3500');
-  r = await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 100, marketerCommission: 300 });
-  ok(r.status === 400, 'رفض عمولة أكبر من الهامش');
+  ok(pub.data.products.length === 1 && pub.data.products[0].customer_price === 3500, 'السعر الأساسي = 3000 + 500 = 3500');
+  ok(pub.data.products[0].wholesale_price === undefined && pub.data.products[0].platform_margin === undefined, 'الواجهة العامة لا تكشف الجملة ولا الهامش');
+  r = await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: -5 });
+  ok(r.status === 400, 'رفض هامش سالب');
 
   console.log('— الإحالة والطلب والعمولة —');
   r = await marketer.post('/api/marketer/links', { productId: prodId });
@@ -132,12 +133,12 @@ try {
   let prodNow = await anon.get('/api/products/' + prodId);
   ok(prodNow.data.product.stock === 9, 'المخزون نقص بوحدة واحدة فقط رغم إعادة الإرسال');
   let comm = await marketer.get('/api/marketer/commissions');
-  ok(comm.data.sums.expected === 200 && comm.data.sums.payable === 0, 'العمولة 200 متوقعة فقط — غير مستحقة قبل التسليم');
+  ok(comm.data.sums.expected === 175 && comm.data.sums.payable === 0, 'عمولة الرابط = 5% من 3500 = 175 متوقعة فقط — غير مستحقة قبل التسليم');
 
   console.log('— snapshot الأسعار —');
   r = await supplier.put('/api/supplier/products/' + prodId, { name: 'منتج المثال', wholesalePrice: 9000, stock: 9, description: 'للاختبار' });
   ok(r.status === 200 && r.data.status === 'pending_review', 'تغيير سعر الجملة يعيد المنتج للمراجعة');
-  await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500, marketerCommission: 200 });
+  await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500 });
   const track = await anon.get(`/api/orders/track?ref=${orderRef}&phone=0600000011`);
   ok(track.status === 200 && track.data.order.total === 4000, 'الطلب القديم احتفظ بسعره الأصلي 4000 بعد تغيير الأسعار');
 
@@ -152,18 +153,20 @@ try {
   r = await supplier.post(`/api/supplier/orders/${oid}/status`, { status: 'delivered_collected' });
   ok(r.status === 200, 'التسليم والتحصيل');
   comm = await marketer.get('/api/marketer/commissions');
-  ok(comm.data.sums.payable === 200, 'العمولة أصبحت مستحقة 200 بعد التسليم والتحصيل فقط');
+  ok(comm.data.sums.payable === 175, 'العمولة أصبحت مستحقة 175 بعد التسليم والتحصيل فقط');
   const ov = await admin.get('/api/admin/overview');
-  ok(ov.data.platformEarned === 300, 'صافي المنصة المثبت = 500 − 200 = 300 (المثال الرسمي)');
+  ok(ov.data.platformEarned === 325, 'صافي المنصة المثبت = 500 − 175 = 325 (عمولة الرابط من الهامش)');
 
   console.log('— التسوية —');
   r = await marketer.post('/api/marketer/settlements', {});
-  ok(r.status === 201 && r.data.amount === 200, 'المسوق يطلب تسوية 200');
+  ok(r.status === 201 && r.data.amount === 175, 'المسوق يطلب تسوية 175');
   const sid = r.data.settlementId;
   r = await admin.post(`/api/admin/settlements/${sid}/action`, { action: 'paid', method: 'CCP', reference: 'REF-TEST-1' });
   ok(r.status === 200, 'الإدارة توثق دفع التسوية بمرجع');
   comm = await marketer.get('/api/marketer/commissions');
-  ok(comm.data.sums.paid === 200, 'العمولة مدفوعة وموثقة');
+  ok(comm.data.sums.paid === 175, 'العمولة مدفوعة وموثقة');
+  r = await marketer.post('/api/marketer/settlements', {});
+  ok(r.status === 400, 'طلب دفع ثانٍ في نفس الأسبوع مرفوض (مرة في الأسبوع كيما سوقلي)');
 
   console.log('— الإلغاء يعيد المخزون ويلغي العمولة —');
   r = await guest.post('/api/orders', { customer: { name: 'زبون ثانٍ', phone: '0600000012', wilaya: 16, commune: 'درارية', address: 'عنوان' }, items: [{ productId: prodId, qty: 2 }], refCode: code, idempotencyKey: 'test-key-2' });
@@ -286,7 +289,7 @@ try {
   const admOrders = await admin.get('/api/admin/orders');
   const guestOrder = admOrders.data.orders.find((o) => o.ref === orderRef);
   r = await marketer.get(`/api/orders/${guestOrder.id}/details`);
-  ok(r.status === 200 && r.data.order.commission_total === 200 && r.data.order.buyer_phone === undefined, 'المسوق المعني يرى عمولته دون هاتف المشتري');
+  ok(r.status === 200 && r.data.order.commission_total === 175 && r.data.order.buyer_phone === undefined, 'المسوق المعني يرى عمولته دون هاتف المشتري');
   r = await anon.get(`/api/orders/${myOrder.id}/details`);
   ok(r.status === 401, 'الزائر ممنوع من تفاصيل الطلبية');
   r = await buyer.get(`/api/orders/${myOrder.id}/details`);
@@ -326,6 +329,66 @@ try {
   await marketer.req('PATCH', '/api/me', { paymentMethod: 'CCP', paymentDetails: '3030303030' });
   const admSettlements = await admin.get('/api/admin/settlements');
   ok(admSettlements.data.settlements.length === 0 || admSettlements.data.settlements.every((s) => 'marketer_payment_method' in s), 'تسويات المدير تحمل معلومات دفع المسوق');
+
+  console.log('— نموذج سوقلي: عمولة حرة ومحفظة ودعوات وتوصيل مكتب وصفحة متجر —');
+  const baseNow = (await anon.get('/api/products/' + prodId)).data.product.customer_price;
+  // المسوق يبيع بسعره: أقل من الحد الأدنى (الأساسي + 5%) مرفوض
+  r = await marketer.post('/api/orders', { customer: { name: 'زبون مسوق', phone: '0600000041', wilaya: 16, commune: 'حسين داي', address: 'عنوان' }, items: [{ productId: prodId, qty: 1, sellPrice: baseNow + 100 }], idempotencyKey: 'test-key-mk-low' });
+  ok(r.status === 400, 'سعر بيع أقل من الحد الأدنى (5%) مرفوض');
+  r = await marketer.post('/api/orders', { customer: { name: 'زبون مسوق', phone: '0600000041', wilaya: 16, commune: 'حسين داي', address: 'عنوان' }, items: [{ productId: prodId, qty: 1, sellPrice: baseNow + 500 }], idempotencyKey: 'test-key-mk-1' });
+  ok(r.status === 201 && r.data.orders[0].total === baseNow + 500 + 500, 'المسوق يبيع بسعره الحر: الإجمالي = سعره + التوصيل');
+  let wallet = await marketer.get('/api/my/wallet');
+  ok(wallet.status === 200 && wallet.data.wallet.waiting >= 500, 'محفظة المسوق: عمولة حرة 500 في «قيد الانتظار»');
+  ok(wallet.data.wallet.paid === 175, 'محفظة المسوق: المدفوع 175 من طلب الرابط السابق');
+  // توصيل للمكتب بسعره الخاص
+  r = await supplier.put('/api/supplier/coverage', { coverage: [{ wilaya_code: 16, delivery_fee: 500, fee_office: 300, duration: '24-48 ساعة' }, { wilaya_code: 35, delivery_fee: 700 }] });
+  ok(r.status === 200, 'المورد يضبط سعر المكتب والمدة');
+  r = await anon.get('/api/delivery-coverage');
+  ok(r.data.coverage.some((c) => c.wilaya_code === 16 && c.min_office_fee === 300 && c.duration === '24-48 ساعة'), 'صفحة أسعار التوصيل تعرض سعر المكتب والمدة');
+  r = await guest.post('/api/orders', { customer: { name: 'زبون مكتب', phone: '0600000042', wilaya: 16, commune: 'الدار البيضاء', address: 'مكتب', deliveryType: 'office' }, items: [{ productId: prodId, qty: 1 }], idempotencyKey: 'test-key-office' });
+  ok(r.status === 201 && r.data.orders[0].delivery_fee === 300 && r.data.orders[0].total === baseNow + 300, 'طلب توصيل للمكتب يُحسب بسعر المكتب');
+  // صفحة متجر المورد العامة
+  r = await anon.get(`/api/suppliers/${supId}/public`);
+  ok(r.status === 200 && r.data.supplier.id === supId && r.data.products.length >= 1, 'صفحة متجر المورد العامة تعرض منتجاته');
+  ok(r.data.products[0].wholesale_price === undefined, 'صفحة المتجر لا تكشف أسعار الجملة');
+  // سعر قبل التخفيض (شارة الخصم كيما النموذج)
+  r = await supplier.post('/api/supplier/products', { name: 'منتج بخصم', description: 'اختبار خصم', wholesalePrice: 2000, stock: 5, comparePrice: 4000 });
+  ok(r.status === 201, 'المورد يضيف منتجاً بسعر قبل التخفيض');
+  const discId = r.data.id;
+  await admin.post(`/api/admin/products/${discId}/review`, { action: 'approve', platformMargin: 500 });
+  const discPub = await anon.get('/api/products/' + discId);
+  ok(discPub.data.product.customer_price === 2500 && discPub.data.product.compare_price === 4000, 'السعر النهائي 2500 والسعر قبل التخفيض 4000 يظهران معاً');
+  // الدعوات: المدعو يربح 5000+ فتذهب 500 للداعي
+  const inv = await marketer.get('/api/my/invite');
+  ok(inv.status === 200 && !!inv.data.code, 'المسوق يحصل على رمز دعوة');
+  const invitee = new Client();
+  r = await invitee.post('/api/auth/register', { role: 'marketer', name: 'مسوق مدعو', phone: '0600000043', password: 'invitee123', passwordConfirm: 'invitee123', terms: true, inviteCode: inv.data.code });
+  ok(r.status === 201, 'التسجيل برمز دعوة');
+  await invitee.post('/api/auth/login', { phone: '0600000043', password: 'invitee123' });
+  r = await invitee.post('/api/orders', { customer: { name: 'زبون المدعو', phone: '0600000044', wilaya: 16, commune: 'برج الكيفان', address: 'عنوان' }, items: [{ productId: prodId, qty: 1, sellPrice: baseNow + 5500 }], idempotencyKey: 'test-key-inv-1' });
+  ok(r.status === 201, 'المدعو يبيع بربح 5500');
+  const invOrders = await supplier.get('/api/supplier/orders');
+  const invOrder = invOrders.data.orders.find((o) => o.ref === r.data.orders[0].ref);
+  for (const st of ['confirmed', 'preparing', 'handed', 'out_for_delivery', 'delivered_collected']) {
+    r = await supplier.post(`/api/supplier/orders/${invOrder.id}/status`, { status: st });
+    if (r.status !== 200) break;
+  }
+  ok(r.status === 200, 'طلب المدعو يصل للتسليم والتحصيل');
+  const invAfter = await marketer.get('/api/my/invite');
+  ok(invAfter.data.bonusesEarned === 500 && invAfter.data.invitedCount === 1, 'الداعي ربح مكافأة الدعوة 500 دج');
+  wallet = await marketer.get('/api/my/wallet');
+  ok(wallet.data.wallet.balance >= 500 && wallet.data.wallet.bonuses === 500, 'مكافأة الدعوة دخلت رصيد الداعي القابل للسحب');
+
+  console.log('— هوية SOUQAR وتطبيق الويب القابل للتثبيت (PWA) —');
+  const manRes = await fetch(BASE + '/manifest.json');
+  const manJson = await manRes.json().catch(() => ({}));
+  ok(manRes.status === 200 && String(manJson.name || '').includes('SOUQAR'), 'بيان التطبيق يخدم باسم SOUQAR');
+  const swRes = await fetch(BASE + '/sw.js');
+  ok(swRes.status === 200, 'عامل الخدمة (Service Worker) يخدم');
+  const icoRes = await fetch(BASE + '/icons/icon-512.png');
+  ok(icoRes.status === 200, 'أيقونة التطبيق 512 تخدم');
+  const homeHtml = await (await fetch(BASE + '/')).text();
+  ok(homeHtml.includes('SOUQAR') && homeHtml.includes('manifest.json') && homeHtml.includes('سوق واحد'), 'الصفحة الرئيسية بهوية SOUQAR الخضراء وتربط بيان التطبيق');
 
   console.log('— واجهة الإدارة المنفصلة —');
   const admPage = await fetch(BASE + '/admin.html');

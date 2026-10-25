@@ -1,5 +1,5 @@
 'use strict';
-// خادم منصة Promotion Dizad — Node.js مدمج فقط، بلا اعتماديات خارجية
+// خادم منصة SOUQAR — Node.js مدمج فقط، بلا اعتماديات خارجية
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -16,6 +16,7 @@ try {
 const { db, DATA_DIR, audit } = require('./db');
 const sec = require('./security');
 const integ = require('./integrations');
+const { iconPNG } = require('./icon');
 
 const PORT = Number(process.env.PORT || 4173);
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -129,14 +130,19 @@ const server = http.createServer(async (req, res) => {
       const phone = sec.cleanPhone(b.phone);
       if (db.prepare('SELECT id FROM users WHERE phone = ?').get(phone)) return send(res, 409, { error: 'يوجد حساب مسجل بهذا الرقم — سجّل الدخول' });
       const status = role === 'supplier' ? 'pending' : 'active';
-      const info = db.prepare(`INSERT INTO users(role,name,phone,email,email_verified,password_hash,wilaya,commune,address,business_name,activity,telegram_chat_id,status,created_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      let invitedBy = null;
+      if (b.inviteCode) {
+        const inv = db.prepare('SELECT id FROM users WHERE invite_code = ?').get(String(b.inviteCode).trim());
+        if (inv) invitedBy = inv.id;
+      }
+      const info = db.prepare(`INSERT INTO users(role,name,phone,email,email_verified,password_hash,wilaya,commune,address,business_name,activity,telegram_chat_id,status,invited_by,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(role, String(b.name).trim(), phone, email, 1, sec.hashPassword(b.password),
           b.wilaya ? Number(b.wilaya) : null, b.commune || null, b.address || null,
-          b.businessName || null, b.activity || null, b.telegramChatId || null, status, Date.now());
+          b.businessName || null, b.activity || null, b.telegramChatId || null, status, invitedBy, Date.now());
       const id = Number(info.lastInsertRowid);
       audit(id, 'register', 'user', id, role);
-      if (role === 'supplier') { await integ.notify({ channel: 'log', type: 'supplier_pending', text: `مورد جديد بانتظار المراجعة: ${b.name} (${phone})` }); await notifyAdmin(`🏭 مورد جديد بانتظار مراجعة الإدارة في منصة Promotion Dizad: ${b.name} (${phone})`); }
+      if (role === 'supplier') { await integ.notify({ channel: 'log', type: 'supplier_pending', text: `مورد جديد بانتظار المراجعة: ${b.name} (${phone})` }); await notifyAdmin(`🏭 مورد جديد بانتظار مراجعة الإدارة في منصة SOUQAR: ${b.name} (${phone})`); }
       return send(res, 201, { ok: true, status, message: role === 'supplier' ? 'تم إنشاء الحساب. حسابات الموردين تُراجَع من الإدارة قبل تفعيل النشر واستقبال الطلبات.' : 'تم إنشاء الحساب بنجاح — يمكنك تسجيل الدخول.' });
     }
     if (p === '/api/auth/login' && req.method === 'POST') {
@@ -172,10 +178,10 @@ const server = http.createServer(async (req, res) => {
         db.prepare('INSERT INTO password_resets(user_id,token,token_hash,expires_at,created_at) VALUES(?,?,?,?,?)')
           .run(user.id, token, sec.hashToken(token), Date.now() + 30 * 60e3, Date.now());
         await integ.notify({ userId: user.id, channel: 'log', type: 'password_reset', text: `رمز استعادة كلمة المرور (صالح 30 دقيقة): ${token}` });
-        if (user.telegram_chat_id) await integ.notify({ userId: user.id, channel: 'telegram', type: 'password_reset', text: `Promotion Dizad — رمز استعادة كلمة المرور (30 دقيقة): ${token}` });
+        if (user.telegram_chat_id) await integ.notify({ userId: user.id, channel: 'telegram', type: 'password_reset', text: `SOUQAR — رمز استعادة كلمة المرور (30 دقيقة): ${token}` });
         // رمز قصير من 6 أرقام عبر القناة المطلوبة: البريد الإلكتروني أو الهاتف (تيليغرام/واتساب حسب المضبوط)
         const code = sec.createAuthCode(user.id, 'reset_password');
-        const codeText = `رمز استعادة كلمة المرور في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله مع رقم هاتفك أو بريدك في نموذج الاستعادة.`;
+        const codeText = `رمز استعادة كلمة المرور في منصة SOUQAR هو: ${code}\nصالح لمدة 15 دقيقة. أدخله مع رقم هاتفك أو بريدك في نموذج الاستعادة.`;
         if (b.email && user.email) await integ.notify({ userId: user.id, channel: 'email', type: 'password_reset', target: user.email, text: codeText });
         else {
           if (user.telegram_chat_id) await integ.notify({ userId: user.id, channel: 'telegram', type: 'password_reset', text: codeText });
@@ -278,7 +284,8 @@ const server = http.createServer(async (req, res) => {
       const sort = url.searchParams.get('sort');
       sql += sort === 'price_asc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) ASC' : sort === 'price_desc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) DESC' : ' ORDER BY p.id DESC';
       const rows = db.prepare(sql).all(...args).map((r) => ({
-        ...r, customer_price: customerPrice(r),
+        id: r.id, supplier_id: r.supplier_id, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name,
+        supplier_name: r.supplier_name, business_name: r.business_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sold: r.sold, created_at: r.created_at,
         sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images),
         in_stock: r.stock > 0
       }));
@@ -286,10 +293,22 @@ const server = http.createServer(async (req, res) => {
     }
     const pm = p.match(/^\/api\/products\/(\d+)$/);
     if (pm && req.method === 'GET') {
-      const r = db.prepare(`SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ?`).get(Number(pm[1]));
+      const r = db.prepare(`SELECT p.*, c.name AS category_name, u.business_name, u.name AS supplier_name FROM products p LEFT JOIN categories c ON c.id = p.category_id JOIN users u ON u.id = p.supplier_id WHERE p.id = ?`).get(Number(pm[1]));
       if (!r || r.status !== 'approved') return send(res, 404, { error: 'المنتج غير موجود أو غير متاح' });
-      const coverage = db.prepare('SELECT wilaya_code, delivery_fee FROM supplier_coverage WHERE supplier_id = ? ORDER BY wilaya_code').all(r.supplier_id);
-      return send(res, 200, { product: { ...r, customer_price: customerPrice(r), sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), coverage } });
+      const coverage = db.prepare('SELECT wilaya_code, delivery_fee, fee_office, duration FROM supplier_coverage WHERE supplier_id = ? ORDER BY wilaya_code').all(r.supplier_id);
+      return send(res, 200, { product: { id: r.id, supplier_id: r.supplier_id, supplier_name: r.supplier_name, business_name: r.business_name, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), coverage } });
+    }
+    // صفحة متجر المورد العامة (كيما نموذج التصميم: متجر بمنتجاته ومعلوماته)
+    const storeM = p.match(/^\/api\/suppliers\/(\d+)\/public$/);
+    if (storeM && req.method === 'GET') {
+      const sup = getUser(Number(storeM[1]));
+      if (!sup || sup.role !== 'supplier' || sup.status !== 'active') return send(res, 404, { error: 'المتجر غير موجود' });
+      const rows = db.prepare(`SELECT p.*, c.name AS category_name,
+        (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status NOT IN ('cancelled','rejected','returned','failed_delivery')) AS sold
+        FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.supplier_id = ? AND p.status = 'approved' ORDER BY p.id DESC`).all(sup.id)
+        .map((r) => ({ id: r.id, supplier_id: r.supplier_id, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sold: r.sold, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), in_stock: r.stock > 0 }));
+      const wilayaRow = sup.wilaya ? db.prepare('SELECT name_ar FROM wilayas WHERE code = ?').get(sup.wilaya) : null;
+      return send(res, 200, { supplier: { id: sup.id, name: sup.name, business_name: sup.business_name, activity: sup.activity, wilaya_name: wilayaRow ? wilayaRow.name_ar : null, member_since: sup.created_at, products_count: rows.length }, products: rows });
     }
     // رابط إحالة: عدّ النقرة + كوكي 30 يوماً + تحويل للمتجر
     const rm = p.match(/^\/r\/([A-Za-z0-9]+)$/);
@@ -340,6 +359,9 @@ const server = http.createServer(async (req, res) => {
           if (mk && mk.status === 'active' && mk.phone !== phone) { marketerId = mk.id; refCode = link.code; }
         }
       }
+      // نموذج سوقلي: المسوق المسجّل دخوله هو البائع — يحدد سعر البيع بنفسه وعمولته هي الفرق
+      const isMarketerPlacer = !!(s && s.role === 'marketer');
+      if (isMarketerPlacer) { marketerId = s.userId; refCode = refCode || 'direct-marketer'; }
 
       const created = [];
       db.exec('BEGIN IMMEDIATE');
@@ -351,36 +373,60 @@ const server = http.createServer(async (req, res) => {
           const qty = Math.max(1, Math.min(99, Number(it.qty) || 1));
           if (prod.stock < qty) throw Object.assign(new Error(`المخزون غير كافٍ لمنتج: ${prod.name}`), { http: 400 });
           if (!bySupplier.has(prod.supplier_id)) bySupplier.set(prod.supplier_id, []);
-          bySupplier.get(prod.supplier_id).push({ prod, qty, size: it.size || null, color: it.color || null });
+          bySupplier.get(prod.supplier_id).push({ prod, qty, size: it.size || null, color: it.color || null, sellPrice: it.sellPrice });
         }
         const groupRef = b.idempotencyKey ? String(b.idempotencyKey) : sec.newToken(6);
         for (const [supplierId, items] of bySupplier) {
           const cov = db.prepare('SELECT * FROM supplier_coverage WHERE supplier_id = ? AND wilaya_code = ?').get(supplierId, wilaya);
           if (!cov) throw Object.assign(new Error('أحد الموردين لا يغطي ولاية التوصيل المختارة — الطلب مرفوض لهذه الولاية'), { http: 400 });
+          // حساب أسعار البيع والعمولات الحرة (نموذج سوقلي) لكل صنف
+          for (const it2 of items) {
+            const base = customerPrice(it2.prod);
+            it2.base = base;
+            if (isMarketerPlacer) {
+              const minSell = Math.ceil(base * 1.05);
+              const sell = it2.sellPrice != null && it2.sellPrice !== '' ? Math.round(Number(it2.sellPrice)) : minSell;
+              if (!Number.isFinite(sell) || sell < minSell) throw Object.assign(new Error(`سعر البيع لمنتج «${it2.prod.name}» أقل من الحد الأدنى ${minSell} دج (السعر الأساسي + 5%)`), { http: 400 });
+              it2.sell = sell;
+              it2.commission = sell - base;
+              it2.platformItem = it2.prod.platform_margin;
+            } else if (marketerId) {
+              // طلب عبر رابط إحالة: الزبون يدفع السعر الأساسي والمسوق يأخذ الحد الأدنى 5% من هامش المنصة
+              it2.sell = base;
+              it2.commission = Math.min(Math.round(base * 0.05), it2.prod.platform_margin);
+              it2.platformItem = it2.prod.platform_margin - it2.commission;
+            } else {
+              it2.sell = base;
+              it2.commission = 0;
+              it2.platformItem = it2.prod.platform_margin;
+            }
+          }
           let subtotal = 0;
-          for (const { prod, qty } of items) subtotal += customerPrice(prod) * qty;
-          const total = subtotal + cov.delivery_fee;
+          for (const it2 of items) subtotal += it2.sell * it2.qty;
+          // توصيل للمكتب بسعره إن اختاره الزبون وحدده المورد (كيما سوقلي: منزل/مكتب)
+          const deliveryFee = cust.deliveryType === 'office' && cov.fee_office != null ? cov.fee_office : cov.delivery_fee;
+          const total = subtotal + deliveryFee;
           const info = db.prepare(`INSERT INTO orders(ref,group_ref,buyer_id,guest_name,guest_phone,wilaya,commune,address,supplier_id,marketer_id,ref_code,subtotal,delivery_fee,total,status,idempotency_key,created_at,updated_at)
             VALUES('TEMP',?,?,?,?,?,?,?,?,?,?,?,?,?,'pending_supplier',?,?,?)`)
             .run(groupRef, s && s.role === 'buyer' ? s.userId : null, name, phone, wilaya, String(cust.commune).trim(), String(cust.address).trim(),
-              supplierId, marketerId, refCode, subtotal, cov.delivery_fee, total, groupRef, Date.now(), Date.now());
+              supplierId, marketerId, refCode, subtotal, deliveryFee, total, groupRef, Date.now(), Date.now());
           const oid = Number(info.lastInsertRowid);
           const ref = `PD-${new Date().getFullYear()}-${String(oid).padStart(6, '0')}`;
           db.prepare('UPDATE orders SET ref = ? WHERE id = ?').run(ref, oid);
           let commissionTotal = 0, platformTotal = 0;
-          for (const { prod, qty, size, color } of items) {
+          for (const it2 of items) {
             db.prepare(`INSERT INTO order_items(order_id,product_id,qty,size,color,wholesale_price,platform_margin,marketer_commission,customer_price)
-              VALUES(?,?,?,?,?,?,?,?,?)`).run(oid, prod.id, qty, size, color, prod.wholesale_price, prod.platform_margin, prod.marketer_commission, customerPrice(prod));
-            db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(qty, prod.id);
-            commissionTotal += prod.marketer_commission * qty;
-            platformTotal += (prod.platform_margin - prod.marketer_commission) * qty;
+              VALUES(?,?,?,?,?,?,?,?,?)`).run(oid, it2.prod.id, it2.qty, it2.size, it2.color, it2.prod.wholesale_price, it2.prod.platform_margin, it2.commission, it2.sell);
+            db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(it2.qty, it2.prod.id);
+            commissionTotal += it2.commission * it2.qty;
+            platformTotal += it2.platformItem * it2.qty;
           }
           if (marketerId) {
             db.prepare(`INSERT INTO commissions(order_id,marketer_id,amount,platform_amount,state,created_at,updated_at)
               VALUES(?,?,?,?,'expected',?,?)`).run(oid, marketerId, commissionTotal, platformTotal, Date.now(), Date.now());
           }
           db.prepare('INSERT INTO order_history(order_id,status,actor_id,note,created_at) VALUES(?,?,?,?,?)')
-            .run(oid, 'pending_supplier', s ? s.userId : null, marketerId ? 'طلب عبر رابط إحالة ' + refCode : 'طلب مباشر', Date.now());
+            .run(oid, 'pending_supplier', s ? s.userId : null, isMarketerPlacer ? 'طلب أنشأه المسوق مباشرة للزبون' : (marketerId ? 'طلب عبر رابط إحالة ' + refCode : 'طلب مباشر'), Date.now());
           created.push(db.prepare('SELECT * FROM orders WHERE id = ?').get(oid));
         }
         db.exec('COMMIT');
@@ -389,8 +435,8 @@ const server = http.createServer(async (req, res) => {
         return send(res, e.http || 500, { error: e.message || 'خطأ في إنشاء الطلب' });
       }
       for (const o of created) {
-        await notifyOrderParties(o, `طلب جديد ${o.ref} بمبلغ ${o.total} دج بانتظار تأكيدك في لوحة المورد — Promotion Dizad`);
-        await notifyAdmin(`🛒 طلب جديد في منصة Promotion Dizad: ${o.ref} — ${o.total} دج — ولاية ${o.wilaya}`);
+        await notifyOrderParties(o, `طلب جديد ${o.ref} بمبلغ ${o.total} دج بانتظار تأكيدك في لوحة المورد — SOUQAR`);
+        await notifyAdmin(`🛒 طلب جديد في منصة SOUQAR: ${o.ref} — ${o.total} دج — ولاية ${o.wilaya}`);
         audit(s ? s.userId : null, 'order_create', 'order', o.id, o.ref);
       }
       return send(res, 201, { ok: true, orders: created.map((o) => ({ ref: o.ref, total: o.total, delivery_fee: o.delivery_fee, subtotal: o.subtotal, status: o.status, status_label: ORDER_STATUSES[o.status] })) });
@@ -486,7 +532,7 @@ const server = http.createServer(async (req, res) => {
           } : {}),
           supplier: supplier ? { id: supplier.id, name: supplier.name, business_name: supplier.business_name } : null,
           ...(s.role === 'admin' || s.role === 'marketer' ? { marketer: marketer ? { id: marketer.id, name: marketer.name, ref_code: o.ref_code } : null } : {}),
-          ...(s.role === 'admin' ? { wholesale_total: wholesaleTotal, margin_total: marginTotal, commission_total: commissionTotal, platform_net: marginTotal - commissionTotal } : {}),
+          ...(s.role === 'admin' ? { wholesale_total: wholesaleTotal, margin_total: marginTotal, commission_total: commissionTotal, platform_net: (db.prepare('SELECT platform_amount FROM commissions WHERE order_id = ?').get(o.id) || { platform_amount: marginTotal }).platform_amount } : {}),
           ...(s.role === 'supplier' ? { wholesale_total: wholesaleTotal } : {}),
           ...(s.role === 'marketer' ? { commission_total: commissionTotal } : {})
         },
@@ -503,7 +549,9 @@ const server = http.createServer(async (req, res) => {
     }
     // أسعار التوصيل العامة: أرخص رسم لكل ولاية عبر الموردين النشطين (لصفحة أسعار التوصيل)
     if (p === '/api/delivery-coverage' && req.method === 'GET') {
-      const rows = db.prepare(`SELECT sc.wilaya_code, MIN(sc.delivery_fee) AS min_fee, COUNT(DISTINCT sc.supplier_id) AS suppliers, w.name_ar
+      // كيما سوقلي: سعر منزل وسعر مكتب ومدة التوصيل لكل ولاية (أرخص الأسعار بين الموردين النشطين)
+      const rows = db.prepare(`SELECT sc.wilaya_code, MIN(sc.delivery_fee) AS min_fee, MIN(COALESCE(sc.fee_office, sc.delivery_fee)) AS min_office_fee, COUNT(DISTINCT sc.supplier_id) AS suppliers, w.name_ar,
+          (SELECT sc2.duration FROM supplier_coverage sc2 JOIN users u2 ON u2.id = sc2.supplier_id AND u2.status = 'active' WHERE sc2.wilaya_code = sc.wilaya_code AND sc2.duration IS NOT NULL ORDER BY sc2.delivery_fee ASC LIMIT 1) AS duration
         FROM supplier_coverage sc JOIN users u ON u.id = sc.supplier_id AND u.status = 'active' JOIN wilayas w ON w.code = sc.wilaya_code
         GROUP BY sc.wilaya_code ORDER BY sc.wilaya_code`).all();
       return send(res, 200, { coverage: rows });
@@ -537,10 +585,11 @@ const server = http.createServer(async (req, res) => {
       db.exec('BEGIN IMMEDIATE');
       try {
         db.prepare('DELETE FROM supplier_coverage WHERE supplier_id = ?').run(s.userId);
-        const ins = db.prepare('INSERT INTO supplier_coverage(supplier_id,wilaya_code,delivery_fee) VALUES(?,?,?)');
+        const ins = db.prepare('INSERT INTO supplier_coverage(supplier_id,wilaya_code,delivery_fee,fee_office,duration) VALUES(?,?,?,?,?)');
         for (const c of b.coverage) {
           const w = Number(c.wilaya_code), f = Number(c.delivery_fee);
-          if (w >= 1 && w <= 58 && Number.isFinite(f) && f >= 0) ins.run(s.userId, w, Math.round(f));
+          const fo = c.fee_office != null && c.fee_office !== '' ? Number(c.fee_office) : null;
+          if (w >= 1 && w <= 58 && Number.isFinite(f) && f >= 0) ins.run(s.userId, w, Math.round(f), fo != null && Number.isFinite(fo) && fo >= 0 ? Math.round(fo) : null, c.duration ? String(c.duration).slice(0, 40) : null);
         }
         db.exec('COMMIT');
       } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'خطأ في حفظ التغطية' }); }
@@ -570,12 +619,12 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const v = validateProduct(b);
       if (v.error) return send(res, 400, { error: v.error });
-      const info = db.prepare(`INSERT INTO products(supplier_id,category_id,name,description,wholesale_price,stock,sizes,colors,images,status,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,'pending_review',?,?)`)
-        .run(s.userId, v.category_id, v.name, v.description, v.wholesale_price, v.stock, JSON.stringify(v.sizes), JSON.stringify(v.colors), JSON.stringify(v.images), Date.now(), Date.now());
+      const info = db.prepare(`INSERT INTO products(supplier_id,category_id,name,description,wholesale_price,stock,sizes,colors,images,status,compare_price,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,'pending_review',?,?,?)`)
+        .run(s.userId, v.category_id, v.name, v.description, v.wholesale_price, v.stock, JSON.stringify(v.sizes), JSON.stringify(v.colors), JSON.stringify(v.images), v.compare_price, Date.now(), Date.now());
       audit(s.userId, 'product_create', 'product', info.lastInsertRowid, v.name);
       await integ.notify({ channel: 'log', type: 'product_pending', text: `منتج جديد بانتظار مراجعة الإدارة: ${v.name}` });
-      await notifyAdmin(`📦 منتج جديد بانتظار اعتماد الإدارة في منصة Promotion Dizad: ${v.name}`);
+      await notifyAdmin(`📦 منتج جديد بانتظار اعتماد الإدارة في منصة SOUQAR: ${v.name}`);
       return send(res, 201, { ok: true, id: Number(info.lastInsertRowid), message: 'أُرسل المنتج لمراجعة الإدارة — لن يظهر للزبائن قبل الاعتماد.' });
     }
     const supProdM = p.match(/^\/api\/supplier\/products\/(\d+)$/);
@@ -590,8 +639,8 @@ const server = http.createServer(async (req, res) => {
       if (status === 'approved' && (v.wholesale_price !== prod.wholesale_price || v.name !== prod.name)) status = 'pending_review';
       if (b.paused === true && status === 'approved') status = 'paused';
       if (b.paused === false && status === 'paused') status = 'approved';
-      db.prepare(`UPDATE products SET category_id=?,name=?,description=?,wholesale_price=?,stock=?,sizes=?,colors=?,images=?,status=?,updated_at=? WHERE id=?`)
-        .run(v.category_id, v.name, v.description, v.wholesale_price, v.stock, JSON.stringify(v.sizes), JSON.stringify(v.colors), JSON.stringify(v.images), status, Date.now(), prod.id);
+      db.prepare(`UPDATE products SET category_id=?,name=?,description=?,wholesale_price=?,stock=?,sizes=?,colors=?,images=?,status=?,compare_price=?,updated_at=? WHERE id=?`)
+        .run(v.category_id, v.name, v.description, v.wholesale_price, v.stock, JSON.stringify(v.sizes), JSON.stringify(v.colors), JSON.stringify(v.images), status, v.compare_price, Date.now(), prod.id);
       audit(s.userId, 'product_update', 'product', prod.id, status);
       return send(res, 200, { ok: true, status });
     }
@@ -625,9 +674,9 @@ const server = http.createServer(async (req, res) => {
     // ---------- المسوق ----------
     if (p === '/api/marketer/products' && req.method === 'GET') {
       const s = requireAuth(req, res, ['marketer']); if (!s) return;
-      const rows = db.prepare(`SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id
+      const rows = db.prepare(`SELECT p.id, p.name, p.description, p.wholesale_price, p.platform_margin, p.stock, p.category_id, p.sizes, p.colors, p.images, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id
         WHERE p.status = 'approved' ORDER BY p.id DESC`).all()
-        .map((r) => ({ ...r, customer_price: customerPrice(r), platform_net: r.platform_margin - r.marketer_commission, images: JSON.parse(r.images), in_stock: r.stock > 0 }));
+        .map((r) => ({ id: r.id, name: r.name, description: r.description, customer_price: customerPrice(r), stock: r.stock, category_id: r.category_id, category_name: r.category_name, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), in_stock: r.stock > 0 }));
       return send(res, 200, { products: rows });
     }
     if (p === '/api/marketer/links' && req.method === 'POST') {
@@ -654,6 +703,44 @@ const server = http.createServer(async (req, res) => {
         .map((o) => ({ ...o, status_label: ORDER_STATUSES[o.status] }));
       return send(res, 200, { orders: rows });
     }
+    if (p === '/api/my/wallet' && req.method === 'GET') {
+      const s = requireAuth(req, res, ['marketer']); if (!s) return;
+      const sum = (sql, ...a) => db.prepare(sql).get(...a).s;
+      const waiting = sum(`SELECT COALESCE(SUM(cm.amount),0) s FROM commissions cm JOIN orders o ON o.id = cm.order_id WHERE cm.marketer_id = ? AND cm.state = 'expected' AND o.status IN ('pending_supplier','confirmed','preparing')`, s.userId);
+      const inDelivery = sum(`SELECT COALESCE(SUM(cm.amount),0) s FROM commissions cm JOIN orders o ON o.id = cm.order_id WHERE cm.marketer_id = ? AND cm.state = 'expected' AND o.status IN ('handed','out_for_delivery')`, s.userId);
+      const approved = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'payable'", s.userId);
+      const paid = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'paid'", s.userId);
+      const payableFree = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL", s.userId);
+      const bonusesFree = sum('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL', s.userId);
+      const bonusesTotal = sum('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ?', s.userId);
+      const pendingPayout = sum("SELECT COALESCE(SUM(amount),0) s FROM settlements WHERE marketer_id = ? AND state IN ('requested','approved')", s.userId);
+      const lastSt = db.prepare('SELECT MAX(created_at) m FROM settlements WHERE marketer_id = ?').get(s.userId).m;
+      const weekMs = 7 * 24 * 3600e3;
+      const balance = payableFree + bonusesFree;
+      return send(res, 200, { wallet: {
+        waiting, inDelivery, approved, paid,
+        bonuses: bonusesTotal, balance, pendingPayout,
+        canRequest: balance > 0 && (!lastSt || Date.now() - lastSt >= weekMs),
+        nextRequestAt: lastSt ? lastSt + weekMs : null
+      } });
+    }
+    if (p === '/api/my/invite' && req.method === 'GET') {
+      const s = requireAuth(req, res); if (!s) return;
+      let me = getUser(s.userId);
+      if (!me.invite_code) {
+        const code = 'PD' + sec.newToken(4).toUpperCase();
+        db.prepare('UPDATE users SET invite_code = ? WHERE id = ?').run(code, me.id);
+        me = getUser(me.id);
+      }
+      const invited = db.prepare('SELECT id, name, created_at FROM users WHERE invited_by = ? ORDER BY id DESC').all(me.id)
+        .map((u) => {
+          const earned = db.prepare("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state IN ('payable','paid')").get(u.id).s;
+          const bonus = db.prepare('SELECT amount FROM invite_bonuses WHERE invitee_id = ?').get(u.id);
+          return { name: u.name, earned, remaining: Math.max(0, 5000 - earned), bonusPaid: bonus ? bonus.amount : 0, joinedAt: u.created_at };
+        });
+      const bonusesEarned = db.prepare('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ?').get(me.id).s;
+      return send(res, 200, { code: me.invite_code, invitedCount: invited.length, invited, bonusesEarned, rule: { bonus: 500, threshold: 5000 } });
+    }
     if (p === '/api/marketer/commissions' && req.method === 'GET') {
       const s = requireAuth(req, res, ['marketer']); if (!s) return;
       const rows = db.prepare(`SELECT cm.*, o.ref FROM commissions cm JOIN orders o ON o.id = cm.order_id WHERE cm.marketer_id = ? ORDER BY cm.id DESC`).all(s.userId);
@@ -665,18 +752,24 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/marketer/settlements' && req.method === 'POST') {
       const s = requireAuth(req, res, ['marketer']); if (!s) return;
+      // كيما سوقلي: طلب دفع واحد في الأسبوع
+      const lastSt = db.prepare('SELECT MAX(created_at) m FROM settlements WHERE marketer_id = ?').get(s.userId).m;
+      if (lastSt && Date.now() - lastSt < 7 * 24 * 3600e3) return send(res, 400, { error: 'يمكنك طلب الدفع مرة واحدة فقط في الأسبوع — طلبك السابق لم تمر عليه 7 أيام بعد' });
       const payable = db.prepare("SELECT * FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL").all(s.userId);
-      if (!payable.length) return send(res, 400, { error: 'لا توجد عمولات مستحقة قابلة للتسوية حالياً' });
-      const amount = payable.reduce((a, c) => a + c.amount, 0);
+      const bonuses = db.prepare('SELECT * FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL').all(s.userId);
+      if (!payable.length && !bonuses.length) return send(res, 400, { error: 'رصيدك القابل للسحب فارغ حالياً — طلب الدفع يتفعل عندما تتوفر عمولات مؤكدة' });
+      const amount = payable.reduce((a, c) => a + c.amount, 0) + bonuses.reduce((a, c) => a + c.amount, 0);
       db.exec('BEGIN IMMEDIATE');
       try {
         const info = db.prepare(`INSERT INTO settlements(marketer_id,amount,state,created_at,updated_at) VALUES(?,?,'requested',?,?)`).run(s.userId, amount, Date.now(), Date.now());
         const sid = Number(info.lastInsertRowid);
         const upd = db.prepare('UPDATE commissions SET settlement_id = ? WHERE id = ?');
         for (const c of payable) upd.run(sid, c.id);
+        const updB = db.prepare('UPDATE invite_bonuses SET settlement_id = ? WHERE id = ?');
+        for (const bn of bonuses) updB.run(sid, bn.id);
         db.exec('COMMIT');
         await integ.notify({ channel: 'log', type: 'settlement_request', text: `طلب تسوية جديد #${sid} بمبلغ ${amount} دج من مسوق #${s.userId}` });
-        await notifyAdmin(`💰 طلب تسوية عمولات جديد #${sid} بمبلغ ${amount} دج في منصة Promotion Dizad`);
+        await notifyAdmin(`💰 طلب تسوية عمولات جديد #${sid} بمبلغ ${amount} دج في منصة SOUQAR`);
         return send(res, 201, { ok: true, settlementId: sid, amount });
       } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'خطأ في إنشاء طلب التسوية' }); }
     }
@@ -718,7 +811,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/admin/products' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
       const rows = db.prepare(`SELECT p.*, u.name AS supplier_name FROM products p JOIN users u ON u.id = p.supplier_id ORDER BY p.id DESC`).all()
-        .map((r) => ({ ...r, customer_price: customerPrice(r), platform_net: r.platform_margin - r.marketer_commission, images: JSON.parse(r.images) }));
+        .map((r) => ({ ...r, customer_price: customerPrice(r), platform_net: r.platform_margin, images: JSON.parse(r.images) }));
       return send(res, 200, { products: rows });
     }
     const prodRevM = p.match(/^\/api\/admin\/products\/(\d+)\/review$/);
@@ -733,13 +826,12 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true, status: 'rejected' });
       }
       if (b.action === 'approve') {
+        // نموذج سوقلي: الإدارة تحدد هامش المنصة فقط — عمولة المسوق حرة يحددها بنفسه عند الطلب (الفرق فوق السعر الأساسي، 5% على الأقل)
         const margin = Math.round(Number(b.platformMargin));
-        const commission = Math.round(Number(b.marketerCommission));
         if (!Number.isFinite(margin) || margin < 0) return send(res, 400, { error: 'هامش المنصة غير صحيح' });
-        if (!Number.isFinite(commission) || commission < 0 || commission > margin) return send(res, 400, { error: 'عمولة المسوق يجب أن تكون بين 0 وهامش المنصة' });
-        db.prepare("UPDATE products SET status='approved', platform_margin=?, marketer_commission=?, reject_reason=NULL, updated_at=? WHERE id=?")
-          .run(margin, commission, Date.now(), prod.id);
-        audit(s.userId, 'product_approve', 'product', prod.id, `margin=${margin} commission=${commission}`);
+        db.prepare("UPDATE products SET status='approved', platform_margin=?, marketer_commission=0, reject_reason=NULL, updated_at=? WHERE id=?")
+          .run(margin, Date.now(), prod.id);
+        audit(s.userId, 'product_approve', 'product', prod.id, `margin=${margin} commission=free`);
         await integ.notify({ userId: prod.supplier_id, channel: 'log', type: 'product_approved', text: `تم اعتماد منتجك: ${prod.name} — سعر الزبون الآن ${prod.wholesale_price + margin} دج` });
         return send(res, 200, { ok: true, status: 'approved' });
       }
@@ -782,6 +874,7 @@ const server = http.createServer(async (req, res) => {
         } else if (b.action === 'rejected') {
           db.prepare("UPDATE settlements SET state='rejected', note=?, updated_at=? WHERE id=?").run(b.note || null, Date.now(), st.id);
           db.prepare('UPDATE commissions SET settlement_id=NULL WHERE settlement_id=?').run(st.id);
+          db.prepare('UPDATE invite_bonuses SET settlement_id=NULL WHERE settlement_id=?').run(st.id);
         } else throw Object.assign(new Error('إجراء غير معروف'), { http: 400 });
         db.exec('COMMIT');
       } catch (e) { db.exec('ROLLBACK'); return send(res, e.http || 500, { error: e.message }); }
@@ -819,6 +912,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { ok: true, file: fname, note: 'نسخة احتياطية كاملة من قاعدة البيانات في مجلد data/backups على الخادم' });
     }
 
+    // أيقونات التطبيق تُولّد برمجياً (بلا ملفات ثنائية في المستودع)
+    if ((p === '/icons/icon-192.png' || p === '/icons/icon-512.png') && req.method === 'GET') {
+      const buf = iconPNG(p.includes('512') ? 512 : 192);
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      return res.end(buf);
+    }
+
     // ---------- ملفات ثابتة ----------
     if (req.method === 'GET') {
       let file = p === '/' ? path.join(PUBLIC, 'index.html') : path.join(PUBLIC, p);
@@ -826,7 +926,7 @@ const server = http.createServer(async (req, res) => {
       if (!file.startsWith(PUBLIC) && !file.startsWith(UPLOADS)) return send(res, 403, { error: 'forbidden' });
       if (fs.existsSync(file) && fs.statSync(file).isFile()) {
         const ext = path.extname(file).toLowerCase();
-        const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+        const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8' };
         res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
         return res.end(fs.readFileSync(file));
       }
@@ -858,7 +958,21 @@ function validateProduct(b) {
     if (!c) return { error: 'التصنيف غير موجود' };
     category_id = c.id;
   }
-  return { name, wholesale_price: wholesale, stock, images, sizes, colors, category_id, description: String(b.description || '').slice(0, 5000) };
+  const compare = b.comparePrice != null && b.comparePrice !== '' ? Math.round(Number(b.comparePrice)) : null;
+  return { name, wholesale_price: wholesale, stock, images, sizes, colors, category_id, description: String(b.description || '').slice(0, 5000), compare_price: compare != null && Number.isFinite(compare) && compare > 0 ? compare : null };
+}
+
+// مكافأة «ادعو أصدقائك» كيما سوقلي: 500 دج للداعي عندما تبلغ أرباح المدعو المؤكدة 5000 دج
+function maybeInviteBonus(inviteeId) {
+  const invitee = getUser(inviteeId);
+  if (!invitee || !invitee.invited_by) return;
+  const earned = db.prepare("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state IN ('payable','paid')").get(inviteeId).s;
+  if (earned < 5000) return;
+  if (db.prepare('SELECT id FROM invite_bonuses WHERE invitee_id = ?').get(inviteeId)) return;
+  db.prepare('INSERT INTO invite_bonuses(inviter_id,invitee_id,amount,created_at) VALUES(?,?,500,?)')
+    .run(invitee.invited_by, inviteeId, Date.now());
+  integ.notify({ userId: invitee.invited_by, channel: 'log', type: 'invite_bonus', text: `🎉 مبروك! ربحت مكافأة دعوة 500 دج لأن صديقك المدعو ${invitee.name} بلغت أرباحه المؤكدة 5000 دج. أُضيفت المكافأة إلى رصيدك القابل للسحب.` }).catch(() => {});
+  notifyAdmin(`🎁 مكافأة دعوة 500 دج لمستخدم #${invitee.invited_by} — المدعو #${inviteeId} بلغ 5000 دج أرباحاً`).catch(() => {});
 }
 
 function changeOrderStatus(o, newStatus, actorId, note, reason, force = false) {
@@ -878,6 +992,7 @@ function changeOrderStatus(o, newStatus, actorId, note, reason, force = false) {
     }
     if (newStatus === 'delivered_collected') {
       db.prepare("UPDATE commissions SET state='payable', updated_at=? WHERE order_id=? AND state='expected'").run(Date.now(), o.id);
+      if (o.marketer_id) maybeInviteBonus(o.marketer_id);
     }
     if (negative) {
       const cm = db.prepare('SELECT * FROM commissions WHERE order_id = ?').get(o.id);
@@ -904,6 +1019,6 @@ function changeOrderStatus(o, newStatus, actorId, note, reason, force = false) {
 }
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`Promotion Dizad platform running on http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`SOUQAR platform running on http://localhost:${PORT}`));
 }
 module.exports = { server, ORDER_STATUSES };

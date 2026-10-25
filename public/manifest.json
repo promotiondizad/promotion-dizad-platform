@@ -1,0 +1,16 @@
+{
+  "name": "SOUQAR سوقار — سوق واحد، تجارة تجمع الجميع",
+  "short_name": "SOUQAR",
+  "description": "منصة تجارة إلكترونية جزائرية: موردون ومسوقون بالعمولة وزبائن — الدفع عند الاستلام وتوصيل لـ58 ولاية.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar",
+  "background_color": "#042a1f",
+  "theme_color": "#06392b",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

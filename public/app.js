@@ -79,8 +79,10 @@ const PAGES = {
     <li>كل مسوق له روابط إحالة فريدة. يُنسب الطلب للمسوق صاحب <strong>آخر رابط صالح نقره المشتري خلال 30 يوماً</strong> قبل الطلب (آخر نقرة تكسب).</li>
     <li>إذا استُخدمت روابط عدة مسوقين، تُعتمد قاعدة «آخر نقرة» وحدها — لا تُقسَّم العمولة.</li>
     <li>لا تُنسب عمولة لمسوق اشترى هو نفسه عبر رابطه.</li>
-    <li>العمولة «متوقعة» عند إنشاء الطلب، وتُثبَّت «مستحقة» فقط بعد حالة «تم التسليم والتحصيل». الطلبات الملغاة أو المرتجعة أو المتعذرة <strong>لا تولّد أرباحاً نهائية</strong> وتُلغى عمولاتها آلياً.</li>
-    <li>تُدفع العمولات عبر طلبات تسوية داخل المنصة، وتوثَّق طريقة الدفع ومرجعها عند الدفع الفعلي خارج المنصة (CCP/Flexy/نقداً حسب الاتفاق).</li>
+    <li>عمولة المسوق <strong>حسب اختياره</strong>: لكل منتج سعر أساسي معروض، والمسوق يحدد سعر بيعه للزبون عند إدخال الطلب — ربحه هو الفرق بين سعر بيعه والسعر الأساسي، بشرط ألا يقل الربح عن 5% من السعر الأساسي. في الطلبات الواردة عبر رابط إحالة (الزبون طلب بنفسه بالسعر الأساسي) يأخذ المسوق الحد الأدنى: 5% من السعر الأساسي.</li>
+    <li>العمولة «متوقعة» عند إنشاء الطلب، وتمر بحالات: قيد الانتظار ← في التوصيل ← موافق عليها (بعد «تم التسليم والتحصيل») ← مدفوعة. الطلبات الملغاة أو المرتجعة أو المتعذرة <strong>لا تولّد أرباحاً نهائية</strong> وتُلغى عمولاتها آلياً.</li>
+    <li>طلب الدفع (سحب الأرباح): مرة واحدة في الأسبوع من الرصيد الموافق عليه، يُعالج خلال 24–48 ساعة إلى طريقة الدفع المسجلة في حساب المسوق (بريدي موب، CCP، Flexy، ظرف بريدي، أو الاستلام من المقر)، ويُوثَّق بمرجع العملية.</li>
+    <li>برنامج «ادعو أصدقائك»: عندما تبلغ الأرباح الموافق عليها لمسوق انضم بدعوتك 5000 دج، تربح مكافأة 500 دج تُضاف إلى رصيدك القابل للسحب.</li>
   </ul>
   <h3>الموردون</h3>
   <ul>
@@ -100,8 +102,31 @@ const PAGES = {
     <li>لا نبيع بيانات المستخدمين ولا نشاركها مع أطراف ثالثة خارج تشغيل الطلب (المورد وشركة توصيله).</li>
     <li>لكل مستخدم رؤية طلباته وبياناته فقط — فصل الصلاحيات مطبق في الخادم.</li>
   </ul>`,
+  faq: `<h2>الأسئلة الشائعة</h2>
+  <h3>كيفاش نربح كمسوق؟</h3>
+  <p>اختر منتجاً من الكتالوج، انسخ وصفه وصوره وانشر إعلانك بسعرك أنت. عندما يطلب زبون، ادخل طلبه من السلة وحدّد سعر بيعك: ربحك = سعر بيعك − السعر الأساسي (5% على الأقل). أو شارك رابط إحالتك ودع الزبون يطلب بنفسه بالسعر الأساسي — ربحك عندها 5% من السعر الأساسي.</p>
+  <h3>متى تصبح عمولتي قابلة للسحب؟</h3>
+  <p>تمر عمولتك بـ: قيد الانتظار (الطلب جديد) ← في التوصيل ← موافق عليها (بعد تسليم الطلب وتحصيل ثمنه نقداً) ← مدفوعة (بعد معالجة طلب الدفع). الطلبات الملغاة أو المرتجعة تُلغى عمولاتها.</p>
+  <h3>كيفاش نسحب أرباحي؟</h3>
+  <p>من محفظتك في لوحتك: اضبط طريقة الدفع وتفاصيلها في «إعدادات حسابي» (بريدي موب، CCP، Flexy، ظرف بريدي، أو الاستلام من المقر)، ثم اطلب الدفع — مرة واحدة في الأسبوع — ويُعالج طلبك خلال 24–48 ساعة.</p>
+  <h3>واش هو برنامج ادعو أصدقائك؟</h3>
+  <p>شارك رابط دعوتك من لوحتك: كل صديق ينضم كمسوق بدعوتك ويبلغ بأرباح موافق عليها 5000 دج، تربح أنت 500 دج مكافأة في رصيدك.</p>
+  <h3>شكون يوصل الطلبات ويستلم الدراهم؟</h3>
+  <p>المورد يجهز الطلب ويوصله عبر شركة توصيله، والزبون يدفع نقداً عند الاستلام. المنصة تنظم العرض والطلبات والأرباح فقط.</p>
+  <h3>هل التوصيل للمنزل ولا للمكتب؟</h3>
+  <p>الزبون يختار عند الطلب: توصيل للمنزل أو لمكتب شركة التوصيل — الأسعار لكل ولاية في صفحة «أسعار التوصيل».</p>`,
+  training: `<h2>🎓 تدريب المسوقين — ابدأ في 6 خطوات</h2>
+  <ol>
+    <li><strong>اختر منتجاً رابحاً:</strong> ابدأ بمنتجات «الأكثر طلباً» في الصفحة الرئيسية — الطلب عليها مثبت.</li>
+    <li><strong>جهّز موادك:</strong> من صفحة المنتج: ⬇️ حمّل الصور و📋 انسخ الوصف الجاهز مع رابطك.</li>
+    <li><strong>انشر إعلانك:</strong> في مجموعات فيسبوك وتيك توك وحالتك — صورة واضحة + فائدة المنتج + «الدفع عند الاستلام».</li>
+    <li><strong>حدّد سعرك بذكاء:</strong> سعرك = السعر الأساسي + ربحك. ربح معقول (10–20%) يبيع أكثر من سعر مبالغ فيه.</li>
+    <li><strong>ادخل طلب الزبون فوراً:</strong> الاسم والهاتف والولاية والبلدية والعنوان من السلة — واتصل بالزبون للتأكيد قبل الإرسال لتقليل المرتجعات.</li>
+    <li><strong>تابع وطوّر:</strong> راقب حالات عمولاتك في محفظتك، وادعُ أصدقاءك برابط الدعوة لربح مكافآت إضافية.</li>
+  </ol>
+  <p class="muted">نصائح سريعة: رد على تعليقات الزبائن بسرعة، لا تعد بما لا يقدر عليه المنتج، وصوّر المنتج بنفسك إن وصلك — المحتوى الحقيقي يبيع أكثر.</p>`,
   contact: `<h2>الدعم والتواصل</h2>
-  <p>راسلنا عبر النموذج أو مباشرة: <a href="https://wa.me/213791402649" target="_blank" rel="noopener">واتساب</a> · <a href="https://www.facebook.com/promotion.dizad" target="_blank" rel="noopener">صفحة فيسبوك Promotion Dizad</a></p>
+  <p>راسلنا عبر النموذج أو مباشرة: <a href="https://wa.me/213791402649" target="_blank" rel="noopener">واتساب</a> · <a href="https://www.facebook.com/promotion.dizad" target="_blank" rel="noopener">صفحة فيسبوك SOUQAR</a></p>
   <form id="supportForm" class="stack">
     <input id="spName" placeholder="الاسم" required>
     <input id="spPhone" placeholder="رقم الهاتف" required>
@@ -109,6 +134,23 @@ const PAGES = {
     <button class="btn gold" type="submit">إرسال</button>
   </form>`
 };
+async function openStore(supplierId) {
+  show('page');
+  $('#pageContent').innerHTML = '<p class="muted">جارٍ تحميل المتجر…</p>';
+  try {
+    const { supplier: s, products } = await api('/api/suppliers/' + supplierId + '/public');
+    $('#pageContent').innerHTML = `
+      <div class="card" style="text-align:center">
+        <div style="font-size:44px">🏪</div>
+        <h2 style="margin:4px 0">${esc(s.business_name || s.name)}</h2>
+        <p class="muted">${esc(s.activity || '')}${s.wilaya_name ? ' · 📍 ' + esc(s.wilaya_name) : ''} · عضو منذ ${new Date(s.member_since).toLocaleDateString('ar-DZ')} · ${s.products_count} منتج</p>
+        <p><span class="badge">مورد موثّق من إدارة SOUQAR ✅</span></p>
+      </div>
+      <h3>منتجات المتجر</h3>
+      <div class="grid" id="storeGrid">${products.length ? products.map(productCard).join('') : '<p class="muted">لا منتجات معروضة حالياً في هذا المتجر.</p>'}</div>`;
+    wireCards('storeGrid');
+  } catch (e) { $('#pageContent').innerHTML = '<p class="muted">تعذر تحميل هذا المتجر.</p>'; }
+}
 async function openPage(key) {
   if (key === 'delivery') {
     show('page');
@@ -116,8 +158,8 @@ async function openPage(key) {
     try {
       const { coverage } = await api('/api/delivery-coverage');
       $('#pageContent').innerHTML = `<h2>أسعار التوصيل حسب الولاية</h2>
-      <p>الجدول يعرض <strong>أرخص رسم توصيل متاح</strong> لكل ولاية عبر موردينا النشطين. الرسم الدقيق لطلبك يظهر في صفحة كل منتج وفي سلة الطلب قبل التأكيد، لأنه يختلف حسب المورد.</p>
-      ${coverage.length ? `<div class="tablewrap"><table><tr><th>الولاية</th><th>أرخص توصيل</th><th>موردون يغطونها</th></tr>${coverage.map((c) => `<tr><td>${c.wilaya_code} — ${esc(c.name_ar)}</td><td>${fmt(c.min_fee)}</td><td>${c.suppliers}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد تغطية مضبوطة بعد — تُبنى القائمة تلقائياً من تغطية الموردين.</p>'}`;
+      <p>الجدول يعرض <strong>أرخص الأسعار المتاحة</strong> لكل ولاية عبر موردينا النشطين: سعر التوصيل <strong>إلى المنزل</strong> وسعر التوصيل <strong>إلى مكتب</strong> شركة التوصيل ومدة التوصيل التقديرية. الرسم الدقيق لطلبك يظهر قبل تأكيد الطلب حسب مورد المنتج.</p>
+      ${coverage.length ? `<div class="tablewrap"><table><tr><th>الولاية</th><th>🏠 منزل</th><th>🏢 مكتب</th><th>المدة</th><th>موردون</th></tr>${coverage.map((c) => `<tr><td>${c.wilaya_code} — ${esc(c.name_ar)}</td><td>${fmt(c.min_fee)}</td><td>${fmt(c.min_office_fee)}</td><td>${esc(c.duration || '—')}</td><td>${c.suppliers}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد تغطية مضبوطة بعد — تُبنى القائمة تلقائياً من تغطية الموردين.</p>'}`;
     } catch (e) { $('#pageContent').innerHTML = '<h2>أسعار التوصيل</h2><p class="muted">تعذر التحميل الآن.</p>'; }
     return;
   }
@@ -138,6 +180,13 @@ async function openPage(key) {
 let FAVS = new Set(JSON.parse(localStorage.getItem('pd_favs') || '[]'));
 let FAV_ONLY = false;
 function saveFavs() { localStorage.setItem('pd_favs', JSON.stringify([...FAVS])); }
+function priceHtml(p) {
+  if (p.compare_price && p.compare_price > p.customer_price) {
+    const off = Math.round((1 - p.customer_price / p.compare_price) * 100);
+    return `<span class="price">${fmt(p.customer_price)}</span> <s class="muted">${fmt(p.compare_price)}</s> <span class="badge out">خصم ${off}%</span>`;
+  }
+  return `<span class="price">${fmt(p.customer_price)}</span>`;
+}
 function productCard(p) {
   return `
     <article class="pcard">
@@ -145,9 +194,9 @@ function productCard(p) {
       <div class="pcard-body">
         <h3>${esc(p.name)}</h3>
         <span class="muted small">${esc(p.category_name || '')}</span>
-        <span class="price">${fmt(p.customer_price)}</span>
+        ${priceHtml(p)}
         ${p.stock > 0 ? '<span class="badge">متوفر</span>' + (p.stock <= 3 ? ' <span class="badge out">بقي ' + p.stock + ' فقط</span>' : '') : '<span class="badge out">نفد المخزون</span>'}
-        ${p.sold > 0 ? `<span class="badge">بيعت ${p.sold} مرة</span>` : ''}
+        ${p.sold >= 3 ? `<span class="badge">🔥 الأكثر مبيعاً · بيعت ${p.sold} مرة</span>` : (p.sold > 0 ? `<span class="badge">بيعت ${p.sold} مرة</span>` : '')}
         <button class="btn" data-view="${p.id}">عرض التفاصيل</button>
         <button class="btn gold" data-add="${p.id}" ${p.stock <= 0 ? 'disabled' : ''}>أضف إلى السلة</button>
         <button class="btn light" data-fav="${p.id}">${FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'}</button>
@@ -186,7 +235,14 @@ async function loadProducts() {
       return n ? `<button class="chip" data-chip="${c.id}" type="button">${esc(c.name)} (${n})</button>` : '';
     }).join('');
     $$('#catChips [data-chip]').forEach((b) => b.addEventListener('click', () => { $('#catFilter').value = b.dataset.chip; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
-  } else $('#catChips').innerHTML = '';
+    // بلاطات الأقسام كيما نموذج التطبيق
+    const CAT_ICONS = [['إلكترون', '💻'], ['هواتف', '📱'], ['أزياء', '👕'], ['ملابس', '👗'], ['جمال', '💄'], ['صحة', '💊'], ['منزل', '🏠'], ['مطبخ', '🍳'], ['رياضة', '🏋️'], ['لياقة', '🏋️'], ['أطفال', '🧸'], ['رضع', '🍼'], ['غذائ', '🛒'], ['أدوات', '🔧'], ['سيارات', '🚗'], ['حيوان', '🐾'], ['كتب', '📚'], ['ألعاب', '🎮'], ['ساعات', '⌚'], ['أحذية', '👟'], ['حقائب', '👜'], ['عطور', '🌸'], ['نظارات', '🕶️'], ['بيت', '🏠']];
+    const iconFor = (name) => { for (const [k, ic] of CAT_ICONS) if (name.includes(k)) return ic; return '🛍️'; };
+    const tiles = CATEGORIES.map((c) => ({ c, n: PRODUCTS.filter((p) => p.category_id === c.id).length })).filter((x) => x.n);
+    $('#secCats').hidden = !tiles.length;
+    $('#catTiles').innerHTML = tiles.map(({ c, n }) => `<div class="cat-tile" data-tile="${c.id}"><span class="ic">${iconFor(c.name)}</span><b>${esc(c.name)}</b><span>${n} منتج</span></div>`).join('');
+    $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
+  } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
 async function openProduct(id) {
   const { product: p } = await api('/api/products/' + id);
@@ -197,29 +253,67 @@ async function openProduct(id) {
     ${p.images.length ? `<img class="main-img" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}">
     <div class="gallery">${p.images.map((im, i) => `<img src="${esc(im)}" data-g="${i}" class="${i === 0 ? 'sel' : ''}" alt="">`).join('')}</div>` : '<div class="noimg" style="height:200px;display:flex;align-items:center;justify-content:center;font-size:60px;background:#eef2f5;border-radius:13px">📦</div>'}
     <p>${esc(p.description || '')}</p>
-    <p class="price">${fmt(p.customer_price)} ${p.stock > 0 ? '<span class="badge">متوفر — مخزون ' + p.stock + '</span>' : '<span class="badge out">نفد المخزون</span>'}</p>
-    ${p.sizes.length ? `<label>المقاس <select id="pmSize">${p.sizes.map((s) => `<option>${esc(s)}</option>`).join('')}</select></label>` : ''}
-    ${p.colors.length ? `<label>اللون <select id="pmColor">${p.colors.map((s) => `<option>${esc(s)}</option>`).join('')}</select></label>` : ''}
+    <p>${priceHtml(p)} ${p.stock > 0 ? '<span class="badge">متوفر — مخزون ' + p.stock + '</span>' : '<span class="badge out">نفد المخزون</span>'}</p>
+    <p class="muted small">🏪 المتجر: <a href="#" id="pmStore"><strong>${esc(p.business_name || p.supplier_name || 'متجر المورد')}</strong></a> — اضغط لعرض كل منتجات هذا المتجر</p>
+    ${p.sizes.length ? `<div>المقاس<div class="swatches" id="pmSizes">${p.sizes.map((s, i) => `<button type="button" data-size="${esc(s)}" class="${i === 0 ? 'sel' : ''}">${esc(s)}</button>`).join('')}</div></div>` : ''}
+    ${p.colors.length ? `<div>اللون<div class="swatches" id="pmColors">${p.colors.map((s, i) => `<button type="button" data-color="${esc(s)}" class="${i === 0 ? 'sel' : ''}">${esc(s)}</button>`).join('')}</div></div>` : ''}
     <label>الكمية <input type="number" id="pmQty" value="1" min="1" max="99"></label>
-    <details><summary>الولايات المتوفرة وتكلفة التوصيل لكل ولاية</summary>
-      <div class="kv">${p.coverage.length ? p.coverage.map((c) => `<span>${wilayaName(c.wilaya_code)}: ${fmt(c.delivery_fee)}</span>`).join('') : '<span class="muted">لم يضبط المورد تغطية التوصيل بعد</span>'}</div>
+    ${ME && ME.role === 'marketer' ? `<p class="badge" style="display:block;padding:10px">💼 للمسوق: هذا هو <strong>السعر الأساسي</strong> — عمولتك حسب اختيارك: حدّد سعر بيعك في السلة وربحك هو الفرق (5% على الأقل من السعر الأساسي).</p>` : ''}
+    <details><summary>الولايات المتوفرة وتكلفة التوصيل لكل ولاية (منزل / مكتب)</summary>
+      <div class="kv">${p.coverage.length ? p.coverage.map((c) => `<span>${wilayaName(c.wilaya_code)}: منزل ${fmt(c.delivery_fee)}${c.fee_office != null ? ' · مكتب ' + fmt(c.fee_office) : ''}${c.duration ? ' · ' + esc(c.duration) : ''}</span>`).join('') : '<span class="muted">لم يضبط المورد تغطية التوصيل بعد</span>'}</div>
     </details>
+    <div class="share-row">
+      <button class="btn light small" id="pmCopyDesc" type="button">📋 نسخ الوصف</button>
+      ${p.images.length ? `<button class="btn light small" id="pmDlImgs" type="button">⬇️ تحميل الصور</button>` : ''}
+      <button class="btn light small" id="pmFav" type="button">${FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'}</button>
+    </div>
+    <div id="pmSimilar"></div>
     <div class="share-row">
       <a class="btn light small" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(p.name + ' — ' + fmt(p.customer_price) + ' ' + pageUrl)}">مشاركة واتساب</a>
       <a class="btn light small" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(p.name)}">مشاركة تيليغرام</a>
       <a class="btn light small" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}">مشاركة فيسبوك</a>
       <a class="btn light small" target="_blank" rel="noopener" href="https://m.me/promotion.dizad">مراسلة الصفحة</a>
     </div>
-    <button class="btn gold big" id="pmAdd" ${p.stock <= 0 ? 'disabled' : ''}>أضف إلى السلة</button>`;
+    <div class="buy-row">
+      <button class="btn gold big" id="pmAdd" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
+      <button class="btn big" id="pmBuyNow" ${p.stock <= 0 ? 'disabled' : ''}>⚡ اشترِ الآن</button>
+    </div>`;
   $('#productModal').hidden = false;
   $('#pmClose').addEventListener('click', () => { $('#productModal').hidden = true; });
   $$('#productModalBox [data-g]').forEach((im) => im.addEventListener('click', () => {
     $('#pmMain').src = im.src; $$('#productModalBox [data-g]').forEach((x) => x.classList.remove('sel')); im.classList.add('sel');
   }));
+  let selSize = p.sizes[0] || null, selColor = p.colors[0] || null;
+  $$('#pmSizes [data-size]').forEach((b) => b.addEventListener('click', () => { selSize = b.dataset.size; $$('#pmSizes [data-size]').forEach((x) => x.classList.toggle('sel', x === b)); }));
+  $$('#pmColors [data-color]').forEach((b) => b.addEventListener('click', () => { selColor = b.dataset.color; $$('#pmColors [data-color]').forEach((x) => x.classList.toggle('sel', x === b)); }));
+  $('#pmStore').addEventListener('click', (e) => { e.preventDefault(); $('#productModal').hidden = true; openStore(p.supplier_id); });
   $('#pmAdd').addEventListener('click', () => {
-    addToCart(p.id, Number($('#pmQty').value) || 1, $('#pmSize')?.value, $('#pmColor')?.value);
+    addToCart(p.id, Number($('#pmQty').value) || 1, selSize, selColor);
     $('#productModal').hidden = true;
   });
+  $('#pmBuyNow').addEventListener('click', async () => {
+    addToCart(p.id, Number($('#pmQty').value) || 1, selSize, selColor);
+    $('#productModal').hidden = true;
+    $('#cartDrawer').hidden = false; await renderCart();
+  });
+  $('#pmCopyDesc').addEventListener('click', async () => {
+    await navigator.clipboard.writeText(`${p.name}\n${p.description || ''}\n💰 السعر: ${fmt(p.customer_price)} — الدفع عند الاستلام\n${pageUrl}`).catch(() => {});
+    toast('نُسخ وصف المنتج — الصقه في إعلانك');
+  });
+  const dlb = $('#pmDlImgs');
+  if (dlb) dlb.addEventListener('click', () => {
+    p.images.forEach((im, i) => setTimeout(() => { const a = document.createElement('a'); a.href = im; a.target = '_blank'; a.rel = 'noopener'; a.click(); }, i * 350));
+    toast('تُفتح صور المنتج — احفظها لاستعمالها في إعلاناتك');
+  });
+  $('#pmFav').addEventListener('click', () => {
+    if (FAVS.has(p.id)) FAVS.delete(p.id); else FAVS.add(p.id);
+    saveFavs(); $('#pmFav').textContent = FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'; loadProducts().catch(() => {});
+  });
+  const similar = PRODUCTS.filter((x) => x.id !== p.id && x.category_id && x.category_id === p.category_id).slice(0, 4);
+  if (similar.length) {
+    $('#pmSimilar').innerHTML = '<h4>منتجات مماثلة</h4><div class="grid">' + similar.map(productCard).join('') + '</div>';
+    wireCards('pmSimilar');
+  }
 }
 function wilayaName(code) { const w = WILAYAS.find((x) => x.code === Number(code)); return w ? w.code + ' — ' + w.name_ar : code; }
 function currentRef() {
@@ -235,6 +329,7 @@ function saveCart() { localStorage.setItem('pd_cart', JSON.stringify(CART)); ren
 function renderCartBadge() {
   const n = CART.reduce((a, i) => a + i.qty, 0);
   $('#cartCount').hidden = n === 0; $('#cartCount').textContent = n;
+  const mc = $('#mCartCount'); if (mc) { mc.hidden = n === 0; mc.textContent = n; }
 }
 function addToCart(productId, qty, size, color) {
   const p = PRODUCTS.find((x) => x.id === productId);
@@ -243,33 +338,44 @@ function addToCart(productId, qty, size, color) {
   checkoutKey = null; sessionStorage.removeItem('pd_checkout_key');
   saveCart(); toast('أُضيف إلى السلة');
 }
+function sellOf(i) {
+  if (!ME || ME.role !== 'marketer') return i.price;
+  const min = Math.ceil(i.price * 1.05);
+  return i.sellPrice && i.sellPrice >= min ? i.sellPrice : min;
+}
 async function renderCart() {
   const box = $('#cartItems');
   if (!CART.length) { box.innerHTML = '<p class="muted">السلة فارغة.</p>'; const t = $('#coTotals'); t.innerHTML = ''; t.hidden = true; return; }
-  box.innerHTML = CART.map((i, idx) => `
+  const isMk = ME && ME.role === 'marketer';
+  box.innerHTML = (isMk ? '<p class="muted small">💼 أنت مسوق: حدّد <strong>سعر البيع للزبون</strong> لكل منتج — ربحك هو الفرق عن السعر الأساسي (5% على الأقل).</p>' : '') + CART.map((i, idx) => `
     <div class="cart-item">
       ${i.image ? `<img src="${esc(i.image)}" alt="">` : ''}
-      <div style="flex:1"><strong>${esc(i.name)}</strong><br><span class="muted small">${i.size ? 'مقاس ' + esc(i.size) + ' · ' : ''}${i.color ? esc(i.color) + ' · ' : ''}${fmt(i.price)}</span></div>
+      <div style="flex:1"><strong>${esc(i.name)}</strong><br><span class="muted small">${i.size ? 'مقاس ' + esc(i.size) + ' · ' : ''}${i.color ? esc(i.color) + ' · ' : ''}السعر الأساسي ${fmt(i.price)}</span>
+      ${isMk ? `<br><label class="small">سعر بيعك للزبون <input type="number" data-sell="${idx}" value="${sellOf(i)}" min="${Math.ceil(i.price * 1.05)}" style="width:110px"> <span class="badge">ربحك ${fmt((sellOf(i) - i.price) * i.qty)}</span></label>` : ''}</div>
       <div class="qty"><button data-dec="${idx}" type="button">−</button><span>${i.qty}</span><button data-inc="${idx}" type="button">+</button></div>
       <button class="icon-btn dark" data-del="${idx}" type="button">حذف</button>
     </div>`).join('');
   $$('#cartItems [data-inc]').forEach((b) => b.addEventListener('click', () => { CART[+b.dataset.inc].qty++; saveCart(); renderCart(); }));
   $$('#cartItems [data-dec]').forEach((b) => b.addEventListener('click', () => { const it = CART[+b.dataset.dec]; it.qty = Math.max(1, it.qty - 1); saveCart(); renderCart(); }));
   $$('#cartItems [data-del]').forEach((b) => b.addEventListener('click', () => { CART.splice(+b.dataset.del, 1); saveCart(); renderCart(); }));
+  $$('#cartItems [data-sell]').forEach((inp) => inp.addEventListener('change', () => { CART[+inp.dataset.sell].sellPrice = Number(inp.value) || null; saveCart(); renderCart(); }));
   await updateTotals();
 }
 async function updateTotals() {
   $('#coTotals').hidden = false;
   const w = Number($('#coWilaya').value);
-  const subtotal = CART.reduce((a, i) => a + i.price * i.qty, 0);
+  const isMk = ME && ME.role === 'marketer';
+  const subtotal = CART.reduce((a, i) => a + sellOf(i) * i.qty, 0);
   let html = `<div>مجموع المنتجات: <strong>${fmt(subtotal)}</strong></div>`;
+  if (isMk) html += `<div>💰 عمولتك المتوقعة من هذا الطلب: <strong>${fmt(CART.reduce((a, i) => a + (sellOf(i) - i.price) * i.qty, 0))}</strong></div>`;
   if (w) {
     try {
       const fees = {};
+      const office = $('#coDelType') && $('#coDelType').value === 'office';
       for (const i of CART) {
         const { product } = await api('/api/products/' + i.productId);
         const cov = product.coverage.find((c) => c.wilaya_code === w);
-        fees[product.supplier_id] = cov ? cov.delivery_fee : null;
+        fees[product.supplier_id] = cov ? (office && cov.fee_office != null ? cov.fee_office : cov.delivery_fee) : null;
       }
       let delivery = 0, missing = false;
       for (const f of Object.values(fees)) { if (f === null) missing = true; else delivery += f; }
@@ -322,14 +428,14 @@ function printReceipt(d) {
   if (!w) return toast('اسمح بالنوافذ المنبثقة للطباعة', true);
   w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>وصل طلبية ${esc(o.ref)}</title>
   <style>body{font-family:Tahoma,Arial;padding:24px;color:#122}h1{font-size:20px}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{border:1px solid #bbb;padding:7px;text-align:right}.tot{text-align:left;font-weight:bold}</style></head><body>
-  <h1>Promotion Dizad — وصل طلبية</h1>
+  <h1>SOUQAR — وصل طلبية</h1>
   <p>رقم الطلبية: <strong>${esc(o.ref)}</strong><br>التاريخ: ${new Date(o.created_at).toLocaleString('ar-DZ')}<br>الحالة: ${esc(o.status_label)}</p>
   ${o.buyer_name ? `<p>المشتري: ${esc(o.buyer_name)} — ${esc(o.buyer_phone || '')}<br>الولاية: ${esc(o.wilaya_name)} · البلدية: ${esc(o.commune)}<br>العنوان: ${esc(o.address || '')}</p>` : ''}
   <table><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr>
   ${d.items.map((i) => `<tr><td>${esc(i.name)}${i.size ? ' · ' + esc(i.size) : ''}${i.color ? ' · ' + esc(i.color) : ''}</td><td>${i.qty}</td><td>${fmt(i.customer_price)}</td><td>${fmt(i.line_total)}</td></tr>`).join('')}</table>
   <p class="tot">مجموع المنتجات: ${fmt(o.subtotal)}<br>التوصيل: ${fmt(o.delivery_fee)}<br>الإجمالي عند الاستلام: ${fmt(o.total)}</p>
   <p>المورد: ${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')}</p>
-  <p>شكراً لثقتكم — Promotion Dizad</p>
+  <p>شكراً لثقتكم — SOUQAR</p>
   <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
   w.document.close();
 }
@@ -378,7 +484,7 @@ async function refreshMe() {
   ME = data.user; CSRF = data.csrf || CSRF;
   $('#authBtn').hidden = !!ME;
   $('#dashBtn').hidden = !ME; $('#logoutBtn').hidden = !ME; $('#bellBtn').hidden = !ME;
-  if (ME) { $('#dashTitle').textContent = ME.role === 'admin' ? 'لوحتي' : 'لوحة ' + ({ supplier: 'المورد', marketer: 'المسوق', buyer: 'المشتري' }[ME.role] || ''); $('#dashUser').textContent = ME.name + ' · ' + ME.phone + ' · ' + ME.role; }
+  if (ME) { $('#dashTitle').textContent = ME.role === 'admin' ? 'لوحتي' : 'لوحة ' + ({ supplier: 'المورد', marketer: 'المسوق', buyer: 'المشتري' }[ME.role] || ''); $('#dashUser').textContent = ME.name + ' · ' + ME.phone + ' · ' + ({ admin: 'صاحب المنصة', supplier: 'مورد', marketer: 'مسوق', buyer: 'مشتري' }[ME.role] || ''); }
   return ME;
 }
 
@@ -475,31 +581,56 @@ async function renderBuyer(box) {
     catch (e) { toast(e.message, true); }
   }));
 }
+const COMM_STATE_AR = (c, orderStatus) => c.state === 'paid' ? 'مدفوعة ✅' : c.state === 'payable' ? 'موافق عليها 💰' : c.state === 'cancelled' ? 'ملغاة' : (['handed', 'out_for_delivery'].includes(orderStatus) ? 'في التوصيل 🚚' : 'قيد الانتظار ⏳');
 async function renderMarketer(box) {
-  const [{ products }, { commissions, sums, settlements }, { links }, { orders }] = await Promise.all([
-    api('/api/marketer/products'), api('/api/marketer/commissions'), api('/api/marketer/links'), api('/api/marketer/orders')
+  const [{ products }, { commissions, settlements }, { links }, { orders }, { wallet }, invite] = await Promise.all([
+    api('/api/marketer/products'), api('/api/marketer/commissions'), api('/api/marketer/links'), api('/api/marketer/orders'), api('/api/my/wallet'), api('/api/my/invite')
   ]);
+  const commByRef = Object.fromEntries(commissions.map((c) => [c.ref, c]));
+  const orderStatusByRef = Object.fromEntries(orders.map((o) => [o.ref, o.status]));
+  const totalClicks = links.reduce((a, l) => a + l.clicks, 0);
+  const invLink = location.origin + '/?inv=' + invite.code;
   box.innerHTML = `
-  <div class="stat-grid">
-    <div class="stat">عمولات متوقعة<b>${fmt(sums.expected)}</b></div>
-    <div class="stat">عمولات مستحقة للتسوية<b>${fmt(sums.payable)}</b></div>
-    <div class="stat">عمولات مدفوعة<b>${fmt(sums.paid)}</b></div>
-    <div class="stat">طلبات جلبتها<b>${orders.length}</b></div>
+  <div class="card" id="sec-wallet"><h3>💰 محفظتي</h3>
+    <div class="stat-grid">
+      <div class="stat">قيد الانتظار ⏳<b>${fmt(wallet.waiting)}</b></div>
+      <div class="stat">في التوصيل 🚚<b>${fmt(wallet.inDelivery)}</b></div>
+      <div class="stat">موافق عليها 💰<b>${fmt(wallet.approved)}</b></div>
+      <div class="stat">مدفوعة ✅<b>${fmt(wallet.paid)}</b></div>
+      <div class="stat">إجمالي أرباحي<b>${fmt(wallet.approved + wallet.paid + wallet.waiting + wallet.inDelivery)}</b></div>
+      <div class="stat">طلبات جلبتها<b>${orders.length}</b></div>
+      <div class="stat">نقرات روابطي<b>${totalClicks}</b></div>
+      <div class="stat">مكافآت الدعوات 🎁<b>${fmt(wallet.bonuses)}</b></div>
+    </div>
+    <p>الرصيد القابل للسحب: <strong>${fmt(wallet.balance)}</strong>${wallet.pendingPayout ? ` · لديك طلب دفع قيد المعالجة: ${fmt(wallet.pendingPayout)}` : ''}</p>
+    ${(() => { const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i)); const sum = commissions.filter((c) => c.state !== 'cancelled' && new Date(c.created_at) >= d && new Date(c.created_at) < new Date(d.getTime() + 86400e3)).reduce((a, c) => a + c.amount, 0); return { d, sum }; }); const max = Math.max(1, ...days.map((x) => x.sum)); return `<h4>📈 أداء المبيعات — آخر 7 أيام</h4><div style="display:flex;gap:6px;align-items:flex-end;height:90px">${days.map((x) => `<div style="flex:1;text-align:center"><div title="${fmt(x.sum)}" style="background:var(--gold);border-radius:6px 6px 0 0;height:${Math.max(4, Math.round(x.sum / max * 56))}px"></div><span class="muted small">${x.d.toLocaleDateString('ar-DZ', { weekday: 'short' })}</span><br><span class="small">${x.sum ? fmt(x.sum) : '—'}</span></div>`).join('')}</div>`; })()}
+    <p class="muted small">طلب الدفع: مرة واحدة في الأسبوع، ويُعالج خلال 24–48 ساعة إلى طريقة الدفع المسجلة في إعدادات حسابك (${ME.payment_method ? esc(ME.payment_method) : 'لم تُضبط بعد — ضبطها من إعدادات حسابي أسفله'}).</p>
+    <button class="btn gold" id="reqSettle" ${wallet.canRequest ? '' : 'disabled'}>💳 طلب الدفع (${fmt(wallet.balance)})</button>
+    ${!wallet.canRequest && wallet.balance > 0 ? `<span class="muted small"> طلب الدفع القادم متاح بعد ${wallet.nextRequestAt ? new Date(wallet.nextRequestAt).toLocaleDateString('ar-DZ') : ''} (مرة في الأسبوع)</span>` : ''}
+    ${settlements.length ? `<h4>سجل المدفوعات</h4>${settlements.map((s) => `<p>#${s.id} — ${fmt(s.amount)} — ${({ requested: 'قيد المعالجة ⏳', approved: 'موافق عليها', paid: 'مدفوعة ✅' + (s.method ? ' · ' + esc(s.method) : '') + (s.reference ? ' · مرجع: ' + esc(s.reference) : ''), rejected: 'مرفوضة' })[s.state]} <span class="muted small">${new Date(s.created_at).toLocaleDateString('ar-DZ')}</span></p>`).join('')}` : ''}
   </div>
-  <div class="card"><h3>منتجات متاحة للتسويق</h3><div class="tablewrap"><table>
-    <tr><th>المنتج</th><th>سعر الزبون</th><th>هامش المنصة</th><th>عمولتك</th><th>المخزون</th><th>رابطك</th><th>مشاركة</th><th>مواد التسويق</th></tr>
-    ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${fmt(p.customer_price)}</td><td>${fmt(p.platform_margin)}</td><td><strong>${fmt(p.marketer_commission)}</strong></td>
+  <div class="card"><h3>📋 قائمة حسابي</h3>
+    <p><a href="#sec-orders">🧾 طلباتي</a> · <a href="#" id="mkFav">❤️ المفضلة</a> · <a href="#sec-wallet">💳 المدفوعات</a> · <a href="#" data-nav="delivery">🚚 سعر التوصيل</a> · <a href="#" data-nav="training">🎓 تدريب</a> · <a href="#" data-nav="faq">❓ الأسئلة الشائعة</a> · <a href="#sec-invite">🎁 ادعو أصدقائك</a></p>
+  </div>
+  <div class="card"><h3>منتجات متاحة للتسويق</h3>
+    <p class="muted small">عمولتك <strong>حسب اختيارك</strong>: السعر المعروض هو السعر الأساسي، حدّد سعر بيعك عند إدخال طلب الزبون في السلة وربحك هو الفرق (5% على الأقل).</p>
+    <div class="tablewrap"><table>
+    <tr><th>المنتج</th><th>السعر الأساسي</th><th>المخزون</th><th>رابطك</th><th>مشاركة</th><th>مواد التسويق</th></tr>
+    ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${fmt(p.customer_price)}</td>
       <td>${p.stock > 0 ? p.stock : '<span class="badge out">نافد</span>'}</td>
       <td><button class="btn small" data-link="${p.id}">إنشاء / نسخ رابط الإحالة</button></td>
       <td><button class="btn small light" data-share="${p.id}">مشاركة</button></td>
-      <td><button class="btn small light" data-copydesc="${p.id}">📋 نسخ الوصف</button> <button class="btn small light" data-dlimgs="${p.id}">⬇️ الصور</button></td></tr>`).join('') || '<tr><td colspan="8" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
+      <td><button class="btn small light" data-copydesc="${p.id}">📋 نسخ الوصف</button> <button class="btn small light" data-dlimgs="${p.id}">⬇️ الصور</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
     <p class="muted small">قاعدة الإحالة: آخر رابط صالح نقره المشتري خلال 30 يوماً هو المعتمد.</p></div>
   <div class="card"><h3>روابطي ونقراتها</h3>${links.length ? links.map((l) => `<p><code>${location.origin}/r/${l.code}</code> — ${l.product_id ? 'منتج #' + l.product_id : 'رابط عام'} — نقرات: ${l.clicks} ${l.product_id ? `<button class="btn small light" data-copymsg="${l.id}">📋 نسخ رسالة مشاركة جاهزة</button>` : ''}</p>`).join('') : '<p class="muted">لا روابط بعد.</p>'}</div>
-  <div class="card"><h3>طلباتي وحالاتها</h3>${orders.length ? `<div class="tablewrap"><table><tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th><th></th></tr>${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
-  <div class="card"><h3>عمولاتي وتسوياتي</h3>
-    ${commissions.length ? `<div class="tablewrap"><table><tr><th>الطلب</th><th>العمولة</th><th>الحالة</th></tr>${commissions.map((c) => `<tr><td>${esc(c.ref)}</td><td>${fmt(c.amount)}</td><td>${({ expected: 'متوقعة', confirmed: 'مثبتة', payable: 'مستحقة', paid: 'مدفوعة', cancelled: 'ملغاة' })[c.state]}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا عمولات بعد.</p>'}
-    <button class="btn gold" id="reqSettle" ${sums.payable <= 0 ? 'disabled' : ''}>طلب تسوية المستحقات (${fmt(sums.payable)})</button>
-    ${settlements.length ? `<h4>طلبات التسوية</h4>${settlements.map((s) => `<p>#${s.id} — ${fmt(s.amount)} — ${({ requested: 'قيد المراجعة', approved: 'موافق عليها', paid: 'مدفوعة' + (s.reference ? ' · مرجع: ' + esc(s.reference) : ''), rejected: 'مرفوضة' })[s.state]}</p>`).join('')}` : ''}
+  <div class="card" id="sec-orders"><h3>طلباتي وحالات أرباحها</h3>${orders.length ? `<div class="tablewrap"><table><tr><th>الرقم</th><th>حالة الطلب</th><th>الإجمالي</th><th>عمولتي</th><th>حالة العمولة</th><th></th></tr>${orders.map((o) => { const c = commByRef[o.ref]; return `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td>${c ? fmt(c.amount) : '—'}</td><td>${c ? COMM_STATE_AR(c, o.status) : '—'}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`; }).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
+  <div class="card" id="sec-invite"><h3>🎁 ادعو أصدقائك</h3>
+    <p>ادعُ أصدقاءك للانضمام كمسوقين: عندما تبلغ الأرباح المؤكدة لأي صديق دعوتَه <strong>5000 دج</strong>، تربح أنت مكافأة <strong>500 دج</strong> تُضاف إلى رصيدك.</p>
+    <p>رابط دعوتك: <code>${invLink}</code> <button class="btn small" id="copyInv" type="button">نسخ الرابط</button>
+    <a class="btn small light" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('انضم معي لمسوّقي SOUQAR واربح من التسويق بالعمولة: ' + invLink)}">مشاركة واتساب</a>
+    <a class="btn small light" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(invLink)}">مشاركة فيسبوك</a></p>
+    <p>أصدقاء انضموا بدعوتك: <strong>${invite.invitedCount}</strong> · مكافآت ربحتها: <strong>${fmt(invite.bonusesEarned)}</strong></p>
+    ${invite.invited.length ? invite.invited.map((u) => `<p class="small">${esc(u.name)} — أرباحه المؤكدة: ${fmt(u.earned)}${u.bonusPaid ? ' — 🎉 جلب لك ' + fmt(u.bonusPaid) : ' — بقي له ' + fmt(u.remaining) + ' ليجلب لك 500 دج'}</p>`).join('') : '<p class="muted small">لا مدعوين بعد — شارك رابطك وابدأ.</p>'}
   </div>`;
   $$('#dashContent [data-link]').forEach((b) => b.addEventListener('click', async () => {
     try {
@@ -541,15 +672,19 @@ async function renderMarketer(box) {
   }));
   const rs = $('#reqSettle');
   if (rs) rs.addEventListener('click', async () => {
-    try { const r = await api('/api/marketer/settlements', { method: 'POST', body: {} }); toast('أُنشئ طلب التسوية #' + r.settlementId + ' بمبلغ ' + fmt(r.amount)); renderDash(); }
+    try { const r = await api('/api/marketer/settlements', { method: 'POST', body: {} }); toast('أُنشئ طلب الدفع #' + r.settlementId + ' بمبلغ ' + fmt(r.amount)); renderDash(); }
     catch (e) { toast(e.message, true); }
   });
+  const ci = $('#copyInv');
+  if (ci) ci.addEventListener('click', async () => { await navigator.clipboard.writeText(invLink).catch(() => {}); toast('نُسخ رابط الدعوة'); });
+  const mf = $('#mkFav');
+  if (mf) mf.addEventListener('click', (e) => { e.preventDefault(); if (!FAV_ONLY) $('#favToggle').click(); show('home'); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); });
 }
 async function renderSupplier(box) {
   const [{ products }, { orders }, { coverage }, reports, { categories }] = await Promise.all([
     api('/api/supplier/products'), api('/api/supplier/orders'), api('/api/supplier/coverage'), api('/api/supplier/reports'), api('/api/categories')
   ]);
-  const covMap = Object.fromEntries(coverage.map((c) => [c.wilaya_code, c.delivery_fee]));
+  const covMap = Object.fromEntries(coverage.map((c) => [c.wilaya_code, c]));
   box.innerHTML = `
   <div class="stat-grid">
     <div class="stat">طلبات جديدة<b>${orders.filter((o) => o.status === 'pending_supplier').length}</b></div>
@@ -567,6 +702,7 @@ async function renderSupplier(box) {
         <input id="pfStock" type="number" min="0" placeholder="المخزون" required>
         <select id="pfCat"><option value="">تصنيف…</option>${categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
       </div>
+      <input id="pfCompare" type="number" min="0" placeholder="السعر قبل التخفيض (اختياري — يظهر مشطوباً مع نسبة خصم بجنب سعرك النهائي)">
       <div class="row-form"><input id="pfSizes" placeholder="المقاسات مفصولة بفواصل (اختياري)"><input id="pfColors" placeholder="الألوان مفصولة بفواصل (اختياري)"></div>
       <label>صور المنتج (حتى 6 — تحميل من جهازك أو روابط)</label>
       <input id="pfFiles" type="file" accept="image/*" multiple>
@@ -577,7 +713,7 @@ async function renderSupplier(box) {
     </form></div>
   <div class="card"><h3>منتجاتي</h3>${products.length ? `<div class="tablewrap"><table>
     <tr><th>المنتج</th><th>الجملة</th><th>هامش المنصة</th><th>عمولة المسوق</th><th>سعر الزبون</th><th>المخزون</th><th>الحالة</th><th></th></tr>
-    ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>${fmt(p.marketer_commission)}</td><td>${fmt(p.customer_price)}</td><td>${p.stock}</td>
+    ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>حسب اختيار المسوق</td><td>${fmt(p.customer_price)}</td><td>${p.stock}</td>
       <td>${({ pending_review: 'بانتظار المراجعة', approved: 'معتمد', rejected: 'مرفوض' + (p.reject_reason ? ': ' + esc(p.reject_reason) : ''), paused: 'موقوف' })[p.status]}</td>
       <td>${p.status === 'approved' ? `<button class="btn small light" data-pause="${p.id}">إيقاف مؤقت</button>` : ''}${p.status === 'paused' ? `<button class="btn small" data-resume="${p.id}">إعادة تفعيل</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا منتجات بعد.</p>'}</div>
   <div class="card"><h3>طلباتي الواردة</h3>${orders.length ? orders.map((o) => `
@@ -592,8 +728,8 @@ async function renderSupplier(box) {
       </div>
     </details>`).join('') : '<p class="muted">لا طلبات بعد.</p>'}</div>
   <div class="card"><h3>تغطية الولايات وتكلفة التوصيل</h3>
-    <p class="muted small">فعّل الولايات التي تغطيها وحدد تكلفة التوصيل لكل واحدة. الطلبات إلى ولايات غير مغطاة تُرفض آلياً.</p>
-    <form id="covForm"><div class="kv">${WILAYAS.map((w) => `<label class="check"><input type="checkbox" data-cov="${w.code}" ${covMap[w.code] !== undefined ? 'checked' : ''}> ${w.code} — ${esc(w.name_ar)} <input type="number" min="0" data-fee="${w.code}" value="${covMap[w.code] ?? ''}" placeholder="دج" style="width:90px"></label>`).join('')}</div>
+    <p class="muted small">فعّل الولايات التي تغطيها وحدد لكل واحدة: سعر التوصيل <strong>للمنزل</strong>، سعر التوصيل <strong>للمكتب</strong> (اختياري)، ومدة التوصيل (مثال: 24–48 ساعة). الطلبات إلى ولايات غير مغطاة تُرفض آلياً.</p>
+    <form id="covForm"><div class="kv">${WILAYAS.map((w) => { const c = covMap[w.code]; return `<label class="check"><input type="checkbox" data-cov="${w.code}" ${c ? 'checked' : ''}> ${w.code} — ${esc(w.name_ar)} <input type="number" min="0" data-fee="${w.code}" value="${c ? c.delivery_fee : ''}" placeholder="منزل دج" style="width:95px"> <input type="number" min="0" data-feeoffice="${w.code}" value="${c && c.fee_office != null ? c.fee_office : ''}" placeholder="مكتب دج" style="width:95px"> <input data-dur="${w.code}" value="${c && c.duration ? esc(c.duration) : ''}" placeholder="المدة" style="width:110px"></label>`; }).join('')}</div>
     <button class="btn gold" type="submit" style="margin-top:10px">حفظ التغطية</button></form></div>`;
   let uploaded = [];
   $('#pfFiles').addEventListener('change', async (e) => {
@@ -612,6 +748,7 @@ async function renderSupplier(box) {
       const r = await api('/api/supplier/products', { method: 'POST', body: {
         name: $('#pfName').value, description: $('#pfDesc').value,
         wholesalePrice: Number($('#pfWholesale').value), stock: Number($('#pfStock').value),
+        comparePrice: $('#pfCompare').value ? Number($('#pfCompare').value) : undefined,
         categoryId: $('#pfCat').value ? Number($('#pfCat').value) : null,
         sizes: $('#pfSizes').value.split(',').map((s) => s.trim()).filter(Boolean),
         colors: $('#pfColors').value.split(',').map((s) => s.trim()).filter(Boolean),
@@ -634,7 +771,7 @@ async function renderSupplier(box) {
   }
   $('#covForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const coverage = $$('#covForm [data-cov]:checked').map((cb) => ({ wilaya_code: Number(cb.dataset.cov), delivery_fee: Number($(`#covForm [data-fee="${cb.dataset.cov}"]`).value) || 0 }));
+    const coverage = $$('#covForm [data-cov]:checked').map((cb) => ({ wilaya_code: Number(cb.dataset.cov), delivery_fee: Number($(`#covForm [data-fee="${cb.dataset.cov}"]`).value) || 0, fee_office: $(`#covForm [data-feeoffice="${cb.dataset.cov}"]`).value === '' ? null : Number($(`#covForm [data-feeoffice="${cb.dataset.cov}"]`).value), duration: $(`#covForm [data-dur="${cb.dataset.cov}"]`).value || null }));
     try { await api('/api/supplier/coverage', { method: 'PUT', body: { coverage } }); toast('حُفظت تغطية التوصيل'); }
     catch (err) { toast(err.message, true); }
   });
@@ -662,8 +799,23 @@ $('#logoutBtn').addEventListener('click', async () => { await api('/api/auth/log
 $$('[data-authtab]').forEach((t) => t.addEventListener('click', () => openAuth(t.dataset.authtab)));
 $$('.role-tabs .tab').forEach((t) => t.addEventListener('click', () => selectRole(t.dataset.role)));
 $('#cartBtn').addEventListener('click', async () => { $('#cartDrawer').hidden = false; await renderCart(); });
+// شريط التنقل السفلي (الجوال) كيما نموذج التطبيق
+$$('#mobileNav [data-mnav]').forEach((b) => b.addEventListener('click', async () => {
+  const k = b.dataset.mnav;
+  $$('#mobileNav [data-mnav]').forEach((x) => x.classList.toggle('on', x === b));
+  if (k === 'home') { show('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  else if (k === 'cats') { show('home'); const el = document.getElementById('secCats').hidden ? document.getElementById('products') : document.getElementById('secCats'); el.scrollIntoView({ behavior: 'smooth' }); }
+  else if (k === 'cart') { $('#cartDrawer').hidden = false; await renderCart(); }
+  else if (k === 'dash') { if (ME) renderDash(); else openAuth('login'); }
+  else if (k === 'more') { $('#moreSheet').hidden = false; }
+}));
+$('#closeMore').addEventListener('click', () => { $('#moreSheet').hidden = true; });
+$('#moreSheet').addEventListener('click', (e) => { if (e.target.id === 'moreSheet') $('#moreSheet').hidden = true; });
+$$('#moreSheet a').forEach((a) => a.addEventListener('click', () => { $('#moreSheet').hidden = true; }));
+$('#moreTrack').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; openTrack(); });
 $('#closeCart').addEventListener('click', () => { $('#cartDrawer').hidden = true; });
 $('#coWilaya').addEventListener('change', updateTotals);
+$('#coDelType').addEventListener('change', updateTotals);
 $('#searchInput').addEventListener('input', () => loadProducts().catch(() => {}));
 $('#catFilter').addEventListener('change', () => loadProducts().catch(() => {}));
 $('#priceFilter').addEventListener('change', () => loadProducts().catch(() => {}));
@@ -702,8 +854,8 @@ $('#checkoutForm').addEventListener('submit', async (e) => {
   try {
     if (!checkoutKey) { checkoutKey = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); sessionStorage.setItem('pd_checkout_key', checkoutKey); }
     const r = await api('/api/orders', { method: 'POST', body: {
-      customer: { name: $('#coName').value, phone: $('#coPhone').value, wilaya: Number($('#coWilaya').value), commune: $('#coCommune').value, address: $('#coAddress').value },
-      items: CART.map((i) => ({ productId: i.productId, qty: i.qty, size: i.size, color: i.color })),
+      customer: { name: $('#coName').value, phone: $('#coPhone').value, wilaya: Number($('#coWilaya').value), commune: $('#coCommune').value, address: $('#coAddress').value, deliveryType: $('#coDelType').value },
+      items: CART.map((i) => ({ productId: i.productId, qty: i.qty, size: i.size, color: i.color, sellPrice: ME && ME.role === 'marketer' ? sellOf(i) : undefined })),
       refCode: currentRef(), idempotencyKey: checkoutKey
     } });
     CART = []; checkoutKey = null; sessionStorage.removeItem('pd_checkout_key'); saveCart();
@@ -747,6 +899,7 @@ $('#registerForm').addEventListener('submit', async (e) => {
       businessName: $('#rgBusiness').value || undefined, activity: $('#rgActivity').value || undefined,
       address: $('#rgAddress').value || undefined,
       telegramChatId: (regRole === 'supplier' ? $('#rgTelegram').value : $('#rgTelegramM').value) || undefined,
+      inviteCode: localStorage.getItem('pd_inv') || undefined,
       terms: $('#rgTerms').checked
     } });
     toast(r.message);
@@ -778,6 +931,7 @@ $('#setupForm').addEventListener('submit', async (e) => {
 });
 
 // ---------- تشغيل ----------
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 (async function init() {
   const params = new URLSearchParams(location.search);
   if (params.get('ref')) {
@@ -785,6 +939,7 @@ $('#setupForm').addEventListener('submit', async (e) => {
     $('#refBanner').hidden = false;
     $('#refBanner').textContent = 'وصلت عبر رابط مسوق — سيُنسب طلبك إليه تلقائياً إذا طلبت خلال 30 يوماً (قاعدة آخر نقرة).';
   }
+  if (params.get('inv')) localStorage.setItem('pd_inv', params.get('inv'));
   const { wilayas } = await api('/api/wilayas'); WILAYAS = wilayas;
   for (const sel of ['#coWilaya', '#rgWilaya']) {
     const el = $(sel); const first = el.querySelector('option'); el.innerHTML = ''; if (first) el.appendChild(first);

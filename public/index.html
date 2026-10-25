@@ -3,29 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Promotion Dizad — منصة التجارة والتسويق بالعمولة في الجزائر</title>
-<meta name="description" content="منصة جزائرية تربط الموردين بالمسوقين والمشترين. المورد يوفر المنتج، المسوق يجلب الطلبات مقابل عمولة، والدفع عند الاستلام.">
+<title>SOUQAR سوقار — سوق واحد، تجارة تجمع الجميع | منصة التجارة والتسويق بالعمولة في الجزائر</title>
+<meta name="description" content="SOUQAR — منصة تجارة إلكترونية جزائرية تجمع الموردين وتجار الجملة والمسوقين بالعمولة والزبائن. الدفع عند الاستلام، توصيل لـ58 ولاية، وتتبع مباشر لطلبك.">
+<meta name="theme-color" content="#06392b">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <header class="topbar">
   <div class="topbar-in">
-    <a class="logo" href="#" data-nav="home" aria-label="Promotion Dizad">
+    <a class="logo" href="#" data-nav="home" aria-label="SOUQAR">
       <span class="logo-mark" aria-hidden="true">
         <svg viewBox="0 0 120 120" focusable="false">
           <defs>
-            <linearGradient id="lg-navy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#143656"/><stop offset="1" stop-color="#081A2C"/></linearGradient>
-            <linearGradient id="lg-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EFD268"/><stop offset="1" stop-color="#C9A227"/></linearGradient>
+            <linearGradient id="lg-navy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d5a41"/><stop offset="1" stop-color="#042a1f"/></linearGradient>
+            <linearGradient id="lg-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2fdc8a"/><stop offset="1" stop-color="#12a15c"/></linearGradient>
           </defs>
           <rect x="5" y="5" width="110" height="110" rx="26" fill="url(#lg-navy)"/>
-          <rect x="5" y="5" width="110" height="110" rx="26" fill="none" stroke="#C9A227" stroke-width="4"/>
-          <g fill="none" stroke="url(#lg-gold)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M28 82 V38 h11.5 a11 11 0 0 1 0 22 H28"/>
-            <path d="M61 82 V38 h8.5 a22 22 0 0 1 0 44 H61"/>
-          </g>
+          <rect x="5" y="5" width="110" height="110" rx="26" fill="none" stroke="#17b978" stroke-width="4"/>
+          <path d="M80 42c-4-9-13-14-23-14-13 0-23 8-23 18 0 25 46 15 46 33 0 11-10 19-24 19-11 0-20-6-24-15" fill="none" stroke="url(#lg-gold)" stroke-width="10" stroke-linecap="round"/>
+          <circle cx="42" cy="100" r="4.5" fill="#2fdc8a"/><circle cx="72" cy="100" r="4.5" fill="#2fdc8a"/>
         </svg>
       </span>
-      <span class="logo-text"><span class="brand-name">Promotion Dizad</span><br><span class="brand-sub">تجارة وتسويق بالعمولة · الجزائر</span></span>
+      <span class="logo-text"><span class="brand-name">SOUQAR</span><br><span class="brand-sub">سوق واحد · تجارة تجمع الجميع</span></span>
     </a>
     <nav class="main-nav">
       <a href="#" data-nav="home">الرئيسية</a>
@@ -49,8 +51,8 @@
 <main id="view-home">
   <section class="hero">
     <div class="hero-in">
-      <h1>منصة <span class="gold">Promotion Dizad</span><br>المورد يجهّز، المسوق يروّج، وأنت تطلب بسهولة</h1>
-      <p>منتجات من موردين جزائريين مراجَعين، الدفع عند الاستلام، وتوصيل حسب ولايتك. بلا أسعار مخفية — كل التكاليف تظهر قبل تأكيد الطلب.</p>
+      <h1><span class="gold">SOUQAR</span> — سوق واحد، تجارة تجمع الجميع</h1>
+      <p>منصة جزائرية تجمع المورّدين وتجار الجملة والمسوّقين بالعمولة والزبائن: المورد يجهّز، المسوق يروّج بعمولة يختارها، وأنت تطلب والدفع عند الاستلام. توصيل لـ58 ولاية وبلا أسعار مخفية.</p>
       <div class="hero-cta">
         <a class="btn gold" href="#products">تصفح المنتجات</a>
         <button class="btn ghost" id="joinMarketer" type="button">سجّل كمسوق واربح عمولة</button>
@@ -58,6 +60,20 @@
       </div>
       <p class="hero-note" id="refBanner" hidden></p>
     </div>
+  </section>
+
+  <section class="wrap">
+    <div class="feat-strip">
+      <div class="feat"><span>🚚</span><div><b>توصيل لـ58 ولاية</b><small>منزل أو مكتب، حسب ولايتك وبلديتك</small></div></div>
+      <div class="feat"><span>💵</span><div><b>دفع آمن عند الاستلام</b><small>لا تدفع شيئاً قبل وصول طلبك</small></div></div>
+      <div class="feat"><span>📦</span><div><b>تتبّع طلبك في كل مرحلة</b><small>من التأكيد حتى التسليم والتحصيل</small></div></div>
+      <div class="feat"><span>👥</span><div><b>حسابات منفصلة لكل دور</b><small>مورد · تاجر جملة · مسوّق · زبون</small></div></div>
+    </div>
+  </section>
+
+  <section class="wrap" id="secCats" hidden>
+    <div class="section-head"><h2>🗂️ تسوق حسب القسم</h2></div>
+    <div id="catTiles" class="cat-tiles"></div>
   </section>
 
   <section class="wrap" id="secNew" hidden>
@@ -223,12 +239,14 @@
     <div class="drawer-head"><h3>سلة الطلبات</h3><button class="icon-btn dark" id="closeCart" type="button">✕</button></div>
     <div id="cartItems"></div>
     <form id="checkoutForm" class="stack">
+      <div class="steps"><div class="step now">1 · العنوان</div><div class="step">2 · الدفع عند الاستلام 💵</div><div class="step">3 · التأكيد</div></div>
       <h4>بيانات التوصيل</h4>
       <input id="coName" placeholder="اسم المشتري" required>
       <input id="coPhone" placeholder="رقم الهاتف" required>
       <select id="coWilaya" required><option value="">اختر الولاية</option></select>
       <input id="coCommune" placeholder="البلدية" required>
       <input id="coAddress" placeholder="عنوان التوصيل بالتفصيل" required>
+      <select id="coDelType"><option value="home">🏠 توصيل إلى المنزل</option><option value="office">🏢 توصيل إلى مكتب شركة التوصيل</option></select>
       <div id="coTotals" class="totals" hidden></div>
       <button class="btn gold big" id="checkoutBtn" type="submit">تأكيد الطلب — الدفع عند الاستلام</button>
       <p class="muted small">بالضغط على تأكيد تُنشأ طلبية رسمية برقم مرجعي. لا توجد أي تكاليف مخفية: سعر المنتجات + التوصيل فقط.</p>
@@ -247,12 +265,14 @@
 <footer class="footer">
   <div class="wrap foot-in">
     <div>
-      <strong>Promotion Dizad</strong>
+      <strong>SOUQAR</strong>
       <p class="muted">منصة جزائرية للتجارة والتسويق بالعمولة: منتجات مختارة من موردين موثوقين، دفع عند الاستلام، وتتبّع مباشر لطلبك خطوة بخطوة.</p>
     </div>
     <div class="foot-links">
       <a href="#" data-nav="terms">الشروط والأحكام</a>
       <a href="#" data-nav="privacy">سياسة الخصوصية</a>
+      <a href="#" data-nav="faq">الأسئلة الشائعة</a>
+      <a href="#" data-nav="training">تدريب المسوقين</a>
       <a href="#" data-nav="contact">الدعم والتواصل</a>
       <a id="fbLink" href="https://www.facebook.com/promotion.dizad" target="_blank" rel="noopener">صفحة فيسبوك الرسمية</a>
       <a id="waLink" href="https://wa.me/213791402649" target="_blank" rel="noopener">واتساب</a>
@@ -260,6 +280,26 @@
     </div>
   </div>
 </footer>
+
+<nav id="mobileNav">
+  <button data-mnav="home" type="button">🏠<span>الرئيسية</span></button>
+  <button data-mnav="cats" type="button">🗂️<span>الأقسام</span></button>
+  <button data-mnav="cart" type="button">🛒<span>السلة</span><b id="mCartCount" hidden></b></button>
+  <button data-mnav="dash" type="button">👤<span>حسابي</span></button>
+  <button data-mnav="more" type="button">☰<span>المزيد</span></button>
+</nav>
+<div id="moreSheet" hidden>
+  <div class="more-box">
+    <div class="drawer-head"><h3>المزيد</h3><button class="icon-btn dark" id="closeMore" type="button">✕</button></div>
+    <a href="#" data-nav="delivery">🚚 أسعار التوصيل</a>
+    <a href="#" data-nav="faq">❓ الأسئلة الشائعة</a>
+    <a href="#" data-nav="training">🎓 تدريب المسوقين</a>
+    <a href="#" data-nav="terms">📜 الشروط والأحكام</a>
+    <a href="#" data-nav="privacy">🔒 سياسة الخصوصية</a>
+    <a href="#" data-nav="contact">✉️ الدعم والتواصل</a>
+    <a href="#" id="moreTrack">📦 تتبع طلبي</a>
+  </div>
+</div>
 
 <script src="/app.js"></script>
 </body>

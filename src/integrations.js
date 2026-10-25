@@ -84,7 +84,7 @@ function smtpSend(to, subject, text) {
         if (!line.startsWith('354')) throw new Error('DATA: ' + line);
         const subj64 = Buffer.from(subject, 'utf8').toString('base64');
         const body64 = Buffer.from(text, 'utf8').toString('base64').replace(/(.{76})/g, '$1\r\n');
-        sock.write(`From: Promotion Dizad <${SMTP.from}>\r\nTo: ${to}\r\nSubject: =?UTF-8?B?${subj64}?=\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${body64}\r\n.\r\n`);
+        sock.write(`From: SOUQAR <${SMTP.from}>\r\nTo: ${to}\r\nSubject: =?UTF-8?B?${subj64}?=\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${body64}\r\n.\r\n`);
         line = await readFn();
         if (!line.startsWith('250')) throw new Error('BODY: ' + line);
         sendFn('QUIT');
@@ -183,8 +183,8 @@ async function attemptNotification(id) {
     } else if (n.channel === 'email') {
       if (!target) throw Object.assign(new Error('no_email_target'), { notConfigured: true });
       if (emailConfigured()) {
-        const subjects = { email_verification: 'رمز تأكيد حسابك — Promotion Dizad', password_reset: 'رمز استعادة كلمة المرور — Promotion Dizad' };
-        await smtpSend(target, subjects[n.type] || 'Promotion Dizad', text);
+        const subjects = { email_verification: 'رمز تأكيد حسابك — SOUQAR', password_reset: 'رمز استعادة كلمة المرور — SOUQAR' };
+        await smtpSend(target, subjects[n.type] || 'SOUQAR', text);
       } else if (process.env.AUTH_CODE_OUTBOX_FILE) {
         // وضع التطوير/الاختبار: سُجّل في الصندوق الصادر أعلاه فيُعدّ مُرسلاً إليه
       } else {

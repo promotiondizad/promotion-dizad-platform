@@ -182,6 +182,18 @@ const WILAYAS = [
 try { db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1'); } catch { /* العمود موجود */ }
 try { db.exec('ALTER TABLE users ADD COLUMN payment_method TEXT'); } catch { /* العمود موجود */ }
 try { db.exec('ALTER TABLE users ADD COLUMN payment_details TEXT'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE users ADD COLUMN invited_by INTEGER'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE users ADD COLUMN invite_code TEXT'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE supplier_coverage ADD COLUMN fee_office INTEGER'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE supplier_coverage ADD COLUMN duration TEXT'); } catch { /* العمود موجود */ }
+db.exec(`CREATE TABLE IF NOT EXISTS invite_bonuses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invitee_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,
+  settlement_id INTEGER REFERENCES settlements(id),
+  created_at INTEGER NOT NULL
+)`);
 db.exec(`CREATE TABLE IF NOT EXISTS auth_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -198,3 +210,4 @@ function audit(actorId, action, entity, entityId, details) {
 }
 
 module.exports = { db, DATA_DIR, audit };
+try { db.exec('ALTER TABLE products ADD COLUMN compare_price INTEGER'); } catch { /* العمود موجود */ }

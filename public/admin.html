@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>إدارة Promotion Dizad</title>
+<title>إدارة SOUQAR</title>
 <link rel="stylesheet" href="/styles.css">
 <style>
   .admin-wrap{max-width:1100px;margin:0 auto;padding:18px 14px 60px}
@@ -12,7 +12,7 @@
   .atab{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer}
   .atab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
   .login-box{max-width:420px;margin:9vh auto}
-  .pd-logo{width:64px;height:64px;border-radius:16px;background:linear-gradient(180deg,#143656,#081a2c);border:2px solid #c9a227;color:#e3c04a;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;margin:0 auto 10px}
+  .pd-logo{width:64px;height:64px;border-radius:16px;background:linear-gradient(180deg,#0d5a41,#042a1f);border:2px solid #17b978;color:#2fdc8a;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;margin:0 auto 10px}
   details.order-det{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--surface)}
 </style>
 </head>
@@ -20,9 +20,9 @@
 <div class="admin-wrap">
 
   <div id="adminLogin" class="login-box" hidden>
-    <div class="pd-logo">PD</div>
+    <div class="pd-logo">S</div>
     <div class="card">
-      <h2 style="text-align:center">واجهة إدارة Promotion Dizad</h2>
+      <h2 style="text-align:center">واجهة إدارة SOUQAR</h2>
       <p class="muted" style="text-align:center">صفحة خاصة بصاحب المنصة فقط — لا تظهر في التطبيق العام.</p>
       <form id="aLoginForm" class="stack">
         <input id="aPhone" placeholder="رقم هاتف المدير" autocomplete="username" required>
@@ -35,7 +35,7 @@
 
   <div id="adminApp" hidden>
     <div class="drawer-head">
-      <h2>🛠 إدارة Promotion Dizad</h2>
+      <h2>🛠 إدارة SOUQAR</h2>
       <span><span class="muted" id="aWho"></span> <button class="btn small light" id="aLogout" type="button">خروج</button></span>
     </div>
     <nav class="atabs" id="aTabs">
@@ -63,7 +63,7 @@ const fmt = (n) => (Number(n) || 0).toLocaleString('fr-DZ') + ' دج';
 let CSRF = null;
 function toast(msg, isErr) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
-  t.style.background = isErr ? '#c0392b' : '#0b2239';
+  t.style.background = isErr ? "#c0392b" : "#06392b";
   setTimeout(() => { t.hidden = true; }, 3400);
 }
 async function api(path, opts = {}) {
@@ -105,7 +105,7 @@ async function renderOverview(box) {
     <div class="stat">إشعارات فاشلة/غير مضبوطة<b>${ov.failedNotifications}</b></div>
     <div class="stat">طلبات متأخرة (+48 سا)<b>${ov.lateOrders.length}</b></div>
   </div>
-  <div class="card"><h3>مستخدمون حسب الدور</h3>${Object.entries(ov.usersByRole || {}).map(([k, v]) => `<p>${esc(k)}: <strong>${v}</strong></p>`).join('')}</div>
+  <div class="card"><h3>مستخدمون حسب الدور</h3>${Object.entries(ov.usersByRole || {}).map(([k, v]) => `<p>${esc(ROLE_AR[k] || k)}: <strong>${v}</strong></p>`).join('')}</div>
   <div class="card"><h3>طلبات حسب الحالة</h3>${Object.entries(ov.ordersByStatus || {}).map(([k, v]) => `<p>${esc(k)}: <strong>${v}</strong></p>`).join('') || '<p class="muted">لا طلبات بعد.</p>'}</div>
   ${ov.lateOrders.length ? `<div class="card"><h3>⚠️ طلبات متأخرة</h3>${ov.lateOrders.map((o) => `<p>${esc(o.ref)} — ${esc(o.status)} — منذ ${new Date(o.created_at).toLocaleString('ar-DZ')}</p>`).join('')}</div>` : ''}`;
 }
@@ -121,7 +121,7 @@ async function renderReviews(box) {
     <button class="btn small danger" data-uact="reject" data-uid="${u.id}">رفض</button></p>`).join('') : '<p class="muted">لا موردين بانتظار المراجعة.</p>'}</div>
   <div class="card"><h3>اعتماد المنتجات وتحديد الهامش والعمولة</h3>${pendingProd.length ? pendingProd.map((p) => `
     <p><strong>${esc(p.name)}</strong> — المورد: ${esc(p.supplier_name)} — الجملة: ${fmt(p.wholesale_price)} — المخزون: ${p.stock}<br>
-    هامش المنصة <input type="number" id="mg-${p.id}" value="500" style="width:100px"> عمولة المسوق <input type="number" id="cm-${p.id}" value="200" style="width:100px">
+    هامش المنصة <input type="number" id="mg-${p.id}" value="500" style="width:100px"> <span class="muted small">(عمولة المسوق حرة — يحددها بنفسه عند الطلب، كيما سوقلي)</span>
     <button class="btn small gold" data-papprove="${p.id}">اعتماد</button>
     <button class="btn small danger" data-preject="${p.id}">رفض</button></p>`).join('') : '<p class="muted">لا منتجات بانتظار الاعتماد.</p>'}</div>`;
   wireUserActions(box); wireProductReviews(box);
@@ -131,12 +131,13 @@ async function renderProducts(box) {
   const { products } = await api('/api/admin/products');
   box.innerHTML = `<div class="card"><h3>كل المنتجات (${products.length})</h3><div class="tablewrap"><table>
     <tr><th>المنتج</th><th>المورد</th><th>الحالة</th><th>الجملة</th><th>الهامش</th><th>العمولة</th><th>سعر الزبون</th><th>صافي المنصة</th><th>المخزون</th></tr>
-    ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.status)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>${fmt(p.marketer_commission)}</td><td>${fmt(p.customer_price)}</td><td>${fmt(p.platform_net)}</td><td>${p.stock}</td></tr>`).join('')}
+    ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.status)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>حسب اختيار المسوق</td><td>${fmt(p.customer_price)}</td><td>${fmt(p.platform_net)}</td><td>${p.stock}</td></tr>`).join('')}
   </table></div></div>`;
 }
 
+const ROLE_AR = { admin: 'المدير', supplier: 'مورد', marketer: 'مسوق', buyer: 'مشتري' };
 function userRow(u) {
-  return `<tr><td>${esc(u.name)}</td><td>${esc(u.role)}</td><td>${esc(u.phone)}</td>
+  return `<tr><td>${esc(u.name)}</td><td>${esc(ROLE_AR[u.role] || u.role)}</td><td>${esc(u.phone)}</td>
   <td>${u.email ? esc(u.email) : '<span class="muted">—</span>'}</td><td>${esc(u.status)}</td>
   <td>${u.status === 'suspended' ? `<button class="btn small" data-uact="activate" data-uid="${u.id}">إعادة تفعيل</button>` : `<button class="btn small light" data-uact="suspend" data-uid="${u.id}">تعليق</button>`}</td></tr>`;
 }
@@ -151,7 +152,7 @@ function wireUserActions(box) {
 function wireProductReviews(box) {
   $$('[data-papprove]', box).forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.papprove;
-    try { await api(`/api/admin/products/${id}/review`, { method: 'POST', body: { action: 'approve', platformMargin: Number($('#mg-' + id).value), marketerCommission: Number($('#cm-' + id).value) } }); toast('تم اعتماد المنتج'); render(); }
+    try { await api(`/api/admin/products/${id}/review`, { method: 'POST', body: { action: 'approve', platformMargin: Number($('#mg-' + id).value) } }); toast('تم اعتماد المنتج'); render(); }
     catch (e) { toast(e.message, true); }
   }));
   $$('[data-preject]', box).forEach((b) => b.addEventListener('click', async () => {
