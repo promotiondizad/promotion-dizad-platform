@@ -616,6 +616,13 @@ async function renderMarketer(box) {
   const totalClicks = links.reduce((a, l) => a + l.clicks, 0);
   const invLink = location.origin + '/?inv=' + invite.code;
   box.innerHTML = `
+  <div class="grid" style="margin-bottom:14px">
+    <div class="card stat-card"><span class="stat-ic">🧾</span><strong>${orders.length}</strong><span>كل الطلبات</span><small>إجمالي طلبيات زبائنك</small></div>
+    <div class="card stat-card"><span class="stat-ic">🚚</span><strong>${orders.filter((o) => ['pending_supplier', 'confirmed', 'preparing', 'handed', 'out_for_delivery'].includes(o.status)).length}</strong><span>قيد التوصيل</span><small>الطلبات التي لم تُسلّم بعد</small></div>
+    <div class="card stat-card"><span class="stat-ic">✅</span><strong>${orders.filter((o) => o.status === 'delivered_collected').length}</strong><span>تم التسليم</span><small>الطلبات المستلمة بنجاح</small></div>
+    <div class="card stat-card"><span class="stat-ic">💰</span><strong>${fmt(wallet.approved + wallet.paid)}</strong><span>العمولات</span><small>المستحقة والمدفوعة</small></div>
+  </div>
+  <div class="card"><h3>📍 مراحل تتبّع كل طلب</h3><div class="stages-strip">${['طلب جديد', 'تم تأكيد الطلب', 'قيد التجهيز لدى المورد', 'تم تسليمه لشركة التوصيل', 'خرج للتوصيل', 'تم التسليم أو الإرجاع أو الإلغاء'].map((t, i) => `<div class="stage-pill"><b>${i + 1}</b><span>${t}</span></div>`).join('')}</div></div>
   <div class="card" id="sec-wallet"><h3>💰 محفظتي</h3>
     <div class="stat-grid">
       <div class="stat">قيد الانتظار ⏳<b>${fmt(wallet.waiting)}</b></div>
