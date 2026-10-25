@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Promotion Dizad — منصة التجارة والتسويق بالعمولة في الجزائر</title>
+<meta name="description" content="منصة جزائرية تربط الموردين بالمسوقين والمشترين. المورد يوفر المنتج، المسوق يجلب الطلبات مقابل عمولة، والدفع عند الاستلام.">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="#" data-nav="home" aria-label="Promotion Dizad">
+      <span class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 120 120" focusable="false">
+          <defs>
+            <linearGradient id="lg-navy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#143656"/><stop offset="1" stop-color="#081A2C"/></linearGradient>
+            <linearGradient id="lg-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EFD268"/><stop offset="1" stop-color="#C9A227"/></linearGradient>
+          </defs>
+          <rect x="5" y="5" width="110" height="110" rx="26" fill="url(#lg-navy)"/>
+          <rect x="5" y="5" width="110" height="110" rx="26" fill="none" stroke="#C9A227" stroke-width="4"/>
+          <g fill="none" stroke="url(#lg-gold)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M28 82 V38 h11.5 a11 11 0 0 1 0 22 H28"/>
+            <path d="M61 82 V38 h8.5 a22 22 0 0 1 0 44 H61"/>
+          </g>
+        </svg>
+      </span>
+      <span class="logo-text"><span class="brand-name">Promotion Dizad</span><br><span class="brand-sub">تجارة وتسويق بالعمولة · الجزائر</span></span>
+    </a>
+    <nav class="main-nav">
+      <a href="#" data-nav="home">الرئيسية</a>
+      <a href="#products" data-nav="home">المنتجات</a>
+      <a href="#" data-nav="track">تتبّع طلبك</a>
+      <a href="#" data-nav="how">كيف نعمل</a>
+      <a href="#" data-nav="terms">الشروط</a>
+      <a href="#" data-nav="contact">تواصل معنا</a>
+    </nav>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="cartBtn" type="button">🛒 السلة <span class="cart-count" id="cartCount" hidden>0</span></button>
+      <button class="icon-btn gold" id="authBtn" type="button">دخول / تسجيل</button>
+      <button class="icon-btn" id="dashBtn" type="button" hidden>لوحتي</button>
+      <button class="icon-btn" id="logoutBtn" type="button" hidden>خروج</button>
+    </div>
+  </div>
+</header>
+
+<main id="view-home">
+  <section class="hero">
+    <div class="hero-in">
+      <h1>منصة <span class="gold">Promotion Dizad</span><br>المورد يجهّز، المسوق يروّج، وأنت تطلب بسهولة</h1>
+      <p>منتجات من موردين جزائريين مراجَعين، الدفع عند الاستلام، وتوصيل حسب ولايتك. بلا أسعار مخفية — كل التكاليف تظهر قبل تأكيد الطلب.</p>
+      <div class="hero-cta">
+        <a class="btn gold" href="#products">تصفح المنتجات</a>
+        <button class="btn ghost" id="joinMarketer" type="button">سجّل كمسوق واربح عمولة</button>
+        <button class="btn ghost" id="joinSupplier" type="button">سجّل كمورد وبع منتجاتك</button>
+      </div>
+      <p class="hero-note" id="refBanner" hidden></p>
+    </div>
+  </section>
+
+  <section class="wrap" id="products">
+    <div class="section-head">
+      <h2>المنتجات المعتمدة</h2>
+      <div class="filters">
+        <input id="searchInput" type="search" placeholder="ابحث عن منتج…">
+        <select id="catFilter"><option value="">كل التصنيفات</option></select>
+        <select id="priceFilter">
+          <option value="">كل الأسعار</option>
+          <option value="0-1000">أقل من 1000 دج</option>
+          <option value="1000-3000">1000 – 3000 دج</option>
+          <option value="3000-5000">3000 – 5000 دج</option>
+          <option value="5000-99999999">أكثر من 5000 دج</option>
+        </select>
+      </div>
+    </div>
+    <div id="productGrid" class="grid"><p class="muted">جارٍ تحميل المنتجات…</p></div>
+  </section>
+
+  <section class="wrap">
+    <div class="card">
+      <h2>تتبع طلبك</h2>
+      <form id="trackForm" class="row-form">
+        <input id="trackRef" placeholder="رقم الطلب مثال PD-2026-000001" required>
+        <input id="trackPhone" placeholder="رقم الهاتف المستعمل في الطلب" required>
+        <button class="btn" type="submit">تتبع</button>
+      </form>
+      <div id="trackResult"></div>
+    </div>
+  </section>
+</main>
+
+<main id="view-track" hidden>
+  <section class="wrap narrow-wide">
+    <div class="card">
+      <h2>📦 تتبّع طلبك خطوة بخطوة</h2>
+      <p class="muted">أدخل الرقم المرجعي الذي وصلك عند تأكيد الطلب ورقم الهاتف المستعمل فيه — تظهر لك المرحلة الحالية والسجل الزمني الكامل وتفاصيل المنتجات والمبالغ.</p>
+      <form id="ttForm" class="row-form">
+        <input id="ttRef" placeholder="رقم الطلب مثال PD-2026-000001" required>
+        <input id="ttPhone" placeholder="رقم الهاتف المستعمل في الطلب" required>
+        <button class="btn gold" type="submit">تتبّع الآن</button>
+      </form>
+      <div id="ttResult"></div>
+    </div>
+    <div class="card" id="ttMineCard" hidden>
+      <h3>طلباتي</h3>
+      <div id="ttMine"></div>
+    </div>
+  </section>
+</main>
+
+<main id="view-page" hidden>
+  <section class="wrap"><div class="card" id="pageContent"></div></section>
+</main>
+
+<main id="view-auth" hidden>
+  <section class="wrap narrow">
+    <div class="card" id="setupCard" hidden>
+      <h2>إعداد المدير الأول</h2>
+      <p class="muted">لا يوجد مدير بعد. أنشئ حساب الإدارة بكلمة مرور تختارها أنت — لا تُحفظ في أي مكان آخر.</p>
+      <form id="setupForm" class="stack">
+        <input id="suName" placeholder="الاسم" required>
+        <input id="suPhone" placeholder="رقم الهاتف" required>
+        <input id="suPass" type="password" placeholder="كلمة المرور (8 أحرف على الأقل)" required>
+        <button class="btn gold" type="submit">إنشاء حساب المدير</button>
+      </form>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-authtab="login" type="button">تسجيل الدخول</button>
+      <button class="tab" data-authtab="register" type="button">حساب جديد</button>
+      <button class="tab" data-authtab="forgot" type="button">استعادة كلمة المرور</button>
+    </div>
+
+    <div class="card" id="pane-login">
+      <form id="loginForm" class="stack">
+        <input id="liPhone" placeholder="رقم الهاتف" required>
+        <input id="liPass" type="password" placeholder="كلمة المرور" required>
+        <button class="btn gold" type="submit">دخول</button>
+      </form>
+    </div>
+
+    <div class="card" id="pane-register" hidden>
+      <div class="role-tabs">
+        <button class="tab" data-role="buyer" type="button">🛍️ مشتري</button>
+        <button class="tab" data-role="marketer" type="button">📣 مسوق</button>
+        <button class="tab" data-role="supplier" type="button">🏭 مورد</button>
+      </div>
+      <p class="muted" id="roleHint"></p>
+      <form id="registerForm" class="stack">
+        <input id="rgName" placeholder="الاسم الكامل" required>
+        <input id="rgPhone" placeholder="رقم الهاتف" required>
+        <input id="rgEmail" type="email" placeholder="البريد الإلكتروني (اختياري)">
+        <input id="rgPass" type="password" placeholder="كلمة المرور (8 أحرف على الأقل)" required>
+        <input id="rgPass2" type="password" placeholder="تأكيد كلمة المرور" required>
+        <select id="rgWilaya"><option value="">الولاية (اختياري عند التسجيل)</option></select>
+        <div id="supplierFields" hidden>
+          <input id="rgBusiness" placeholder="اسم المؤسسة / النشاط التجاري">
+          <input id="rgActivity" placeholder="معلومات النشاط (ماذا تبيع؟)">
+          <input id="rgAddress" placeholder="العنوان">
+          <input id="rgTelegram" placeholder="معرف محادثة تيليغرام Chat ID لاستقبال إشعارات الطلبات (اختياري)">
+          <p class="muted">حساب المورد يُراجَع من الإدارة قبل تفعيل نشر المنتجات واستقبال الطلبات.</p>
+        </div>
+        <div id="marketerFields" hidden>
+          <input id="rgTelegramM" placeholder="معرف محادثة تيليغرام Chat ID لإشعارات الطلبات (اختياري)">
+        </div>
+        <label class="check"><input type="checkbox" id="rgTerms"> أوافق على <a href="#" data-nav="terms">شروط الاستخدام</a> وسياسة العمولات الموثقة فيها</label>
+        <button class="btn gold" type="submit">إنشاء الحساب</button>
+      </form>
+    </div>
+
+    <div class="card" id="pane-forgot" hidden>
+      <form id="forgotForm" class="stack">
+        <input id="fgPhone" placeholder="رقم هاتف الحساب" required>
+        <button class="btn" type="submit">إرسال رمز الاستعادة</button>
+      </form>
+      <form id="resetForm" class="stack">
+        <input id="rsToken" placeholder="رمز الاستعادة الذي وصلك">
+        <input id="rsPass" type="password" placeholder="كلمة المرور الجديدة">
+        <input id="rsPass2" type="password" placeholder="تأكيد كلمة المرور الجديدة">
+        <button class="btn gold" type="submit">تغيير كلمة المرور</button>
+      </form>
+    </div>
+  </section>
+</main>
+
+<main id="view-dash" hidden>
+  <section class="wrap">
+    <h2 id="dashTitle">لوحتي</h2>
+    <p class="muted" id="dashUser"></p>
+    <div id="dashContent"></div>
+  </section>
+</main>
+
+<div class="drawer" id="cartDrawer" hidden>
+  <div class="drawer-box">
+    <div class="drawer-head"><h3>سلة الطلبات</h3><button class="icon-btn dark" id="closeCart" type="button">✕</button></div>
+    <div id="cartItems"></div>
+    <form id="checkoutForm" class="stack">
+      <h4>بيانات التوصيل</h4>
+      <input id="coName" placeholder="اسم المشتري" required>
+      <input id="coPhone" placeholder="رقم الهاتف" required>
+      <select id="coWilaya" required><option value="">اختر الولاية</option></select>
+      <input id="coCommune" placeholder="البلدية" required>
+      <input id="coAddress" placeholder="عنوان التوصيل بالتفصيل" required>
+      <div id="coTotals" class="totals"></div>
+      <button class="btn gold big" id="checkoutBtn" type="submit">تأكيد الطلب — الدفع عند الاستلام</button>
+      <p class="muted small">بالضغط على تأكيد تُنشأ طلبية رسمية برقم مرجعي. لا توجد أي تكاليف مخفية: سعر المنتجات + التوصيل فقط.</p>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="productModal" hidden><div class="modal-box" id="productModalBox"></div></div>
+
+<div id="toast" class="toast" hidden></div>
+
+<footer class="footer">
+  <div class="wrap foot-in">
+    <div>
+      <strong>Promotion Dizad</strong>
+      <p class="muted">منصة وسيطة تنظم الطلبات والإحالات والعمولات. المنصة لا تبيع مخزوناً ولا تستلم أموال الزبائن ولا تدير التوصيل بنفسها — المورد يجهز الطلب ويتعامل مع شركة التوصيل التي يتعاقد معها.</p>
+    </div>
+    <div class="foot-links">
+      <a href="#" data-nav="how">كيف تتحرك الأموال؟</a>
+      <a href="#" data-nav="terms">الشروط والأحكام</a>
+      <a href="#" data-nav="privacy">سياسة الخصوصية</a>
+      <a href="#" data-nav="contact">الدعم والتواصل</a>
+      <a id="fbLink" href="https://www.facebook.com/promotion.dizad" target="_blank" rel="noopener">صفحة فيسبوك الرسمية</a>
+      <a id="waLink" href="https://wa.me/213791402649" target="_blank" rel="noopener">واتساب</a>
+      <a id="tgLink" href="https://t.me/share/url?url=" target="_blank" rel="noopener">مشاركة تيليغرام</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

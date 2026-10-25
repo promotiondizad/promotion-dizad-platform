@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: promotion-dizad-platform
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /api/setup/status
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ADMIN_TELEGRAM_CHAT_ID
+        sync: false
+      - key: STORE_WHATSAPP
+        value: 213791402649

@@ -1,0 +1,237 @@
+// اختبارات آلية شاملة — تشغيل: npm test
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
+const PORT = 4199, BASE = `http://localhost:${PORT}`;
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pd-test-'));
+const dbPath = path.join(tmp, 'test.db');
+let passed = 0, failed = 0;
+function ok(cond, name) { if (cond) { passed++; console.log('  ✓ ' + name); } else { failed++; console.log('  ✗ فشل: ' + name); } }
+
+const srv = spawn('node', ['src/server.js'], {
+  cwd: path.join(import.meta.dirname, '..'),
+  env: { ...process.env, PORT: String(PORT), DB_PATH: dbPath, DATA_DIR: tmp, TELEGRAM_BOT_TOKEN: '', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_NUMBER_ID: '', FACEBOOK_PAGE_ACCESS_TOKEN: '', ADMIN_TELEGRAM_CHAT_ID: '' },
+  stdio: 'pipe'
+});
+srv.stderr.on('data', (d) => process.stderr.write('[srv] ' + d));
+async function waitUp() {
+  for (let i = 0; i < 50; i++) { try { const r = await fetch(BASE + '/api/wilayas'); if (r.ok) return; } catch {} await new Promise((r) => setTimeout(r, 200)); }
+  throw new Error('server did not start');
+}
+class Client {
+  constructor() { this.cookie = ''; this.csrf = null; }
+  async req(method, p, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (this.cookie) headers.Cookie = this.cookie;
+    if (this.csrf && method !== 'GET') headers['x-csrf'] = this.csrf;
+    const res = await fetch(BASE + p, { method, headers, body: body ? JSON.stringify(body) : undefined, redirect: 'manual' });
+    const sc = res.headers.get('set-cookie');
+    if (sc) this.cookie = sc.split(';')[0];
+    const data = await res.json().catch(() => ({}));
+    if (data.csrf) this.csrf = data.csrf;
+    return { status: res.status, data, headers: res.headers };
+  }
+  get(p) { return this.req('GET', p); }
+  post(p, b) { return this.req('POST', p, b || {}); }
+  put(p, b) { return this.req('PUT', p, b || {}); }
+}
+
+try {
+  await waitUp();
+  console.log('— الولايات والتصنيفات —');
+  const anon = new Client();
+  const w = await anon.get('/api/wilayas');
+  ok(w.data.wilayas.length === 58, '58 ولاية محملة');
+
+  console.log('— الإعداد والتسجيل والصلاحيات —');
+  let r = await anon.post('/api/setup', { name: 'المدير', phone: '0600000001', password: 'adminpass123' });
+  ok(r.status === 201, 'إنشاء المدير الأول');
+  r = await anon.post('/api/setup', { name: 'x', phone: '0600000999', password: 'adminpass123' });
+  ok(r.status === 403, 'منع إنشاء مدير ثانٍ');
+  const admin = new Client();
+  r = await admin.post('/api/auth/login', { phone: '0600000001', password: 'adminpass123' });
+  ok(r.status === 200 && r.data.user.role === 'admin', 'دخول المدير');
+
+  const supplier = new Client();
+  r = await supplier.post('/api/auth/register', { role: 'supplier', name: 'مورد تجريبي', phone: '0600000002', password: 'supplier123', passwordConfirm: 'supplier123', terms: true, activity: 'أجهزة كهرومنزلية', businessName: 'متجر التجربة' });
+  ok(r.status === 201 && r.data.status === 'pending', 'تسجيل مورد بحالة انتظار المراجعة');
+  r = await supplier.post('/api/auth/register', { role: 'supplier', name: 'مكرر', phone: '0600000002', password: 'supplier123', passwordConfirm: 'supplier123', terms: true, activity: 'x' });
+  ok(r.status === 409, 'رفض تكرار رقم الهاتف');
+  r = await supplier.post('/api/auth/register', { role: 'buyer', name: 'ضعيف', phone: '0600000010', password: '123', passwordConfirm: '123', terms: true });
+  ok(r.status === 400, 'رفض كلمة مرور ضعيفة');
+  r = await supplier.post('/api/auth/login', { phone: '0600000002', password: 'supplier123' });
+  ok(r.status === 200, 'دخول المورد (الحساب pending)');
+  r = await supplier.post('/api/supplier/products', { name: 'منتج مبكر', wholesalePrice: 1000, stock: 5 });
+  ok(r.status === 403, 'المورد غير المفعّل لا ينشر منتجات');
+
+  const marketer = new Client();
+  r = await marketer.post('/api/auth/register', { role: 'marketer', name: 'مسوق تجريبي', phone: '0600000003', password: 'marketer123', passwordConfirm: 'marketer123', terms: true, wilaya: 16 });
+  ok(r.status === 201, 'تسجيل مسوق مفعّل فوراً');
+  await marketer.post('/api/auth/login', { phone: '0600000003', password: 'marketer123' });
+  const buyer = new Client();
+  r = await buyer.post('/api/auth/register', { role: 'buyer', name: 'مشتري تجريبي', phone: '0600000004', password: 'buyer12345', passwordConfirm: 'buyer12345', terms: true });
+  ok(r.status === 201, 'تسجيل مشتري');
+  await buyer.post('/api/auth/login', { phone: '0600000004', password: 'buyer12345' });
+
+  console.log('— فصل الصلاحيات —');
+  r = await marketer.get('/api/supplier/orders');
+  ok(r.status === 403, 'المسوق ممنوع من لوحة المورد');
+  r = await buyer.get('/api/admin/overview');
+  ok(r.status === 403, 'المشتري ممنوع من لوحة الإدارة');
+  r = await new Client().get('/api/my/orders');
+  ok(r.status === 401, 'الزائر ممنوع من طلبات المشتري');
+
+  console.log('— تفعيل المورد والمنتج والمثال الحسابي الرسمي —');
+  const users = await admin.get('/api/admin/users?role=supplier');
+  const supId = users.data.users[0].id;
+  r = await admin.post(`/api/admin/users/${supId}/action`, { action: 'approve' });
+  ok(r.status === 200, 'الإدارة تفعّل المورد');
+  await supplier.post('/api/auth/login', { phone: '0600000002', password: 'supplier123' });
+  r = await supplier.put('/api/supplier/coverage', { coverage: [{ wilaya_code: 16, delivery_fee: 500 }, { wilaya_code: 35, delivery_fee: 700 }] });
+  ok(r.status === 200, 'المورد يضبط تغطية التوصيل');
+  r = await supplier.post('/api/supplier/products', { name: 'منتج المثال', description: 'للاختبار', wholesalePrice: 3000, stock: 10 });
+  ok(r.status === 201, 'المورد يضيف منتجاً (ينتظر الاعتماد)');
+  const prodId = r.data.id;
+  let pub = await anon.get('/api/products');
+  ok(pub.data.products.length === 0, 'المنتج غير المعتمد لا يظهر للزبائن');
+  r = await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500, marketerCommission: 200 });
+  ok(r.status === 200, 'الإدارة تعتمد المنتج بهامش 500 وعمولة 200');
+  pub = await anon.get('/api/products');
+  ok(pub.data.products.length === 1 && pub.data.products[0].customer_price === 3500, 'سعر الزبون = 3000 + 500 = 3500');
+  r = await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 100, marketerCommission: 300 });
+  ok(r.status === 400, 'رفض عمولة أكبر من الهامش');
+
+  console.log('— الإحالة والطلب والعمولة —');
+  r = await marketer.post('/api/marketer/links', { productId: prodId });
+  ok(r.status === 201, 'المسوق ينشئ رابط إحالة');
+  const code = r.data.link.code;
+  const click = await fetch(BASE + '/r/' + code, { redirect: 'manual' });
+  ok(click.status === 302, 'رابط الإحالة يحوّل للمتجر');
+  const guest = new Client();
+  const orderBody = { customer: { name: 'زبون ضيف', phone: '0600000011', wilaya: 16, commune: 'باب الزوار', address: 'حي تجريبي' }, items: [{ productId: prodId, qty: 1 }], refCode: code, idempotencyKey: 'test-key-1' };
+  r = await guest.post('/api/orders', orderBody);
+  ok(r.status === 201 && r.data.orders[0].total === 4000, 'إجمالي الطلب = 3500 + توصيل 500 = 4000 (المثال الرسمي)');
+  const orderRef = r.data.orders[0].ref;
+  r = await guest.post('/api/orders', orderBody);
+  ok(r.status === 200 && r.data.duplicate === true, 'منع تكرار الطلب بنفس مفتاح عدم التكرار');
+  let supOrders = await supplier.get('/api/supplier/orders');
+  ok(supOrders.data.orders.length === 1, 'الطلب وُجّه للمورد الصحيح مرة واحدة فقط');
+  const oid = supOrders.data.orders[0].id;
+  let prodNow = await anon.get('/api/products/' + prodId);
+  ok(prodNow.data.product.stock === 9, 'المخزون نقص بوحدة واحدة فقط رغم إعادة الإرسال');
+  let comm = await marketer.get('/api/marketer/commissions');
+  ok(comm.data.sums.expected === 200 && comm.data.sums.payable === 0, 'العمولة 200 متوقعة فقط — غير مستحقة قبل التسليم');
+
+  console.log('— snapshot الأسعار —');
+  r = await supplier.put('/api/supplier/products/' + prodId, { name: 'منتج المثال', wholesalePrice: 9000, stock: 9, description: 'للاختبار' });
+  ok(r.status === 200 && r.data.status === 'pending_review', 'تغيير سعر الجملة يعيد المنتج للمراجعة');
+  await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500, marketerCommission: 200 });
+  const track = await anon.get(`/api/orders/track?ref=${orderRef}&phone=0600000011`);
+  ok(track.status === 200 && track.data.order.total === 4000, 'الطلب القديم احتفظ بسعره الأصلي 4000 بعد تغيير الأسعار');
+
+  console.log('— حالات الطلب واستحقاق العمولة —');
+  r = await supplier.post(`/api/supplier/orders/${oid}/status`, { status: 'preparing' });
+  ok(r.status === 400, 'منع قفز الحالات (جديد ← تجهيز مباشرة)');
+  for (const st of ['confirmed', 'preparing', 'handed', 'out_for_delivery']) {
+    r = await supplier.post(`/api/supplier/orders/${oid}/status`, { status: st });
+    if (r.status !== 200) break;
+  }
+  ok(r.status === 200, 'تسلسل الحالات حتى خرج للتوصيل');
+  r = await supplier.post(`/api/supplier/orders/${oid}/status`, { status: 'delivered_collected' });
+  ok(r.status === 200, 'التسليم والتحصيل');
+  comm = await marketer.get('/api/marketer/commissions');
+  ok(comm.data.sums.payable === 200, 'العمولة أصبحت مستحقة 200 بعد التسليم والتحصيل فقط');
+  const ov = await admin.get('/api/admin/overview');
+  ok(ov.data.platformEarned === 300, 'صافي المنصة المثبت = 500 − 200 = 300 (المثال الرسمي)');
+
+  console.log('— التسوية —');
+  r = await marketer.post('/api/marketer/settlements', {});
+  ok(r.status === 201 && r.data.amount === 200, 'المسوق يطلب تسوية 200');
+  const sid = r.data.settlementId;
+  r = await admin.post(`/api/admin/settlements/${sid}/action`, { action: 'paid', method: 'CCP', reference: 'REF-TEST-1' });
+  ok(r.status === 200, 'الإدارة توثق دفع التسوية بمرجع');
+  comm = await marketer.get('/api/marketer/commissions');
+  ok(comm.data.sums.paid === 200, 'العمولة مدفوعة وموثقة');
+
+  console.log('— الإلغاء يعيد المخزون ويلغي العمولة —');
+  r = await guest.post('/api/orders', { customer: { name: 'زبون ثانٍ', phone: '0600000012', wilaya: 16, commune: 'درارية', address: 'عنوان' }, items: [{ productId: prodId, qty: 2 }], refCode: code, idempotencyKey: 'test-key-2' });
+  ok(r.status === 201, 'طلب ثانٍ بكمية 2');
+  supOrders = await supplier.get('/api/supplier/orders');
+  const o2 = supOrders.data.orders.find((o) => o.ref === r.data.orders[0].ref);
+  prodNow = await anon.get('/api/products/' + prodId);
+  const stockBefore = prodNow.data.product.stock;
+  r = await supplier.post(`/api/supplier/orders/${o2.id}/status`, { status: 'rejected', reason: 'رقم لا يرد' });
+  ok(r.status === 200, 'المورد يرفض الطلب مع سبب');
+  prodNow = await anon.get('/api/products/' + prodId);
+  ok(prodNow.data.product.stock === stockBefore + 2, 'المخزون أُعيد بعد الرفض');
+  comm = await marketer.get('/api/marketer/commissions');
+  ok(comm.data.commissions.find((c) => c.order_id === o2.id).state === 'cancelled', 'عمولة الطلب المرفوض أُلغيت');
+
+  console.log('— ولاية غير مغطاة —');
+  r = await guest.post('/api/orders', { customer: { name: 'زبون', phone: '0600000013', wilaya: 1, commune: 'أدرار', address: 'عنوان' }, items: [{ productId: prodId, qty: 1 }], idempotencyKey: 'test-key-3' });
+  ok(r.status === 400, 'رفض الطلب لولاية لا يغطيها المورد');
+
+  console.log('— قفل الدخول واستعادة كلمة المرور —');
+  const lock = new Client();
+  for (let i = 0; i < 5; i++) await lock.post('/api/auth/login', { phone: '0600000004', password: 'wrongpass' });
+  r = await lock.post('/api/auth/login', { phone: '0600000004', password: 'buyer12345' });
+  ok(r.status === 423, 'قفل الحساب بعد 5 محاولات فاشلة حتى بكلمة مرور صحيحة');
+  // فكّ القفل مباشرة من القاعدة لمحاكاة مرور 15 دقيقة، ثم الاستعادة
+  const db = new DatabaseSync(dbPath);
+  db.prepare('UPDATE users SET locked_until = 0, failed_logins = 0 WHERE phone = ?').run('0600000004');
+  r = await lock.post('/api/auth/forgot', { phone: '0600000004' });
+  ok(r.status === 200, 'طلب استعادة كلمة المرور');
+  const resetRow = db.prepare('SELECT token FROM password_resets ORDER BY id DESC LIMIT 1').get();
+  r = await lock.post('/api/auth/reset', { token: resetRow.token, password: 'newbuyer123', passwordConfirm: 'newbuyer123' });
+  ok(r.status === 200, 'تغيير كلمة المرور بالرمز');
+  r = await lock.post('/api/auth/login', { phone: '0600000004', password: 'newbuyer123' });
+  ok(r.status === 200, 'الدخول بكلمة المرور الجديدة');
+  const hashRow = db.prepare('SELECT password_hash FROM users WHERE phone = ?').get('0600000004');
+  ok(hashRow.password_hash.startsWith('scrypt:') && !hashRow.password_hash.includes('newbuyer123'), 'كلمة المرور مخزنة بتجزئة scrypt لا كنص مكشوف');
+
+  console.log('— التكاملات والنسخ الاحتياطي —');
+  const ig = await admin.get('/api/admin/integrations');
+  ok(ig.data.integrations.telegram.configured === false, 'تيليغرام يظهر غير مضبوط بصدق (بلا توكن)');
+  ok(typeof ig.data.integrations.whatsapp.note === 'string' && ig.data.integrations.whatsapp.note.length > 10, 'حالة واتساب موثقة مع تنبيه الرسوم');
+  const notifs = await admin.get('/api/admin/notifications');
+  ok(notifs.data.notifications.some((n) => n.status === 'queued_not_configured'), 'إشعارات الطلبات في الطابور بحالة غير مضبوط — لا ادعاء إرسال كاذب');
+  r = await admin.post('/api/admin/backup', {});
+  ok(r.status === 201 && fs.existsSync(path.join(tmp, 'backups', r.data.file)), 'نسخة احتياطية من قاعدة البيانات تُنشأ فعلاً');
+
+  console.log('— رفع الصور —');
+  const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  r = await supplier.post('/api/upload', { dataUrl: px });
+  ok(r.status === 201 && r.data.url.startsWith('/uploads/'), 'المورد يرفع صورة منتج من جهازه');
+  const img = await fetch(BASE + r.data.url);
+  ok(img.status === 200, 'الصورة المرفوعة تُعرض من الخادم');
+
+  console.log('— تتبع الطلبات —');
+  r = await anon.get(`/api/orders/track?ref=${orderRef}&phone=0699999999`);
+  ok(r.status === 404, 'تتبع برقم هاتف خاطئ مرفوض');
+  r = await anon.get(`/api/orders/track?ref=${orderRef}&phone=0600000011`);
+  ok(r.status === 200 && Array.isArray(r.data.items) && r.data.items.length === 1, 'التتبع العام يعرض منتجات الطلب');
+  ok(r.data.order.stage === 5 && r.data.history.length >= 6, 'التتبع يعرض المرحلة النهائية والسجل الزمني الكامل');
+  ok(r.data.order.wilaya_name === 'الجزائر', 'التتبع يعرض اسم ولاية الوجهة');
+  await buyer.post('/api/auth/login', { phone: '0600000004', password: 'newbuyer123' });
+  r = await buyer.post('/api/orders', { customer: { name: 'مشتري تجريبي', phone: '0600000004', wilaya: 16, commune: 'الشراقة', address: 'عنوان المشتري' }, items: [{ productId: prodId, qty: 1 }], idempotencyKey: 'test-key-buyer-1' });
+  ok(r.status === 201, 'المشتري المسجل ينشئ طلباً مرتبطاً بحسابه');
+  const myOrders = await buyer.get('/api/my/orders');
+  const myOrder = myOrders.data.orders.find((o) => o.ref === r.data.orders[0].ref);
+  r = await buyer.get(`/api/orders/${myOrder.id}/timeline`);
+  ok(r.status === 200 && r.data.history.length >= 1 && r.data.order.guest_phone === '0600000004', 'صاحب الطلب يرى سجله الزمني الكامل');
+  r = await marketer.get(`/api/orders/${myOrder.id}/timeline`);
+  ok(r.status === 404, 'مسوق غير معني بالطلب لا يرى سجله الزمني');
+  r = await new Client().get(`/api/orders/${myOrder.id}/timeline`);
+  ok(r.status === 401, 'الزائر ممنوع من السجل الزمني');
+
+  console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
+  process.exitCode = failed ? 1 : 0;
+} catch (e) {
+  console.error('خطأ في الاختبارات:', e);
+  process.exitCode = 1;
+} finally {
+  srv.kill();
+}

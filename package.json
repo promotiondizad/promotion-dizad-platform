@@ -1,0 +1,1 @@
+{"description":"منصة Promotion Dizad — تجارة إلكترونية وتسويق بالعمولة في الجزائر (موردون / مسوقون / مشترون)","engines":{"node":">=22"},"name":"promotion-dizad-platform","private":true,"scripts":{"start":"node src/server.js","test":"node tests/run-tests.mjs"},"version":"1.0.0"}
