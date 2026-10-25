@@ -207,7 +207,7 @@ async function renderOrders(box) {
 
 async function renderSettlements(box) {
   const { payable, payments } = await api('/api/admin/settlements');
-  const METHODS = ['بريدي موب', 'CCP', 'Flexy', 'نقداً', 'أخرى'];
+  const METHODS = ['تحويل بريدي موب', 'تحويل البريد الجاري', 'التحصيل من مقر المنصة', 'Enveloppe', 'Flexy', 'نقداً عند الاستلام من الإدارة'];
   box.innerHTML = `<div class="card"><h3>مستحقات المسوقين — قابلة للدفع الآن</h3>
     <p class="muted small">لا توجد طلبات تسوية. الدفع الفعلي يتم خارج المنصة (CCP / بريدي موب / Flexy…) حسب الاتفاق ووسيلة المسوق المسجّلة — زر التأكيد يوثّق فقط ما حدث فعلاً بطريقته ومرجعه.</p>
     ${payable.length ? payable.map((m) => `

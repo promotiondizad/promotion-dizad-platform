@@ -385,18 +385,6 @@ const server = http.createServer(async (req, res) => {
       const covCount = db.prepare('SELECT COUNT(*) c FROM supplier_coverage WHERE supplier_id = ?').get(sup.id).c;
       return send(res, 200, { supplier: { id: sup.id, name: sup.name, business_name: sup.business_name, activity: sup.activity, wilaya_name: wilayaRow ? wilayaRow.name_ar : null, member_since: sup.created_at, products_count: rows.length, rating_avg: storeRating.a, rating_count: storeRating.c, coverage_count: covCount, reviews: storeReviews }, products: rows });
     }
-    // رابط إحالة: عدّ النقرة + كوكي 30 يوماً + تحويل للمتجر
-    const rm = p.match(/^\/r\/([A-Za-z0-9]+)$/);
-    if (rm && req.method === 'GET') {
-      const link = db.prepare('SELECT * FROM referral_links WHERE code = ?').get(rm[1]);
-      if (link) {
-        db.prepare('UPDATE referral_links SET clicks = clicks + 1 WHERE id = ?').run(link.id);
-        const dest = link.product_id ? `/?ref=${link.code}&product=${link.product_id}` : `/?ref=${link.code}`;
-        res.writeHead(302, { Location: dest, 'Set-Cookie': `pd_ref=${link.code}; Path=/; Max-Age=${30 * 24 * 3600}; SameSite=Lax` });
-        return res.end();
-      }
-      res.writeHead(302, { Location: '/' }); return res.end();
-    }
     if (p === '/api/support' && req.method === 'POST') {
       const b = await readBody(req);
       if (!b.name || !sec.validPhone(b.phone || '') || !b.message) return send(res, 400, { error: 'أدخل الاسم والهاتف والرسالة' });
@@ -424,19 +412,10 @@ const server = http.createServer(async (req, res) => {
       if (!cust.address || !String(cust.address).trim()) return send(res, 400, { error: 'عنوان التوصيل مطلوب' });
       if (!Array.isArray(b.items) || !b.items.length) return send(res, 400, { error: 'السلة فارغة' });
 
-      // حلّ الإحالة: آخر رابط صالح استخدمه المشتري (قاعدة موثقة في الشروط)
+      // التسويق يدوي فقط بلا روابط إحالة: المسوق المسجّل دخوله هو البائع — يحدد سعر البيع بنفسه وعمولته هي الفرق
       let marketerId = null, refCode = null;
-      const refCandidate = b.refCode || (req.headers.cookie || '').match(/pd_ref=([A-Za-z0-9]+)/)?.[1];
-      if (refCandidate) {
-        const link = db.prepare('SELECT * FROM referral_links WHERE code = ?').get(String(refCandidate));
-        if (link) {
-          const mk = getUser(link.marketer_id);
-          if (mk && mk.status === 'active' && mk.phone !== phone) { marketerId = mk.id; refCode = link.code; }
-        }
-      }
-      // نموذج سوقلي: المسوق المسجّل دخوله هو البائع — يحدد سعر البيع بنفسه وعمولته هي الفرق
       const isMarketerPlacer = !!(s && s.role === 'marketer');
-      if (isMarketerPlacer) { marketerId = s.userId; refCode = refCode || 'direct-marketer'; }
+      if (isMarketerPlacer) { marketerId = s.userId; refCode = 'direct-marketer'; }
 
       const created = [];
       db.exec('BEGIN IMMEDIATE');
@@ -465,11 +444,6 @@ const server = http.createServer(async (req, res) => {
               it2.sell = sell;
               it2.commission = sell - base;
               it2.platformItem = it2.prod.platform_margin;
-            } else if (marketerId) {
-              // طلب عبر رابط إحالة: الزبون يدفع السعر الأساسي والمسوق يأخذ الحد الأدنى 5% من هامش المنصة
-              it2.sell = base;
-              it2.commission = Math.min(Math.round(base * 0.05), it2.prod.platform_margin);
-              it2.platformItem = it2.prod.platform_margin - it2.commission;
             } else {
               it2.sell = base;
               it2.commission = 0;
@@ -501,7 +475,7 @@ const server = http.createServer(async (req, res) => {
               VALUES(?,?,?,?,'expected',?,?)`).run(oid, marketerId, commissionTotal, platformTotal, Date.now(), Date.now());
           }
           db.prepare('INSERT INTO order_history(order_id,status,actor_id,note,created_at) VALUES(?,?,?,?,?)')
-            .run(oid, 'pending_supplier', s ? s.userId : null, isMarketerPlacer ? 'طلب أنشأه المسوق مباشرة للزبون' : (marketerId ? 'طلب عبر رابط إحالة ' + refCode : 'طلب مباشر'), Date.now());
+            .run(oid, 'pending_supplier', s ? s.userId : null, isMarketerPlacer ? 'طلب أنشأه المسوق يدوياً للزبون' : 'طلب مباشر', Date.now());
           created.push(db.prepare('SELECT * FROM orders WHERE id = ?').get(oid));
         }
         db.exec('COMMIT');
@@ -770,24 +744,6 @@ const server = http.createServer(async (req, res) => {
         .map((r) => ({ id: r.id, name: r.name, description: r.description, customer_price: customerPrice(r), stock: r.stock, category_id: r.category_id, category_name: r.category_name, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), in_stock: r.stock > 0 }));
       return send(res, 200, { products: rows });
     }
-    if (p === '/api/marketer/links' && req.method === 'POST') {
-      const s = requireAuth(req, res, ['marketer']); if (!s) return;
-      const b = await readBody(req);
-      const productId = b.productId ? Number(b.productId) : null;
-      if (productId && !db.prepare("SELECT id FROM products WHERE id = ? AND status = 'approved'").get(productId))
-        return send(res, 400, { error: 'المنتج غير متاح للتسويق' });
-      let link = db.prepare('SELECT * FROM referral_links WHERE marketer_id = ? AND product_id IS ?').get(s.userId, productId);
-      if (!link) {
-        const code = sec.newToken(5);
-        const info = db.prepare('INSERT INTO referral_links(code,marketer_id,product_id,created_at) VALUES(?,?,?,?)').run(code, s.userId, productId, Date.now());
-        link = db.prepare('SELECT * FROM referral_links WHERE id = ?').get(Number(info.lastInsertRowid));
-      }
-      return send(res, 201, { ok: true, link: { code: link.code, path: '/r/' + link.code, clicks: link.clicks } });
-    }
-    if (p === '/api/marketer/links' && req.method === 'GET') {
-      const s = requireAuth(req, res, ['marketer']); if (!s) return;
-      return send(res, 200, { links: db.prepare('SELECT * FROM referral_links WHERE marketer_id = ? ORDER BY id DESC').all(s.userId) });
-    }
     if (p === '/api/marketer/orders' && req.method === 'GET') {
       const s = requireAuth(req, res, ['marketer']); if (!s) return;
       const rows = db.prepare('SELECT id, ref, subtotal, delivery_fee, total, status, created_at FROM orders WHERE marketer_id = ? ORDER BY id DESC').all(s.userId)
@@ -924,9 +880,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/admin/payments/confirm' && req.method === 'POST') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
       const b = await readBody(req);
-      const METHODS = ['بريدي موب', 'CCP', 'Flexy', 'نقداً', 'أخرى'];
+      const METHODS = ['تحويل بريدي موب', 'تحويل البريد الجاري', 'التحصيل من مقر المنصة', 'Enveloppe', 'Flexy', 'نقداً عند الاستلام من الإدارة'];
       if (!METHODS.includes(b.method)) return send(res, 400, { error: 'اختر طريقة الدفع الفعلية: بريدي موب / CCP / Flexy / نقداً' });
-      if (b.method !== 'نقداً' && !(b.reference && String(b.reference).trim())) return send(res, 400, { error: 'مرجع العملية مطلوب لتوثيق الدفع (رقم التحويل أو العملية)' });
+      if (['تحويل بريدي موب', 'تحويل البريد الجاري', 'Flexy'].includes(b.method) && !(b.reference && String(b.reference).trim())) return send(res, 400, { error: 'مرجع العملية مطلوب لتوثيق الدفع (رقم التحويل أو العملية)' });
       const marketer = getUser(Number(b.marketerId));
       if (!marketer || marketer.role !== 'marketer') return send(res, 404, { error: 'المسوق غير موجود' });
       const payable = db.prepare("SELECT * FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL").all(marketer.id);

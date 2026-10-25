@@ -74,15 +74,13 @@ async function openTrack() {
 // ---------- صفحات ثابتة ----------
 const PAGES = {
   terms: `<h2>الشروط والأحكام</h2>
-  <h3>قواعد الإحالة والعمولات</h3>
+  <h3>قواعد التسويق والعمولات</h3>
   <ul>
-    <li>كل مسوق له روابط إحالة فريدة. يُنسب الطلب للمسوق صاحب <strong>آخر رابط صالح نقره المشتري خلال 30 يوماً</strong> قبل الطلب (آخر نقرة تكسب).</li>
-    <li>إذا استُخدمت روابط عدة مسوقين، تُعتمد قاعدة «آخر نقرة» وحدها — لا تُقسَّم العمولة.</li>
-    <li>لا تُنسب عمولة لمسوق اشترى هو نفسه عبر رابطه.</li>
-    <li>عمولة المسوق <strong>حسب اختياره</strong>: لكل منتج سعر أساسي معروض، والمسوق يحدد سعر بيعه للزبون عند إدخال الطلب — ربحه هو الفرق بين سعر بيعه والسعر الأساسي، بشرط ألا يقل الربح عن 5% من السعر الأساسي. في الطلبات الواردة عبر رابط إحالة (الزبون طلب بنفسه بالسعر الأساسي) يأخذ المسوق الحد الأدنى: 5% من السعر الأساسي.</li>
+    <li>التسويق في المنصة <strong>يدوي فقط — لا توجد روابط إحالة</strong>: المسوق يسوّق المنتجات بنفسه (بالوصف والصور المتاحين في لوحته) ويُدخل طلبات زبائنه بنفسه من حسابه.</li>
+    <li>عمولة المسوق <strong>حسب اختياره</strong>: لكل منتج سعر أساسي معروض، والمسوق يحدد سعر بيعه للزبون عند إدخال الطلب — ربحه هو الفرق بين سعر بيعه والسعر الأساسي، بشرط ألا يقل الربح عن 5% من السعر الأساسي.</li>
     <li>العمولة «متوقعة» عند إنشاء الطلب، وتمر بحالات: قيد الانتظار ← في التوصيل ← موافق عليها (بعد «تم التسليم والتحصيل») ← مدفوعة. الطلبات الملغاة أو المرتجعة أو المتعذرة <strong>لا تولّد أرباحاً نهائية</strong> وتُلغى عمولاتها آلياً.</li>
-    <li>طلب الدفع (سحب الأرباح): مرة واحدة في الأسبوع من الرصيد الموافق عليه، يُعالج خلال 24–48 ساعة إلى طريقة الدفع المسجلة في حساب المسوق (بريدي موب، CCP، Flexy، ظرف بريدي، أو الاستلام من المقر)، ويُوثَّق بمرجع العملية.</li>
-    <li>برنامج «ادعو أصدقائك»: عندما تبلغ الأرباح الموافق عليها لمسوق انضم بدعوتك 5000 دج، تربح مكافأة 500 دج تُضاف إلى رصيدك القابل للسحب.</li>
+    <li>الدفع: لا توجد طلبات سحب — الدفع الفعلي يتم خارج المنصة حسب طريقة الاستلام المسجلة في حساب المسوق (تحويل بريدي موب، تحويل البريد الجاري، Flexy، ظرف بريدي، أو الاستلام من مقر المنصة)، وعند حدوثه توثّقه الإدارة في المنصة بطريقته ومرجعه فتتحول العمولات إلى «مدفوعة».</li>
+    <li>برنامج «ادعو أصدقائك»: عندما تبلغ الأرباح الموافق عليها لمسوق انضم بدعوتك 5000 دج، تربح مكافأة 500 دج تُضاف إلى رصيدك القابل للدفع.</li>
   </ul>
   <h3>الموردون</h3>
   <ul>
@@ -389,13 +387,6 @@ async function openProduct(id) {
   }
 }
 function wilayaName(code) { const w = WILAYAS.find((x) => x.code === Number(code)); return w ? w.code + ' — ' + w.name_ar : code; }
-function currentRef() {
-  try {
-    const r = JSON.parse(localStorage.getItem('pd_ref') || 'null');
-    if (r && r.code && Date.now() - r.at < 30 * 24 * 3600e3) return r.code;
-  } catch {}
-  return null;
-}
 
 // ---------- السلة والطلب ----------
 function saveCart() { localStorage.setItem('pd_cart', JSON.stringify(CART)); renderCartBadge(); }
@@ -485,7 +476,7 @@ async function openOrderDetails(id) {
       <div class="totals">${moneyRows.map(([k, v]) => `<div>${k}: <strong>${v}</strong></div>`).join('')}</div>
       <div class="card"><h4>الأطراف</h4>
         <p>المورد: <strong>${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')}</strong>
-        ${o.marketer !== undefined ? `<br>المسوق: ${o.marketer ? '<strong>' + esc(o.marketer.name) + '</strong> (رمز الإحالة: ' + esc(o.marketer.ref_code || '') + ')' : 'بيع مباشر بلا مسوق'}` : ''}</p></div>
+        ${o.marketer !== undefined ? `<br>المسوق: ${o.marketer ? '<strong>' + esc(o.marketer.name) + '</strong>' : 'بيع مباشر بلا مسوق'}` : ''}</p></div>
       ${o.reject_reason ? `<p class="muted">سبب الرفض/الإلغاء: ${esc(o.reject_reason)}</p>` : ''}
       <div class="card"><h4>سجل حالات الطلبية</h4>
         ${d.history.length ? d.history.map((h) => `<p class="small">${new Date(h.created_at).toLocaleString('ar-DZ')} — ${esc(h.label)}${h.note ? ' · ' + esc(h.note) : ''}</p>`).join('') : '<p class="muted">لا سجل بعد.</p>'}</div>`;
@@ -561,7 +552,7 @@ document.addEventListener('click', (e) => {
 let regRole = 'buyer';
 const ROLE_HINTS = {
   buyer: 'حساب مشتري: اطلب وتابع طلباتك وسجل مشترياتك.',
-  marketer: 'حساب مسوق: روابط إحالة خاصة بك، عمولات موثقة، وتسويات — العمولة تُثبت بعد التسليم والتحصيل فقط.',
+  marketer: 'حساب مسوق: تسويق يدوي بلا روابط — سوّق بنفسك وأدخل طلبات زبائنك بسعرك، عمولات موثقة تُثبت بعد التسليم والتحصيل فقط.',
   supplier: 'حساب مورد: تُراجع الإدارة حسابك أولاً، ثم تنشر منتجاتك وتستقبل الطلبات الموجهة إليك آلياً.'
 };
 function selectRole(r) {
@@ -602,7 +593,7 @@ function renderSettings() {
       <input id="pfTelegram" value="${esc(ME.telegram_chat_id || '')}" placeholder="معرّف تيليغرام الرقمي (لإشعارات فورية — اختياري)">
       ${ME.role === 'marketer' ? `<select id="pfPayMethod">
         <option value="">— طريقة استلام أرباحك —</option>
-        ${['بريدي موب', 'CCP', 'Flexy', 'نقداً عند الاستلام من الإدارة', 'أخرى'].map((m) => `<option ${ME.payment_method === m ? 'selected' : ''}>${m}</option>`).join('')}
+        ${['تحويل بريدي موب', 'تحويل البريد الجاري', 'التحصيل من مقر المنصة', 'Enveloppe', 'Flexy', 'نقداً عند الاستلام من الإدارة'].map((m) => `<option ${ME.payment_method === m ? 'selected' : ''}>${m}</option>`).join('')}
       </select>
       <input id="pfPayDetails" value="${esc(ME.payment_details || '')}" placeholder="تفاصيل الدفع (رقم الحساب/الهاتف المرتبط…)">` : ''}
       <button class="btn" type="submit">حفظ البيانات</button>
@@ -616,6 +607,12 @@ function renderSettings() {
       <button class="btn gold" type="submit">تغيير كلمة المرور</button>
     </form>
   </details>`;
+  const pmSel = $('#pfPayMethod');
+  if (pmSel) {
+    const pmLabels = { 'تحويل بريدي موب': 'RIB البريد موب', 'تحويل البريد الجاري': 'رقمك ومفتاحك البريدي', 'التحصيل من مقر المنصة': 'الاسم الكامل ورقم هاتفك — الاستلام من مقر المنصة', 'Enveloppe': 'الاسم الكامل، العنوان، الهاتف', 'Flexy': 'رقم هاتفك Flexy', 'نقداً عند الاستلام من الإدارة': 'الاسم الكامل ورقم هاتفك' };
+    const pmUpd = () => { const d = $('#pfPayDetails'); if (d) d.placeholder = pmLabels[pmSel.value] || 'تفاصيل الدفع'; };
+    pmSel.addEventListener('change', pmUpd); pmUpd();
+  }
   const pfW = $('#pfWilaya');
   if (pfW) { pfW.addEventListener('change', () => fillCommunes(pfW.value)); if (pfW.value) fillCommunes(pfW.value); }
   $('#profileForm').addEventListener('submit', async (e) => {
@@ -696,12 +693,11 @@ async function renderBuyer(box) {
 }
 const COMM_STATE_AR = (c, orderStatus) => c.state === 'paid' ? 'مدفوعة ✅' : c.state === 'payable' ? 'موافق عليها 💰' : c.state === 'cancelled' ? 'ملغاة' : (['handed', 'out_for_delivery'].includes(orderStatus) ? 'في التوصيل 🚚' : 'قيد الانتظار ⏳');
 async function renderMarketer(box) {
-  const [{ products }, { commissions, settlements }, { links }, { orders }, { wallet }, invite] = await Promise.all([
-    api('/api/marketer/products'), api('/api/marketer/commissions'), api('/api/marketer/links'), api('/api/marketer/orders'), api('/api/my/wallet'), api('/api/my/invite')
+  const [{ products }, { commissions, settlements }, { orders }, { wallet }, invite] = await Promise.all([
+    api('/api/marketer/products'), api('/api/marketer/commissions'), api('/api/marketer/orders'), api('/api/my/wallet'), api('/api/my/invite')
   ]);
   const commByRef = Object.fromEntries(commissions.map((c) => [c.ref, c]));
   const orderStatusByRef = Object.fromEntries(orders.map((o) => [o.ref, o.status]));
-  const totalClicks = links.reduce((a, l) => a + l.clicks, 0);
   const invLink = location.origin + '/?inv=' + invite.code;
   box.innerHTML = `
   <div class="grid" style="margin-bottom:14px">
@@ -715,7 +711,6 @@ async function renderMarketer(box) {
     <div class="stat-grid">
       <div class="stat">إجمالي أرباحي<b>${fmt(wallet.approved + wallet.paid + wallet.waiting + wallet.inDelivery)}</b></div>
       <div class="stat">طلبات جلبتها<b>${orders.length}</b></div>
-      <div class="stat">نقرات روابطي<b>${totalClicks}</b></div>
       <div class="stat">مكافآت الدعوات 🎁<b>${fmt(wallet.bonuses)}</b></div>
     </div>
     <div class="wallet-hero">
@@ -736,8 +731,9 @@ async function renderMarketer(box) {
   </div>
   <div class="card"><h3>📋 قائمة حسابي</h3>
     <div class="menu-list">
-      <a class="menu-row" href="#sec-orders">🧾<span>طلباتي</span>‹</a>
+      <a class="menu-row" href="#dashSettings" id="mkProfile">👤<span>الملف الشخصي</span>‹</a>
       <a class="menu-row" href="#" id="mkFav">❤️<span>المفضلة</span>‹</a>
+      <a class="menu-row" href="#sec-orders">🧾<span>طلباتي</span>‹</a>
       <a class="menu-row" href="#sec-wallet">💳<span>المدفوعات</span>‹</a>
       <a class="menu-row" href="#" data-nav="delivery">🚚<span>سعر التوصيل</span>‹</a>
       <a class="menu-row" href="#" data-nav="training">🎓<span>تدريب</span>‹</a>
@@ -749,14 +745,11 @@ async function renderMarketer(box) {
   <div class="card"><h3>منتجات متاحة للتسويق</h3>
     <p class="muted small">عمولتك <strong>حسب اختيارك</strong>: السعر المعروض هو السعر الأساسي، حدّد سعر بيعك عند إدخال طلب الزبون في السلة وربحك هو الفرق (5% على الأقل).</p>
     <div class="tablewrap"><table>
-    <tr><th>المنتج</th><th>السعر الأساسي</th><th>المخزون</th><th>رابطك</th><th>مشاركة</th><th>مواد التسويق</th></tr>
+    <tr><th>المنتج</th><th>السعر الأساسي</th><th>المخزون</th><th>مواد التسويق اليدوي</th></tr>
     ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${fmt(p.customer_price)}</td>
       <td>${p.stock > 0 ? p.stock : '<span class="badge out">نافد</span>'}</td>
-      <td><button class="btn small" data-link="${p.id}">إنشاء / نسخ رابط الإحالة</button></td>
-      <td><button class="btn small light" data-share="${p.id}">مشاركة</button></td>
-      <td><button class="btn small light" data-copydesc="${p.id}">📋 نسخ الوصف</button> <button class="btn small light" data-dlimgs="${p.id}">⬇️ الصور</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
-    <p class="muted small">قاعدة الإحالة: آخر رابط صالح نقره المشتري خلال 30 يوماً هو المعتمد.</p></div>
-  <div class="card"><h3>روابطي ونقراتها</h3>${links.length ? links.map((l) => `<p><code>${location.origin}/r/${l.code}</code> — ${l.product_id ? 'منتج #' + l.product_id : 'رابط عام'} — نقرات: ${l.clicks} ${l.product_id ? `<button class="btn small light" data-copymsg="${l.id}">📋 نسخ رسالة مشاركة جاهزة</button>` : ''}</p>`).join('') : '<p class="muted">لا روابط بعد.</p>'}</div>
+      <td><button class="btn small light" data-copydesc="${p.id}">📋 نسخ الوصف</button> <button class="btn small light" data-dlimgs="${p.id}">⬇️ الصور</button></td></tr>`).join('') || '<tr><td colspan="4" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
+  </div>
   <div class="card" id="sec-orders"><h3>طلباتي وحالات أرباحها</h3>${orders.length ? `<div class="chip-row" id="mkOrderChips"><button class="chip on" data-ofilter="all" type="button">الكل</button><button class="chip" data-ofilter="progress" type="button">قيد التوصيل</button><button class="chip" data-ofilter="delivered" type="button">تم التسليم</button><button class="chip" data-ofilter="bad" type="button">ملغاة / مرتجعة</button></div><div class="tablewrap"><table><tr><th>الرقم</th><th>حالة الطلب</th><th>الإجمالي</th><th>عمولتي</th><th>حالة العمولة</th><th></th></tr>${orders.map((o) => { const c = commByRef[o.ref]; return `<tr data-ostatus="${o.status}"><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td>${c ? fmt(c.amount) : '—'}</td><td>${c ? COMM_STATE_AR(c, o.status) : '—'}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`; }).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
   <div class="card" id="sec-invite"><h3>🎁 ادعو أصدقائك</h3>
     <p>ادعُ أصدقاءك للانضمام كمسوقين: عندما تبلغ الأرباح المؤكدة لأي صديق دعوتَه <strong>5000 دج</strong>، تربح أنت مكافأة <strong>500 دج</strong> تُضاف إلى رصيدك.</p>
@@ -775,30 +768,11 @@ async function renderMarketer(box) {
       tr.style.display = show ? '' : 'none';
     });
   }));
-  $$('#dashContent [data-link]').forEach((b) => b.addEventListener('click', async () => {
-    try {
-      const r = await api('/api/marketer/links', { method: 'POST', body: { productId: Number(b.dataset.link) } });
-      const full = location.origin + r.link.path;
-      await navigator.clipboard.writeText(full).catch(() => {});
-      toast('رابط الإحالة: ' + full + ' (نُسخ إن سمح المتصفح)');
-      renderDash();
-    } catch (e) { toast(e.message, true); }
-  }));
-  $$('#dashContent [data-copymsg]').forEach((b) => b.addEventListener('click', async () => {
-    const l = links.find((x) => x.id === Number(b.dataset.copymsg));
-    const p = products.find((x) => x.id === l.product_id);
-    const full = location.origin + '/r/' + l.code;
-    const msg = `🔥 ${p ? p.name : 'منتج مميز'} — ${p ? fmt(p.customer_price) : ''}\nجودة مضمونة والدفع عند الاستلام 🚚💵\nاطلب من هنا: ${full}`;
-    await navigator.clipboard.writeText(msg).catch(() => {});
-    toast('نُسخت الرسالة الجاهزة مع رابطك — الصقها أين تشاء');
-  }));
   $$('#dashContent [data-copydesc]').forEach((b) => b.addEventListener('click', async () => {
     const p = products.find((x) => x.id === Number(b.dataset.copydesc));
-    const r = await api('/api/marketer/links', { method: 'POST', body: { productId: p.id } });
-    const full = location.origin + r.link.path;
-    const txt = `${p.name}\n${p.description || ''}\n💰 السعر: ${fmt(p.customer_price)} — الدفع عند الاستلام\nاطلب من هنا: ${full}`;
+    const txt = `${p.name}\n${p.description || ''}\n💰 السعر: ${fmt(p.customer_price)} — الدفع عند الاستلام`;
     await navigator.clipboard.writeText(txt).catch(() => {});
-    toast('نُسخ الوصف التسويقي مع رابطك');
+    toast('نُسخ الوصف التسويقي — سوّق يدوياً والصق أين تشاء');
   }));
   $$('#dashContent [data-dlimgs]').forEach((b) => b.addEventListener('click', () => {
     const p = products.find((x) => x.id === Number(b.dataset.dlimgs));
@@ -806,13 +780,8 @@ async function renderMarketer(box) {
     p.images.forEach((im, i) => setTimeout(() => { const a = document.createElement('a'); a.href = im; a.target = '_blank'; a.rel = 'noopener'; a.click(); }, i * 350));
     toast('تُفتح ' + p.images.length + ' صورة — احفظ ما تحتاجه لإعلانك');
   }));
-  $$('#dashContent [data-share]').forEach((b) => b.addEventListener('click', async () => {
-    const p = products.find((x) => x.id === Number(b.dataset.share));
-    const r = await api('/api/marketer/links', { method: 'POST', body: { productId: p.id } });
-    const full = location.origin + r.link.path;
-    const text = encodeURIComponent(p.name + ' — ' + fmt(p.customer_price));
-    window.open(`https://wa.me/?text=${text}%20${encodeURIComponent(full)}`, '_blank');
-  }));
+  const mkp = $('#mkProfile');
+  if (mkp) mkp.addEventListener('click', () => { const det = document.querySelector('#dashSettings details'); if (det) det.open = true; });
   const ml = $('#mkLogout');
   if (ml) ml.addEventListener('click', () => { const lb = $('#logoutBtn'); if (lb) lb.click(); });
   const ci = $('#copyInv');
@@ -1038,7 +1007,7 @@ $('#checkoutForm').addEventListener('submit', async (e) => {
     const r = await api('/api/orders', { method: 'POST', body: {
       customer: { name: $('#coName').value, phone: $('#coPhone').value, wilaya: Number($('#coWilaya').value), commune: $('#coCommune').value, address: $('#coAddress').value, deliveryType: $('#coDelType').value },
       items: CART.map((i) => ({ productId: i.productId, qty: i.qty, size: i.size, color: i.color, sellPrice: ME && ME.role === 'marketer' ? sellOf(i) : undefined })),
-      refCode: currentRef(), idempotencyKey: checkoutKey
+      idempotencyKey: checkoutKey
     } });
     CART = []; checkoutKey = null; sessionStorage.removeItem('pd_checkout_key'); saveCart();
     $('#cartDrawer').hidden = true;
@@ -1127,11 +1096,6 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
     }
   } catch (e) { /* بيئة بلا تخزين محلي */ }
   const params = new URLSearchParams(location.search);
-  if (params.get('ref')) {
-    localStorage.setItem('pd_ref', JSON.stringify({ code: params.get('ref'), at: Date.now() }));
-    $('#refBanner').hidden = false;
-    $('#refBanner').textContent = 'وصلت عبر رابط مسوق — سيُنسب طلبك إليه تلقائياً إذا طلبت خلال 30 يوماً (قاعدة آخر نقرة).';
-  }
   if (params.get('inv')) localStorage.setItem('pd_inv', params.get('inv'));
   const { wilayas } = await api('/api/wilayas'); WILAYAS = wilayas;
   for (const sel of ['#coWilaya', '#rgWilaya']) {

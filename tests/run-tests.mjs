@@ -114,18 +114,15 @@ try {
   r = await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: -5 });
   ok(r.status === 400, 'رفض هامش سالب');
 
-  console.log('— الإحالة والطلب والعمولة —');
+  console.log('— الطلب اليدوي والعمولة (بلا روابط إحالة) —');
   r = await marketer.post('/api/marketer/links', { productId: prodId });
-  ok(r.status === 201, 'المسوق ينشئ رابط إحالة');
-  const code = r.data.link.code;
-  const click = await fetch(BASE + '/r/' + code, { redirect: 'manual' });
-  ok(click.status === 302, 'رابط الإحالة يحوّل للمتجر');
+  ok(r.status === 404, 'روابط الإحالة محذوفة نهائياً — التسويق يدوي فقط');
   const guest = new Client();
-  const orderBody = { customer: { name: 'زبون ضيف', phone: '0600000011', wilaya: 16, commune: 'باب الزوار', address: 'حي تجريبي' }, items: [{ productId: prodId, qty: 1 }], refCode: code, idempotencyKey: 'test-key-1' };
-  r = await guest.post('/api/orders', orderBody);
-  ok(r.status === 201 && r.data.orders[0].total === 4000, 'إجمالي الطلب = 3500 + توصيل 500 = 4000 (المثال الرسمي)');
+  const orderBody = { customer: { name: 'زبون ضيف', phone: '0600000011', wilaya: 16, commune: 'باب الزوار', address: 'حي تجريبي' }, items: [{ productId: prodId, qty: 1, sellPrice: 3675 }], idempotencyKey: 'test-key-1' };
+  r = await marketer.post('/api/orders', orderBody);
+  ok(r.status === 201 && r.data.orders[0].total === 4175, 'إجمالي طلب المسوق اليدوي = سعره 3675 + توصيل 500 = 4175');
   const orderRef = r.data.orders[0].ref;
-  r = await guest.post('/api/orders', orderBody);
+  r = await marketer.post('/api/orders', orderBody);
   ok(r.status === 200 && r.data.duplicate === true, 'منع تكرار الطلب بنفس مفتاح عدم التكرار');
   let supOrders = await supplier.get('/api/supplier/orders');
   ok(supOrders.data.orders.length === 1, 'الطلب وُجّه للمورد الصحيح مرة واحدة فقط');
@@ -133,14 +130,14 @@ try {
   let prodNow = await anon.get('/api/products/' + prodId);
   ok(prodNow.data.product.stock === 9, 'المخزون نقص بوحدة واحدة فقط رغم إعادة الإرسال');
   let comm = await marketer.get('/api/marketer/commissions');
-  ok(comm.data.sums.expected === 175 && comm.data.sums.payable === 0, 'عمولة الرابط = 5% من 3500 = 175 متوقعة فقط — غير مستحقة قبل التسليم');
+  ok(comm.data.sums.expected === 175 && comm.data.sums.payable === 0, 'عمولة المسوق من سعره = 3675 − 3500 = 175 متوقعة فقط — غير مستحقة قبل التسليم');
 
   console.log('— snapshot الأسعار —');
   r = await supplier.put('/api/supplier/products/' + prodId, { name: 'منتج المثال', wholesalePrice: 9000, stock: 9, description: 'للاختبار' });
   ok(r.status === 200 && r.data.status === 'pending_review', 'تغيير سعر الجملة يعيد المنتج للمراجعة');
   await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500 });
   const track = await anon.get(`/api/orders/track?ref=${orderRef}&phone=0600000011`);
-  ok(track.status === 200 && track.data.order.total === 4000, 'الطلب القديم احتفظ بسعره الأصلي 4000 بعد تغيير الأسعار');
+  ok(track.status === 200 && track.data.order.total === 4175, 'الطلب القديم احتفظ بسعره الأصلي 4175 بعد تغيير الأسعار');
 
   console.log('— حالات الطلب واستحقاق العمولة —');
   r = await supplier.post(`/api/supplier/orders/${oid}/status`, { status: 'preparing' });
@@ -155,7 +152,7 @@ try {
   comm = await marketer.get('/api/marketer/commissions');
   ok(comm.data.sums.payable === 175, 'العمولة أصبحت مستحقة 175 بعد التسليم والتحصيل فقط');
   const ov = await admin.get('/api/admin/overview');
-  ok(ov.data.platformEarned === 325, 'صافي المنصة المثبت = 500 − 175 = 325 (عمولة الرابط من الهامش)');
+  ok(ov.data.platformEarned === 500, 'صافي المنصة المثبت = هامش 500 كاملاً (عمولة المسوق من سعره لا من الهامش)');
 
   console.log('— الدفع الموثّق بلا طلبات تسوية —');
   r = await marketer.post('/api/marketer/settlements', {});
@@ -166,19 +163,19 @@ try {
   let admSt = await admin.get('/api/admin/settlements');
   const payRow = admSt.data.payable.find((x) => x.marketer_id === mkRow.id);
   ok(payRow && payRow.total === 175, 'مستحقات المسوق القابلة للدفع = 175 بلا أي طلب منه');
-  r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'CCP' });
+  r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'تحويل البريد الجاري' });
   ok(r.status === 400, 'توثيق دفع CCP بلا مرجع مرفوض');
-  r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'CCP', reference: 'REF-TEST-1' });
+  r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'تحويل البريد الجاري', reference: 'REF-TEST-1' });
   ok(r.status === 201 && r.data.amount === 175, 'الإدارة توثّق دفعاً فعلياً حدث خارج المنصة بطريقته ومرجعه');
   comm = await marketer.get('/api/marketer/commissions');
-  ok(comm.data.sums.paid === 175 && comm.data.settlements[0] && comm.data.settlements[0].state === 'paid' && comm.data.settlements[0].method === 'CCP' && comm.data.settlements[0].reference === 'REF-TEST-1', 'العمولة مدفوعة وموثقة عند المسوق بالطريقة والمرجع');
+  ok(comm.data.sums.paid === 175 && comm.data.settlements[0] && comm.data.settlements[0].state === 'paid' && comm.data.settlements[0].method === 'تحويل البريد الجاري' && comm.data.settlements[0].reference === 'REF-TEST-1', 'العمولة مدفوعة وموثقة عند المسوق بالطريقة والمرجع');
   r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'Flexy', reference: 'FX-2' });
   ok(r.status === 400, 'لا دفع ثانٍ بلا رصيد قابل للدفع');
   admSt = await admin.get('/api/admin/settlements');
   ok(admSt.data.payments.length === 1 && admSt.data.payments[0].reference === 'REF-TEST-1', 'سجل المدفوعات الموثقة عند الإدارة يحمل المرجع');
 
   console.log('— الإلغاء يعيد المخزون ويلغي العمولة —');
-  r = await guest.post('/api/orders', { customer: { name: 'زبون ثانٍ', phone: '0600000012', wilaya: 16, commune: 'درارية', address: 'عنوان' }, items: [{ productId: prodId, qty: 2 }], refCode: code, idempotencyKey: 'test-key-2' });
+  r = await marketer.post('/api/orders', { customer: { name: 'زبون ثانٍ', phone: '0600000012', wilaya: 16, commune: 'درارية', address: 'عنوان' }, items: [{ productId: prodId, qty: 2, sellPrice: 10000 }], idempotencyKey: 'test-key-2' });
   ok(r.status === 201, 'طلب ثانٍ بكمية 2');
   supOrders = await supplier.get('/api/supplier/orders');
   const o2 = supOrders.data.orders.find((o) => o.ref === r.data.orders[0].ref);
@@ -325,8 +322,8 @@ try {
   ok(ascPrices.every((v, i, a) => i === 0 || a[i - 1] <= v), 'الأسعار مرتبة تصاعدياً فعلاً');
 
   console.log('— مطابقة سوقلي: إشعارات داخلية وأسعار توصيل ومعلومات الدفع —');
-  r = await mkMail.req('PATCH', '/api/me', { paymentMethod: 'بريدي موب', paymentDetails: '0021456789' });
-  ok(r.status === 200 && r.data.user.payment_method === 'بريدي موب' && r.data.user.payment_details === '0021456789', 'المسوق يحفظ معلومات دفع أرباحه');
+  r = await mkMail.req('PATCH', '/api/me', { paymentMethod: 'تحويل بريدي موب', paymentDetails: '0021456789' });
+  ok(r.status === 200 && r.data.user.payment_method === 'تحويل بريدي موب' && r.data.user.payment_details === '0021456789', 'المسوق يحفظ معلومات دفع أرباحه');
   r = await mkMail.get('/api/my/notifications');
   ok(r.status === 200 && r.data.notifications.length >= 1 && r.data.notifications.every((n) => typeof n.text === 'string'), 'الإشعارات الداخلية تعرض سجل المستخدم نفسه');
   r = await anon.get('/api/my/notifications');
@@ -335,7 +332,7 @@ try {
   ok(r.status === 200 && r.data.coverage.some((c) => c.wilaya_code === 16 && c.min_fee === 500 && c.suppliers >= 1), 'صفحة أسعار التوصيل تعرض أرخص رسم لكل ولاية');
   r = await anon.get('/api/products');
   ok(r.data.products.find((p) => p.id === prodId).sold >= 1, 'بطاقة المنتج تعرض عدد مرات البيع');
-  await marketer.req('PATCH', '/api/me', { paymentMethod: 'CCP', paymentDetails: '3030303030' });
+  await marketer.req('PATCH', '/api/me', { paymentMethod: 'تحويل البريد الجاري', paymentDetails: '3030303030' });
   const admSettlements = await admin.get('/api/admin/settlements');
   ok(Array.isArray(admSettlements.data.payable) && Array.isArray(admSettlements.data.payments), 'واجهة مدفوعات المدير: مستحقات قابلة للدفع + سجل موثّق');
 
@@ -348,7 +345,7 @@ try {
   ok(r.status === 201 && r.data.orders[0].total === baseNow + 500 + 500, 'المسوق يبيع بسعره الحر: الإجمالي = سعره + التوصيل');
   let wallet = await marketer.get('/api/my/wallet');
   ok(wallet.status === 200 && wallet.data.wallet.waiting >= 500, 'محفظة المسوق: عمولة حرة 500 في «قيد الانتظار»');
-  ok(wallet.data.wallet.paid === 175, 'محفظة المسوق: المدفوع 175 من طلب الرابط السابق');
+  ok(wallet.data.wallet.paid === 175, 'محفظة المسوق: المدفوع 175 من طلبه اليدوي السابق');
   // توصيل للمكتب بسعره الخاص
   r = await supplier.put('/api/supplier/coverage', { coverage: [{ wilaya_code: 16, delivery_fee: 500, fee_office: 300, duration: '24-48 ساعة' }, { wilaya_code: 35, delivery_fee: 700 }] });
   ok(r.status === 200, 'المورد يضبط سعر المكتب والمدة');
