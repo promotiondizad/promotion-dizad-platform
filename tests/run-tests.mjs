@@ -357,6 +357,13 @@ try {
   const admSettlements = await admin.get('/api/admin/settlements');
   ok(admSettlements.data.settlements.length === 0 || admSettlements.data.settlements.every((s) => 'marketer_payment_method' in s), 'تسويات المدير تحمل معلومات دفع المسوق');
 
+  console.log('— واجهة الإدارة المنفصلة —');
+  const admPage = await fetch(BASE + '/admin.html');
+  const admHtml = await admPage.text();
+  ok(admPage.status === 200 && admHtml.includes('واجهة إدارة'), 'واجهة الإدارة متاحة في صفحتها المنفصلة /admin.html');
+  const pubJs = await (await fetch(BASE + '/app.js')).text();
+  ok(!pubJs.includes('renderAdmin') && !pubJs.includes('/api/admin/overview'), 'التطبيق العام لا يحتوي أي كود لواجهة الإدارة');
+
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;
 } catch (e) {

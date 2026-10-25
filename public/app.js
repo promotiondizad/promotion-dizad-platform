@@ -378,7 +378,7 @@ async function refreshMe() {
   ME = data.user; CSRF = data.csrf || CSRF;
   $('#authBtn').hidden = !!ME;
   $('#dashBtn').hidden = !ME; $('#logoutBtn').hidden = !ME; $('#bellBtn').hidden = !ME;
-  if (ME) { $('#dashTitle').textContent = 'لوحة ' + ({ admin: 'الإدارة العامة', supplier: 'المورد', marketer: 'المسوق', buyer: 'المشتري' }[ME.role] || ''); $('#dashUser').textContent = ME.name + ' · ' + ME.phone + ' · ' + ME.role; }
+  if (ME) { $('#dashTitle').textContent = ME.role === 'admin' ? 'لوحتي' : 'لوحة ' + ({ supplier: 'المورد', marketer: 'المسوق', buyer: 'المشتري' }[ME.role] || ''); $('#dashUser').textContent = ME.name + ' · ' + ME.phone + ' · ' + ME.role; }
   return ME;
 }
 
@@ -454,7 +454,15 @@ async function renderDash() {
   if (ME.role === 'buyer') await renderBuyer(box);
   else if (ME.role === 'marketer') await renderMarketer(box);
   else if (ME.role === 'supplier') await renderSupplier(box);
-  else if (ME.role === 'admin') await renderAdmin(box);
+  else if (ME.role === 'admin') {
+    // واجهة الإدارة منفصلة تماماً عن التطبيق العام — لا يظهر أي محتوى إداري هنا
+    $('#dashSettings').innerHTML = '';
+    box.innerHTML = `<div class="card" style="text-align:center;padding:34px 18px">
+      <h3>🛠 واجهة الإدارة في صفحتها الخاصة</h3>
+      <p class="muted">لحماية المنصة، لوحة الإدارة منفصلة عن هذا التطبيق العام ولا تظهر للمستخدمين.</p>
+      <p><a class="btn gold big" href="/admin.html">فتح واجهة الإدارة</a></p>
+    </div>`;
+  }
   sectionNav();
 }
 async function renderBuyer(box) {
@@ -633,105 +641,6 @@ async function renderSupplier(box) {
   });
 }
 
-async function renderAdmin(box) {
-  const [ov, users, products, orders, settlements, integ, notifs, support, auditL] = await Promise.all([
-    api('/api/admin/overview'), api('/api/admin/users'), api('/api/admin/products'), api('/api/admin/orders'),
-    api('/api/admin/settlements'), api('/api/admin/integrations'), api('/api/admin/notifications'), api('/api/admin/support'), api('/api/admin/audit')
-  ]);
-  const pendingSup = users.users.filter((u) => u.role === 'supplier' && u.status === 'pending');
-  const pendingProd = products.products.filter((p) => p.status === 'pending_review');
-  box.innerHTML = `
-  <div class="stat-grid">
-    <div class="stat">أرباح المنصة المثبتة<b>${fmt(ov.platformEarned)}</b></div>
-    <div class="stat">عمولات مستحقة للمسوقين<b>${fmt(ov.marketerDue)}</b></div>
-    <div class="stat">موردون بانتظار المراجعة<b>${ov.pendingSuppliers}</b></div>
-    <div class="stat">منتجات بانتظار الاعتماد<b>${ov.pendingProducts}</b></div>
-    <div class="stat">إشعارات فاشلة/غير مضبوطة<b>${ov.failedNotifications}</b></div>
-    <div class="stat">طلبات متأخرة (+48 سا)<b>${ov.lateOrders.length}</b></div>
-  </div>
-  <div class="card"><h3>مراجعة الموردين</h3>${pendingSup.length ? pendingSup.map((u) => `
-    <p><strong>${esc(u.name)}</strong> — ${esc(u.business_name || '')} — ${esc(u.phone)} — ${esc(u.activity || '')}
-    <button class="btn small" data-uact="approve" data-uid="${u.id}">تفعيل</button>
-    <button class="btn small danger" data-uact="reject" data-uid="${u.id}">رفض</button></p>`).join('') : '<p class="muted">لا موردين بانتظار المراجعة.</p>'}</div>
-  <div class="card"><h3>اعتماد المنتجات وتحديد الهامش والعمولة</h3>${pendingProd.length ? pendingProd.map((p) => `
-    <p><strong>${esc(p.name)}</strong> — المورد: ${esc(p.supplier_name)} — الجملة: ${fmt(p.wholesale_price)} — المخزون: ${p.stock}<br>
-    هامش المنصة <input type="number" id="mg-${p.id}" value="500" style="width:100px"> عمولة المسوق <input type="number" id="cm-${p.id}" value="200" style="width:100px">
-    <button class="btn small gold" data-papprove="${p.id}">اعتماد</button>
-    <button class="btn small danger" data-preject="${p.id}">رفض</button></p>`).join('') : '<p class="muted">لا منتجات بانتظار الاعتماد.</p>'}
-    <details><summary>كل المنتجات (${products.products.length})</summary><div class="tablewrap"><table><tr><th>المنتج</th><th>الحالة</th><th>الجملة</th><th>الهامش</th><th>العمولة</th><th>سعر الزبون</th><th>صافي المنصة</th></tr>
-    ${products.products.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.status)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>${fmt(p.marketer_commission)}</td><td>${fmt(p.customer_price)}</td><td>${fmt(p.platform_net)}</td></tr>`).join('')}</table></div></details></div>
-  <div class="card"><h3>المستخدمون</h3><input id="admUserQ" type="search" placeholder="🔍 ابحث بالاسم أو الهاتف أو البريد…" style="margin-bottom:10px"><div class="tablewrap"><table id="admUsersTable"><tr><th>الاسم</th><th>الدور</th><th>الهاتف</th><th>البريد وتأكيده</th><th>الحالة</th><th></th></tr>
-    ${users.users.filter((u) => u.role !== 'admin').map((u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.role)}</td><td>${esc(u.phone)}</td>
-    <td>${u.email ? esc(u.email) + (u.email_verified ? ' <span class="badge">مؤكد ✅</span>' : ' <span class="badge out">غير مؤكد</span>') : '<span class="muted">—</span>'}</td><td>${esc(u.status)}</td>
-    <td>${u.email && !u.email_verified ? `<button class="btn small gold" data-verify-user="${u.id}">تأكيد البريد يدوياً</button> ` : ''}${u.status === 'suspended' ? `<button class="btn small" data-uact="activate" data-uid="${u.id}">إعادة تفعيل</button>` : `<button class="btn small light" data-uact="suspend" data-uid="${u.id}">تعليق</button>`}</td></tr>`).join('')}</table></div></div>
-  <div class="card"><h3>كل الطلبات ومصادرها</h3><input id="admOrderQ" type="search" placeholder="🔍 ابحث برقم الطلبية…" style="margin-bottom:10px"><div class="tablewrap"><table id="admOrdersTable"><tr><th>الرقم</th><th>الحالة</th><th>المورد</th><th>المسوق</th><th>الإجمالي</th><th></th></tr>
-    ${orders.orders.slice(0, 60).map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>#${o.supplier_id}</td><td>${o.marketer_id ? '#' + o.marketer_id + ' (' + esc(o.ref_code || '') + ')' : 'مباشر'}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div></div>
-  <div class="card"><h3>تسويات المسوقين</h3>${settlements.settlements.length ? settlements.settlements.map((s) => `
-    <p>#${s.id} — ${esc(s.marketer_name)} — ${fmt(s.amount)} — ${esc(s.state)}${s.marketer_payment_method ? `<br><span class="muted small">💳 طريقة دفع المسوق: ${esc(s.marketer_payment_method)} — ${esc(s.marketer_payment_details || '')}</span>` : ''} ${s.state === 'requested' || s.state === 'approved' ? `
-    <input placeholder="طريقة الدفع" id="sm-${s.id}" style="width:110px"> <input placeholder="المرجع" id="sr-${s.id}" style="width:110px">
-    <button class="btn small gold" data-spaid="${s.id}">تأكيد الدفع الفعلي</button> <button class="btn small danger" data-sreject="${s.id}">رفض</button>` : ''}</p>`).join('') : '<p class="muted">لا طلبات تسوية.</p>'}
-    <p class="muted small">الدفع الفعلي يتم خارج المنصة (CCP/Flexy…) حسب الاتفاق — زر التأكيد يوثّق فقط ما حدث فعلاً بطريقته ومرجعه.</p></div>
-  <div class="card"><h3>حالة التكاملات</h3>
-    ${Object.entries(integ.integrations).map(([k, v]) => `<p><strong>${k}</strong>: ${v.configured ? '✅ مضبوط' : '⚠️ غير مضبوط'} — ${esc(v.note)}<br><span class="muted small">فاشلة/في الطابور: ${v.failedCount}${v.last ? ' · آخر محاولة: ' + esc(v.last.status) : ''}</span></p>`).join('')}
-    <h4>الإشعارات الأخيرة</h4>${notifs.notifications.slice(0, 15).map((n) => `<p class="small">#${n.id} ${esc(n.channel)} · ${esc(n.type)} · ${esc(n.status)} · محاولات ${n.attempts}${n.last_error ? ' · ' + esc(n.last_error) : ''} <button class="btn small light" data-retry="${n.id}">إعادة المحاولة</button></p>`).join('')}</div>
-  <div class="card"><h3>رسائل الدعم</h3>${support.messages.length ? support.messages.map((m) => `<p><strong>${esc(m.name)}</strong> (${esc(m.phone)}): ${esc(m.message)}</p>`).join('') : '<p class="muted">لا رسائل.</p>'}</div>
-  <div class="card"><h3>أدوات</h3>
-    <form id="catForm" class="row-form"><input id="catName" placeholder="تصنيف جديد"><button class="btn" type="submit">إضافة تصنيف</button></form>
-    <p><button class="btn light" id="backupBtn" type="button">إنشاء نسخة احتياطية من قاعدة البيانات</button></p>
-    <details><summary>سجل العمليات الإدارية (تدقيق)</summary>${auditL.logs.slice(0, 40).map((l) => `<p class="small">#${l.id} ${esc(l.action)} · ${esc(l.entity || '')} ${esc(l.entity_id || '')} · ${new Date(l.created_at).toLocaleString('ar-DZ')}</p>`).join('')}</details>
-  </div>`;
-  const filterRows = (inputId, tableId) => {
-    const inp = $(inputId); if (!inp) return;
-    inp.addEventListener('input', () => {
-      const q = inp.value.trim();
-      $$('#dashContent ' + tableId + ' tr').forEach((tr, i) => { if (i > 0) tr.style.display = !q || tr.textContent.includes(q) ? '' : 'none'; });
-    });
-  };
-  filterRows('#admUserQ', '#admUsersTable');
-  filterRows('#admOrderQ', '#admOrdersTable');
-  $$('#dashContent [data-verify-user]').forEach((b) => b.addEventListener('click', async () => {
-    try { await api(`/api/admin/users/${b.dataset.verifyUser}/verify-email`, { method: 'POST', body: {} }); toast('تم تأكيد بريد المستخدم'); renderDash(); }
-    catch (e) { toast(e.message, true); }
-  }));
-  $$('#dashContent [data-uact]').forEach((b) => b.addEventListener('click', async () => {
-    let reason = null;
-    if (b.dataset.uact === 'reject') { reason = prompt('سبب الرفض:'); if (reason === null) return; }
-    try { await api(`/api/admin/users/${b.dataset.uid}/action`, { method: 'POST', body: { action: b.dataset.uact, reason } }); toast('تم'); renderDash(); }
-    catch (e) { toast(e.message, true); }
-  }));
-  $$('#dashContent [data-papprove]').forEach((b) => b.addEventListener('click', async () => {
-    const id = b.dataset.papprove;
-    try { await api(`/api/admin/products/${id}/review`, { method: 'POST', body: { action: 'approve', platformMargin: Number($('#mg-' + id).value), marketerCommission: Number($('#cm-' + id).value) } }); toast('تم اعتماد المنتج'); renderDash(); }
-    catch (e) { toast(e.message, true); }
-  }));
-  $$('#dashContent [data-preject]').forEach((b) => b.addEventListener('click', async () => {
-    const reason = prompt('سبب رفض المنتج:'); if (reason === null) return;
-    try { await api(`/api/admin/products/${b.dataset.preject}/review`, { method: 'POST', body: { action: 'reject', reason } }); toast('رُفض المنتج'); renderDash(); }
-    catch (e) { toast(e.message, true); }
-  }));
-  $$('#dashContent [data-spaid]').forEach((b) => b.addEventListener('click', async () => {
-    const id = b.dataset.spaid;
-    try { await api(`/api/admin/settlements/${id}/action`, { method: 'POST', body: { action: 'paid', method: $('#sm-' + id).value, reference: $('#sr-' + id).value } }); toast('وُثّق دفع التسوية'); renderDash(); }
-    catch (e) { toast(e.message, true); }
-  }));
-  $$('#dashContent [data-sreject]').forEach((b) => b.addEventListener('click', async () => {
-    try { await api(`/api/admin/settlements/${b.dataset.sreject}/action`, { method: 'POST', body: { action: 'rejected', note: 'رفضته الإدارة' } }); toast('رُفضت التسوية'); renderDash(); }
-    catch (e) { toast(e.message, true); }
-  }));
-  $$('#dashContent [data-retry]').forEach((b) => b.addEventListener('click', async () => {
-    const r = await api(`/api/admin/notifications/${b.dataset.retry}/retry`, { method: 'POST', body: {} });
-    toast(r.ok ? 'أُرسل الإشعار' : 'ما زال غير مُرسل: ' + (r.result.error || ''), !r.ok); renderDash();
-  }));
-  $('#catForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try { await api('/api/admin/categories', { method: 'POST', body: { name: $('#catName').value } }); toast('أُضيف التصنيف'); renderDash(); }
-    catch (err) { toast(err.message, true); }
-  });
-  $('#backupBtn').addEventListener('click', async () => {
-    try { const r = await api('/api/admin/backup', { method: 'POST', body: {} }); toast('أُنشئت النسخة: ' + r.file); }
-    catch (e) { toast(e.message, true); }
-  });
-}
 
 // ---------- أحداث عامة ----------
 function openAuth(tab = 'login', role, phone) {
