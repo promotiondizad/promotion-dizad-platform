@@ -313,3 +313,20 @@ html,body{overflow-x:clip}
 .prod-row{flex-wrap:wrap}
 .prod-row .pr-main{min-width:170px}
 .tablewrap{overflow-x:auto}
+
+/* ===== محفظة المسوق وقائمة الحساب (أسلوب سوقلي) ===== */
+.wallet-hero{background:linear-gradient(135deg,#0d5a41,#06392b);color:#fff;border-radius:18px;padding:18px;margin-bottom:12px;box-shadow:0 10px 24px rgba(6,57,43,.25)}
+.wallet-hero .wh-amount{font-size:31px;font-weight:900;margin:4px 0}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+@media(min-width:720px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{border-radius:16px;padding:14px;color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.12)}
+.tile small{display:block;opacity:.94;font-weight:700;margin-bottom:5px}
+.tile b{font-size:20px}
+.tile.blue{background:linear-gradient(135deg,#2196f3,#1565c0)}
+.tile.green{background:linear-gradient(135deg,#43a047,#2e7d32)}
+.tile.teal{background:linear-gradient(135deg,#26a69a,#00796b)}
+.tile.purple{background:linear-gradient(135deg,#8e24aa,#6a1b9a)}
+.menu-list{display:flex;flex-direction:column}
+.menu-row{display:flex;align-items:center;gap:11px;padding:13px 6px;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700;background:none;border-top:none;border-left:none;border-right:none;width:100%;text-align:start;font-size:15px;cursor:pointer;font-family:inherit}
+.menu-row span{flex:1}
+.menu-row:last-child{border-bottom:none}

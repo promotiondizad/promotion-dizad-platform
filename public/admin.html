@@ -44,7 +44,7 @@
       <button class="atab" data-atab="products" type="button">📦 المنتجات</button>
       <button class="atab" data-atab="users" type="button">👥 المستخدمون</button>
       <button class="atab" data-atab="orders" type="button">🧾 الطلبات</button>
-      <button class="atab" data-atab="settlements" type="button">💰 التسويات</button>
+      <button class="atab" data-atab="settlements" type="button">💰 المدفوعات</button>
       <button class="atab" data-atab="integrations" type="button">🔌 التكاملات والإشعارات</button>
       <button class="atab" data-atab="support" type="button">✉️ الدعم</button>
       <button class="atab" data-atab="tools" type="button">🧰 أدوات</button>
@@ -206,20 +206,29 @@ async function renderOrders(box) {
 }
 
 async function renderSettlements(box) {
-  const { settlements } = await api('/api/admin/settlements');
-  box.innerHTML = `<div class="card"><h3>تسويات المسوقين</h3>${settlements.length ? settlements.map((s) => `
-    <p>#${s.id} — ${esc(s.marketer_name)} — ${fmt(s.amount)} — ${esc(s.state)}${s.marketer_payment_method ? `<br><span class="muted small">💳 طريقة دفع المسوق: ${esc(s.marketer_payment_method)} — ${esc(s.marketer_payment_details || '')}</span>` : ''} ${s.state === 'requested' || s.state === 'approved' ? `
-    <input placeholder="طريقة الدفع" id="sm-${s.id}" style="width:110px"> <input placeholder="المرجع" id="sr-${s.id}" style="width:110px">
-    <button class="btn small gold" data-spaid="${s.id}">تأكيد الدفع الفعلي</button> <button class="btn small danger" data-sreject="${s.id}">رفض</button>` : ''}</p>`).join('') : '<p class="muted">لا طلبات تسوية.</p>'}
-    <p class="muted small">الدفع الفعلي يتم خارج المنصة (CCP/Flexy…) حسب الاتفاق — زر التأكيد يوثّق فقط ما حدث فعلاً بطريقته ومرجعه.</p></div>`;
-  $$('[data-spaid]', box).forEach((b) => b.addEventListener('click', async () => {
-    const id = b.dataset.spaid;
-    try { await api(`/api/admin/settlements/${id}/action`, { method: 'POST', body: { action: 'paid', method: $('#sm-' + id).value, reference: $('#sr-' + id).value } }); toast('وُثّق دفع التسوية'); render(); }
-    catch (e) { toast(e.message, true); }
-  }));
-  $$('[data-sreject]', box).forEach((b) => b.addEventListener('click', async () => {
-    try { await api(`/api/admin/settlements/${b.dataset.sreject}/action`, { method: 'POST', body: { action: 'rejected', note: 'رفضته الإدارة' } }); toast('رُفضت التسوية'); render(); }
-    catch (e) { toast(e.message, true); }
+  const { payable, payments } = await api('/api/admin/settlements');
+  const METHODS = ['بريدي موب', 'CCP', 'Flexy', 'نقداً', 'أخرى'];
+  box.innerHTML = `<div class="card"><h3>مستحقات المسوقين — قابلة للدفع الآن</h3>
+    <p class="muted small">لا توجد طلبات تسوية. الدفع الفعلي يتم خارج المنصة (CCP / بريدي موب / Flexy…) حسب الاتفاق ووسيلة المسوق المسجّلة — زر التأكيد يوثّق فقط ما حدث فعلاً بطريقته ومرجعه.</p>
+    ${payable.length ? payable.map((m) => `
+    <div class="ord-card">
+      <div class="ord-head"><strong>${esc(m.name)}</strong><span class="muted small">${esc(m.phone)}</span><strong style="color:#0d9d63">${fmt(m.total)}</strong></div>
+      <p class="small">عمولات: ${fmt(m.commissions_sum)} · مكافآت دعوات: ${fmt(m.bonuses_sum)}<br><span class="muted">💳 وسيلة المسوق: ${m.payment_method ? esc(m.payment_method) + ' — ' + esc(m.payment_details || '') : '⚠️ لم يضبط وسيلة استلام بعد'}</span></p>
+      <div class="row-form">
+        <select id="pm-${m.marketer_id}">${METHODS.map((x) => `<option ${m.payment_method === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+        <input id="pr-${m.marketer_id}" placeholder="مرجع العملية (رقم التحويل) — إلزامي إلا للنقد">
+        <input id="pn-${m.marketer_id}" placeholder="ملاحظة (اختياري)">
+        <button class="btn small gold" data-payconf="${m.marketer_id}" type="button">✅ تأكيد دفع حدث فعلاً</button>
+      </div>
+    </div>`).join('') : '<p class="muted">لا مستحقات قابلة للدفع حالياً.</p>'}</div>
+  <div class="card"><h3>🧾 سجل المدفوعات الموثّقة</h3>
+    ${payments.length ? payments.map((s) => `<p>#${s.id} — ${esc(s.marketer_name)} — ${fmt(s.amount)} — ${esc(s.method || '')}${s.reference ? ' · مرجع: ' + esc(s.reference) : ''}${s.note ? ' · ' + esc(s.note) : ''} <span class="muted small">${new Date(s.created_at).toLocaleDateString('ar-DZ')}</span></p>`).join('') : '<p class="muted">لا مدفوعات موثّقة بعد.</p>'}</div>`;
+  $$('[data-payconf]', box).forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.payconf;
+    try {
+      const r = await api('/api/admin/payments/confirm', { method: 'POST', body: { marketerId: Number(id), method: $('#pm-' + id).value, reference: $('#pr-' + id).value, note: $('#pn-' + id).value } });
+      toast('وُثّق الدفع #' + r.settlementId + ' بمبلغ ' + fmt(r.amount)); render();
+    } catch (e) { toast(e.message, true); }
   }));
 }
 

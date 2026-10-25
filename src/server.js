@@ -804,16 +804,8 @@ const server = http.createServer(async (req, res) => {
       const payableFree = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL", s.userId);
       const bonusesFree = sum('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL', s.userId);
       const bonusesTotal = sum('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ?', s.userId);
-      const pendingPayout = sum("SELECT COALESCE(SUM(amount),0) s FROM settlements WHERE marketer_id = ? AND state IN ('requested','approved')", s.userId);
-      const lastSt = db.prepare('SELECT MAX(created_at) m FROM settlements WHERE marketer_id = ?').get(s.userId).m;
-      const weekMs = 7 * 24 * 3600e3;
       const balance = payableFree + bonusesFree;
-      return send(res, 200, { wallet: {
-        waiting, inDelivery, approved, paid,
-        bonuses: bonusesTotal, balance, pendingPayout,
-        canRequest: balance > 0 && (!lastSt || Date.now() - lastSt >= weekMs),
-        nextRequestAt: lastSt ? lastSt + weekMs : null
-      } });
+      return send(res, 200, { wallet: { waiting, inDelivery, approved, paid, bonuses: bonusesTotal, balance } });
     }
     if (p === '/api/my/invite' && req.method === 'GET') {
       const s = requireAuth(req, res); if (!s) return;
@@ -841,30 +833,6 @@ const server = http.createServer(async (req, res) => {
       const settlements = db.prepare('SELECT * FROM settlements WHERE marketer_id = ? ORDER BY id DESC').all(s.userId);
       return send(res, 200, { commissions: rows, sums, settlements });
     }
-    if (p === '/api/marketer/settlements' && req.method === 'POST') {
-      const s = requireAuth(req, res, ['marketer']); if (!s) return;
-      // كيما سوقلي: طلب دفع واحد في الأسبوع
-      const lastSt = db.prepare('SELECT MAX(created_at) m FROM settlements WHERE marketer_id = ?').get(s.userId).m;
-      if (lastSt && Date.now() - lastSt < 7 * 24 * 3600e3) return send(res, 400, { error: 'يمكنك طلب الدفع مرة واحدة فقط في الأسبوع — طلبك السابق لم تمر عليه 7 أيام بعد' });
-      const payable = db.prepare("SELECT * FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL").all(s.userId);
-      const bonuses = db.prepare('SELECT * FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL').all(s.userId);
-      if (!payable.length && !bonuses.length) return send(res, 400, { error: 'رصيدك القابل للسحب فارغ حالياً — طلب الدفع يتفعل عندما تتوفر عمولات مؤكدة' });
-      const amount = payable.reduce((a, c) => a + c.amount, 0) + bonuses.reduce((a, c) => a + c.amount, 0);
-      db.exec('BEGIN IMMEDIATE');
-      try {
-        const info = db.prepare(`INSERT INTO settlements(marketer_id,amount,state,created_at,updated_at) VALUES(?,?,'requested',?,?)`).run(s.userId, amount, Date.now(), Date.now());
-        const sid = Number(info.lastInsertRowid);
-        const upd = db.prepare('UPDATE commissions SET settlement_id = ? WHERE id = ?');
-        for (const c of payable) upd.run(sid, c.id);
-        const updB = db.prepare('UPDATE invite_bonuses SET settlement_id = ? WHERE id = ?');
-        for (const bn of bonuses) updB.run(sid, bn.id);
-        db.exec('COMMIT');
-        await integ.notify({ channel: 'log', type: 'settlement_request', text: `طلب تسوية جديد #${sid} بمبلغ ${amount} دج من مسوق #${s.userId}` });
-        await notifyAdmin(`💰 طلب تسوية عمولات جديد #${sid} بمبلغ ${amount} دج في منصة SOUQAR`);
-        return send(res, 201, { ok: true, settlementId: sid, amount });
-      } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'خطأ في إنشاء طلب التسوية' }); }
-    }
-
     // ---------- الإدارة العامة ----------
     if (p === '/api/admin/overview' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
@@ -945,32 +913,40 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/admin/settlements' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
-      const rows = db.prepare(`SELECT st.*, u.name AS marketer_name, u.phone AS marketer_phone, u.payment_method AS marketer_payment_method, u.payment_details AS marketer_payment_details FROM settlements st JOIN users u ON u.id = st.marketer_id ORDER BY st.id DESC`).all();
-      return send(res, 200, { settlements: rows });
+      const payable = db.prepare(`SELECT u.id AS marketer_id, u.name, u.phone, u.payment_method, u.payment_details,
+        (SELECT COALESCE(SUM(amount),0) FROM commissions WHERE marketer_id = u.id AND state = 'payable' AND settlement_id IS NULL) AS commissions_sum,
+        (SELECT COALESCE(SUM(amount),0) FROM invite_bonuses WHERE inviter_id = u.id AND settlement_id IS NULL) AS bonuses_sum
+        FROM users u WHERE u.role = 'marketer'`).all()
+        .map((r) => ({ ...r, total: r.commissions_sum + r.bonuses_sum })).filter((r) => r.total > 0);
+      const payments = db.prepare(`SELECT st.*, u.name AS marketer_name, u.phone AS marketer_phone FROM settlements st JOIN users u ON u.id = st.marketer_id WHERE st.state = 'paid' ORDER BY st.id DESC`).all();
+      return send(res, 200, { payable, payments });
     }
-    const settleM = p.match(/^\/api\/admin\/settlements\/(\d+)\/action$/);
-    if (settleM && req.method === 'POST') {
+    if (p === '/api/admin/payments/confirm' && req.method === 'POST') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
-      const st = db.prepare('SELECT * FROM settlements WHERE id = ?').get(Number(settleM[1]));
-      if (!st) return send(res, 404, { error: 'طلب التسوية غير موجود' });
       const b = await readBody(req);
+      const METHODS = ['بريدي موب', 'CCP', 'Flexy', 'نقداً', 'أخرى'];
+      if (!METHODS.includes(b.method)) return send(res, 400, { error: 'اختر طريقة الدفع الفعلية: بريدي موب / CCP / Flexy / نقداً' });
+      if (b.method !== 'نقداً' && !(b.reference && String(b.reference).trim())) return send(res, 400, { error: 'مرجع العملية مطلوب لتوثيق الدفع (رقم التحويل أو العملية)' });
+      const marketer = getUser(Number(b.marketerId));
+      if (!marketer || marketer.role !== 'marketer') return send(res, 404, { error: 'المسوق غير موجود' });
+      const payable = db.prepare("SELECT * FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL").all(marketer.id);
+      const bonuses = db.prepare('SELECT * FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL').all(marketer.id);
+      const amount = payable.reduce((a, c) => a + c.amount, 0) + bonuses.reduce((a, x) => a + x.amount, 0);
+      if (!amount) return send(res, 400, { error: 'لا رصيد قابل للدفع لهذا المسوق حالياً' });
       db.exec('BEGIN IMMEDIATE');
       try {
-        if (b.action === 'paid') {
-          db.prepare("UPDATE settlements SET state='paid', method=?, reference=?, note=?, updated_at=? WHERE id=?")
-            .run(b.method || null, b.reference || null, b.note || null, Date.now(), st.id);
-          db.prepare("UPDATE commissions SET state='paid', updated_at=? WHERE settlement_id=?").run(Date.now(), st.id);
-        } else if (b.action === 'approved') {
-          db.prepare("UPDATE settlements SET state='approved', updated_at=? WHERE id=?").run(Date.now(), st.id);
-        } else if (b.action === 'rejected') {
-          db.prepare("UPDATE settlements SET state='rejected', note=?, updated_at=? WHERE id=?").run(b.note || null, Date.now(), st.id);
-          db.prepare('UPDATE commissions SET settlement_id=NULL WHERE settlement_id=?').run(st.id);
-          db.prepare('UPDATE invite_bonuses SET settlement_id=NULL WHERE settlement_id=?').run(st.id);
-        } else throw Object.assign(new Error('إجراء غير معروف'), { http: 400 });
+        const info = db.prepare(`INSERT INTO settlements(marketer_id,amount,state,method,reference,note,created_at,updated_at) VALUES(?,?,'paid',?,?,?,?,?)`)
+          .run(marketer.id, amount, b.method, b.reference ? String(b.reference).trim() : null, b.note || null, Date.now(), Date.now());
+        const sid = Number(info.lastInsertRowid);
+        const upd = db.prepare("UPDATE commissions SET settlement_id = ?, state = 'paid', updated_at = ? WHERE id = ?");
+        for (const c of payable) upd.run(sid, Date.now(), c.id);
+        const updB = db.prepare('UPDATE invite_bonuses SET settlement_id = ? WHERE id = ?');
+        for (const bn of bonuses) updB.run(sid, bn.id);
         db.exec('COMMIT');
-      } catch (e) { db.exec('ROLLBACK'); return send(res, e.http || 500, { error: e.message }); }
-      audit(s.userId, 'settlement_' + b.action, 'settlement', st.id, b.reference || null);
-      return send(res, 200, { ok: true });
+        audit(s.userId, 'payment_confirm', 'settlement', sid, b.reference || b.method);
+        await integ.notify({ channel: 'log', type: 'payment_confirmed', text: `دفع موثّق #${sid} بمبلغ ${amount} دج للمسوق ${marketer.name} عبر ${b.method} — مرجع: ${b.reference || 'نقداً'}` });
+        return send(res, 201, { ok: true, settlementId: sid, amount });
+      } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'خطأ في توثيق الدفع' }); }
     }
     if (p === '/api/admin/integrations' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;

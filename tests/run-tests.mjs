@@ -157,16 +157,25 @@ try {
   const ov = await admin.get('/api/admin/overview');
   ok(ov.data.platformEarned === 325, 'صافي المنصة المثبت = 500 − 175 = 325 (عمولة الرابط من الهامش)');
 
-  console.log('— التسوية —');
+  console.log('— الدفع الموثّق بلا طلبات تسوية —');
   r = await marketer.post('/api/marketer/settlements', {});
-  ok(r.status === 201 && r.data.amount === 175, 'المسوق يطلب تسوية 175');
-  const sid = r.data.settlementId;
-  r = await admin.post(`/api/admin/settlements/${sid}/action`, { action: 'paid', method: 'CCP', reference: 'REF-TEST-1' });
-  ok(r.status === 200, 'الإدارة توثق دفع التسوية بمرجع');
+  ok(r.status === 404, 'لا توجد طلبات تسوية إطلاقاً (المسار أُزيل)');
+  const mkUsers = await admin.get('/api/admin/users?role=marketer');
+  const mkMe = await marketer.get('/api/me');
+  const mkRow = mkUsers.data.users.find((u) => u.id === mkMe.data.user.id) || mkUsers.data.users[0];
+  let admSt = await admin.get('/api/admin/settlements');
+  const payRow = admSt.data.payable.find((x) => x.marketer_id === mkRow.id);
+  ok(payRow && payRow.total === 175, 'مستحقات المسوق القابلة للدفع = 175 بلا أي طلب منه');
+  r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'CCP' });
+  ok(r.status === 400, 'توثيق دفع CCP بلا مرجع مرفوض');
+  r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'CCP', reference: 'REF-TEST-1' });
+  ok(r.status === 201 && r.data.amount === 175, 'الإدارة توثّق دفعاً فعلياً حدث خارج المنصة بطريقته ومرجعه');
   comm = await marketer.get('/api/marketer/commissions');
-  ok(comm.data.sums.paid === 175, 'العمولة مدفوعة وموثقة');
-  r = await marketer.post('/api/marketer/settlements', {});
-  ok(r.status === 400, 'طلب دفع ثانٍ في نفس الأسبوع مرفوض (مرة في الأسبوع كيما سوقلي)');
+  ok(comm.data.sums.paid === 175 && comm.data.settlements[0] && comm.data.settlements[0].state === 'paid' && comm.data.settlements[0].method === 'CCP' && comm.data.settlements[0].reference === 'REF-TEST-1', 'العمولة مدفوعة وموثقة عند المسوق بالطريقة والمرجع');
+  r = await admin.post('/api/admin/payments/confirm', { marketerId: mkRow.id, method: 'Flexy', reference: 'FX-2' });
+  ok(r.status === 400, 'لا دفع ثانٍ بلا رصيد قابل للدفع');
+  admSt = await admin.get('/api/admin/settlements');
+  ok(admSt.data.payments.length === 1 && admSt.data.payments[0].reference === 'REF-TEST-1', 'سجل المدفوعات الموثقة عند الإدارة يحمل المرجع');
 
   console.log('— الإلغاء يعيد المخزون ويلغي العمولة —');
   r = await guest.post('/api/orders', { customer: { name: 'زبون ثانٍ', phone: '0600000012', wilaya: 16, commune: 'درارية', address: 'عنوان' }, items: [{ productId: prodId, qty: 2 }], refCode: code, idempotencyKey: 'test-key-2' });
@@ -328,7 +337,7 @@ try {
   ok(r.data.products.find((p) => p.id === prodId).sold >= 1, 'بطاقة المنتج تعرض عدد مرات البيع');
   await marketer.req('PATCH', '/api/me', { paymentMethod: 'CCP', paymentDetails: '3030303030' });
   const admSettlements = await admin.get('/api/admin/settlements');
-  ok(admSettlements.data.settlements.length === 0 || admSettlements.data.settlements.every((s) => 'marketer_payment_method' in s), 'تسويات المدير تحمل معلومات دفع المسوق');
+  ok(Array.isArray(admSettlements.data.payable) && Array.isArray(admSettlements.data.payments), 'واجهة مدفوعات المدير: مستحقات قابلة للدفع + سجل موثّق');
 
   console.log('— نموذج سوقلي: عمولة حرة ومحفظة ودعوات وتوصيل مكتب وصفحة متجر —');
   const baseNow = (await anon.get('/api/products/' + prodId)).data.product.customer_price;

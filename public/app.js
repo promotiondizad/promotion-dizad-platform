@@ -713,24 +713,38 @@ async function renderMarketer(box) {
   <div class="card"><h3>📍 مراحل تتبّع كل طلب</h3><div class="stages-strip">${['طلب جديد', 'تم تأكيد الطلب', 'قيد التجهيز لدى المورد', 'تم تسليمه لشركة التوصيل', 'خرج للتوصيل', 'تم التسليم أو الإرجاع أو الإلغاء'].map((t, i) => `<div class="stage-pill"><b>${i + 1}</b><span>${t}</span></div>`).join('')}</div></div>
   <div class="card" id="sec-wallet"><h3>💰 محفظتي</h3>
     <div class="stat-grid">
-      <div class="stat">قيد الانتظار ⏳<b>${fmt(wallet.waiting)}</b></div>
-      <div class="stat">في التوصيل 🚚<b>${fmt(wallet.inDelivery)}</b></div>
-      <div class="stat">موافق عليها 💰<b>${fmt(wallet.approved)}</b></div>
-      <div class="stat">مدفوعة ✅<b>${fmt(wallet.paid)}</b></div>
       <div class="stat">إجمالي أرباحي<b>${fmt(wallet.approved + wallet.paid + wallet.waiting + wallet.inDelivery)}</b></div>
       <div class="stat">طلبات جلبتها<b>${orders.length}</b></div>
       <div class="stat">نقرات روابطي<b>${totalClicks}</b></div>
       <div class="stat">مكافآت الدعوات 🎁<b>${fmt(wallet.bonuses)}</b></div>
     </div>
-    <p>الرصيد القابل للسحب: <strong>${fmt(wallet.balance)}</strong>${wallet.pendingPayout ? ` · لديك طلب دفع قيد المعالجة: ${fmt(wallet.pendingPayout)}` : ''}</p>
+    <div class="wallet-hero">
+      <span class="small" style="opacity:.85">💳 محفظتي — الرصيد القابل للدفع</span>
+      <div class="wh-amount">${fmt(wallet.balance)}</div>
+      <span class="small" style="opacity:.9">وسيلة استلامي: ${ME.payment_method ? esc(ME.payment_method) + (ME.payment_details ? ' — ' + esc(ME.payment_details) : '') : 'لم تُضبط بعد — اضبطها من «إعدادات حسابي» أسفله (CCP / بريدي موب / Flexy)'}</span>
+    </div>
+    <div class="tiles">
+      <div class="tile blue"><small>عمولة في توصيل</small><b>${fmt(wallet.inDelivery)}</b></div>
+      <div class="tile green"><small>عمولة قيد الانتظار</small><b>${fmt(wallet.waiting)}</b></div>
+      <div class="tile teal"><small>عمولة موافق عليها</small><b>${fmt(wallet.approved)}</b></div>
+      <div class="tile purple"><small>عمولة مدفوعة</small><b>${fmt(wallet.paid)}</b></div>
+    </div>
+    <p class="muted small">الدفع الفعلي يتم خارج المنصة (CCP / بريدي موب / Flexy…) حسب وسيلتك المسجّلة — لا توجد طلبات دفع؛ عند حدوث الدفع توثّقه الإدارة هنا بطريقته ومرجعه فتتحول عمولاتك إلى «مدفوعة».</p>
     ${(() => { const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i)); const sum = commissions.filter((c) => c.state !== 'cancelled' && new Date(c.created_at) >= d && new Date(c.created_at) < new Date(d.getTime() + 86400e3)).reduce((a, c) => a + c.amount, 0); return { d, sum }; }); const max = Math.max(1, ...days.map((x) => x.sum)); return `<h4>📈 أداء المبيعات — آخر 7 أيام</h4><div style="display:flex;gap:6px;align-items:flex-end;height:90px">${days.map((x) => `<div style="flex:1;text-align:center"><div title="${fmt(x.sum)}" style="background:var(--gold);border-radius:6px 6px 0 0;height:${Math.max(4, Math.round(x.sum / max * 56))}px"></div><span class="muted small">${x.d.toLocaleDateString('ar-DZ', { weekday: 'short' })}</span><br><span class="small">${x.sum ? fmt(x.sum) : '—'}</span></div>`).join('')}</div>`; })()}
-    <p class="muted small">طلب الدفع: مرة واحدة في الأسبوع، ويُعالج خلال 24–48 ساعة إلى طريقة الدفع المسجلة في إعدادات حسابك (${ME.payment_method ? esc(ME.payment_method) : 'لم تُضبط بعد — ضبطها من إعدادات حسابي أسفله'}).</p>
-    <button class="btn gold" id="reqSettle" ${wallet.canRequest ? '' : 'disabled'}>💳 طلب الدفع (${fmt(wallet.balance)})</button>
-    ${!wallet.canRequest && wallet.balance > 0 ? `<span class="muted small"> طلب الدفع القادم متاح بعد ${wallet.nextRequestAt ? new Date(wallet.nextRequestAt).toLocaleDateString('ar-DZ') : ''} (مرة في الأسبوع)</span>` : ''}
-    ${settlements.length ? `<h4>سجل المدفوعات</h4>${settlements.map((s) => `<p>#${s.id} — ${fmt(s.amount)} — ${({ requested: 'قيد المعالجة ⏳', approved: 'موافق عليها', paid: 'مدفوعة ✅' + (s.method ? ' · ' + esc(s.method) : '') + (s.reference ? ' · مرجع: ' + esc(s.reference) : ''), rejected: 'مرفوضة' })[s.state]} <span class="muted small">${new Date(s.created_at).toLocaleDateString('ar-DZ')}</span></p>`).join('')}` : ''}
+    <h4>🧾 سجل المدفوعات الموثّقة</h4>
+    ${settlements.length ? settlements.map((s) => `<p>#${s.id} — ${fmt(s.amount)} — مدفوعة ✅${s.method ? ' · ' + esc(s.method) : ''}${s.reference ? ' · مرجع: ' + esc(s.reference) : ''} <span class="muted small">${new Date(s.created_at).toLocaleDateString('ar-DZ')}</span></p>`).join('') : '<p class="muted small">لا مدفوعات موثّقة بعد — أول دفعة تصلك خارج المنصة تظهر هنا بطريقتها ومرجعها.</p>'}
   </div>
   <div class="card"><h3>📋 قائمة حسابي</h3>
-    <p><a href="#sec-orders">🧾 طلباتي</a> · <a href="#" id="mkFav">❤️ المفضلة</a> · <a href="#sec-wallet">💳 المدفوعات</a> · <a href="#" data-nav="delivery">🚚 سعر التوصيل</a> · <a href="#" data-nav="training">🎓 تدريب</a> · <a href="#" data-nav="faq">❓ الأسئلة الشائعة</a> · <a href="#sec-invite">🎁 ادعو أصدقائك</a></p>
+    <div class="menu-list">
+      <a class="menu-row" href="#sec-orders">🧾<span>طلباتي</span>‹</a>
+      <a class="menu-row" href="#" id="mkFav">❤️<span>المفضلة</span>‹</a>
+      <a class="menu-row" href="#sec-wallet">💳<span>المدفوعات</span>‹</a>
+      <a class="menu-row" href="#" data-nav="delivery">🚚<span>سعر التوصيل</span>‹</a>
+      <a class="menu-row" href="#" data-nav="training">🎓<span>تدريب</span>‹</a>
+      <a class="menu-row" href="#" data-nav="faq">❓<span>الأسئلة الشائعة</span>‹</a>
+      <a class="menu-row" href="#sec-invite">🎁<span>ادعو أصدقائك</span>‹</a>
+      <button class="menu-row" id="mkLogout" type="button">🚪<span>تسجيل الخروج</span>‹</button>
+    </div>
   </div>
   <div class="card"><h3>منتجات متاحة للتسويق</h3>
     <p class="muted small">عمولتك <strong>حسب اختيارك</strong>: السعر المعروض هو السعر الأساسي، حدّد سعر بيعك عند إدخال طلب الزبون في السلة وربحك هو الفرق (5% على الأقل).</p>
@@ -799,12 +813,8 @@ async function renderMarketer(box) {
     const text = encodeURIComponent(p.name + ' — ' + fmt(p.customer_price));
     window.open(`https://wa.me/?text=${text}%20${encodeURIComponent(full)}`, '_blank');
   }));
-  const rs = $('#reqSettle');
-  if (rs) rs.addEventListener('click', async () => {
-    try { if (!ME.payment_method || !ME.payment_details) { toast('أضف طريقة الدفع ورقم حسابك في إعدادات حسابك أولاً، ثم اطلب السحب', true); return; }
-    const r = await api('/api/marketer/settlements', { method: 'POST', body: {} }); toast('أُنشئ طلب الدفع #' + r.settlementId + ' بمبلغ ' + fmt(r.amount) + ' — يُراجع خلال 24 ساعة'); renderDash(); }
-    catch (e) { toast(e.message, true); }
-  });
+  const ml = $('#mkLogout');
+  if (ml) ml.addEventListener('click', () => { const lb = $('#logoutBtn'); if (lb) lb.click(); });
   const ci = $('#copyInv');
   if (ci) ci.addEventListener('click', async () => { await navigator.clipboard.writeText(invLink).catch(() => {}); toast('نُسخ رابط الدعوة'); });
   const mf = $('#mkFav');

@@ -186,6 +186,12 @@ try { db.exec('ALTER TABLE users ADD COLUMN invited_by INTEGER'); } catch { /* �
 try { db.exec('ALTER TABLE users ADD COLUMN invite_code TEXT'); } catch { /* العمود موجود */ }
 try { db.exec('ALTER TABLE supplier_coverage ADD COLUMN fee_office INTEGER'); } catch { /* العمود موجود */ }
 try { db.exec('ALTER TABLE supplier_coverage ADD COLUMN duration TEXT'); } catch { /* العمود موجود */ }
+// نموذج الدفع الجديد (قرار المستخدم 2026-10-25): لا طلبات تسوية — أي تسوية قديمة بحالة requested/approved تُلغى وتُحرَّر عمولاتها ومكافآتها لتصبح قابلة للدفع المباشر الموثّق.
+try {
+  db.exec(`UPDATE commissions SET settlement_id = NULL WHERE settlement_id IN (SELECT id FROM settlements WHERE state IN ('requested','approved'))`);
+  db.exec(`UPDATE invite_bonuses SET settlement_id = NULL WHERE settlement_id IN (SELECT id FROM settlements WHERE state IN ('requested','approved'))`);
+  db.exec(`DELETE FROM settlements WHERE state IN ('requested','approved')`);
+} catch { /* جداول غير جاهزة بعد في أول إقلاع */ }
 db.exec(`CREATE TABLE IF NOT EXISTS invite_bonuses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
