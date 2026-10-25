@@ -452,6 +452,17 @@ try {
   r = await anon.post(`/api/suppliers/${supIdMain}/follow`, {});
   ok(r.status === 401, 'الزائر لا يتابع دون دخول');
 
+
+  console.log('— إشعارات الطلبات الغنية (مشتري + منتج + عمولة) —');
+  {
+    const lines = fs.readFileSync(outboxPath, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    const updates = lines.filter((e) => e.type === 'order_update').map((e) => String(e.text || ''));
+    const supDigest = updates.find((x) => x.includes('مشتري مقيم') && x.includes('0600000052'));
+    ok(!!supDigest && supDigest.includes('منتج التقييم') && supDigest.includes('الإجمالي') && supDigest.includes('🛒 طلب جديد'), 'إشعار المورد يحمل اسم المشتري ورقمه والمنتج والإجمالي');
+    const commMsg = updates.find((x) => x.includes('عمولتك') && x.includes('أصبحت موافقاً عليها'));
+    ok(!!commMsg, 'المسوق يصله إشعار عمولته عند التسليم والتحصيل');
+  }
+
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;
 } catch (e) {

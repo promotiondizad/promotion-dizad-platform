@@ -85,6 +85,31 @@ const ADMIN_CHAT = process.env.ADMIN_TELEGRAM_CHAT_ID || '';
 async function notifyAdmin(text) {
   if (ADMIN_CHAT) await integ.notify({ channel: 'telegram', type: 'admin_alert', text, target: ADMIN_CHAT });
 }
+function orderDigest(o, forSupplier) {
+  const items = db.prepare('SELECT oi.qty, p.name FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?').all(o.id);
+  const buyerAcc = o.buyer_id ? db.prepare('SELECT name, phone FROM users WHERE id = ?').get(o.buyer_id) : null;
+  const bName = o.guest_name || (buyerAcc && buyerAcc.name) || '—';
+  const bPhone = o.guest_phone || (buyerAcc && buyerAcc.phone) || '—';
+  const wRow = db.prepare('SELECT name_ar FROM wilayas WHERE code = ?').get(o.wilaya);
+  const wName = wRow ? wRow.name_ar : ('ولاية ' + o.wilaya);
+  const sup = db.prepare('SELECT name, business_name FROM users WHERE id = ?').get(o.supplier_id);
+  const lines = [
+    '🛒 طلب جديد في منصة SOUQAR: ' + o.ref,
+    'المنتج: ' + items.map((i) => i.name + ' ×' + i.qty).join('، '),
+    'المشتري: ' + bName + ' — ' + bPhone,
+    'العنوان: ' + wName + (o.commune ? ' — ' + o.commune : '') + (o.address ? ' — ' + o.address : ''),
+    'الإجمالي: ' + o.total + ' دج (منتجات ' + o.subtotal + ' دج + توصيل ' + o.delivery_fee + ' دج)'
+  ];
+  if (!forSupplier) {
+    if (o.marketer_id) {
+      const mk = db.prepare('SELECT name, phone FROM users WHERE id = ?').get(o.marketer_id);
+      const cm = db.prepare('SELECT amount FROM commissions WHERE order_id = ?').get(o.id);
+      lines.push('المسوّق: ' + (mk ? mk.name : '#' + o.marketer_id) + (mk && mk.phone ? ' (' + mk.phone + ')' : '') + ' — عمولته: ' + (cm ? cm.amount : 0) + ' دج');
+    } else lines.push('المسوّق: طلب مباشر (بلا مسوّق)');
+    lines.push('المورّد: ' + (sup ? (sup.business_name || sup.name) : '—'));
+  }
+  return lines.join('\n');
+}
 async function notifyOrderParties(order, text) {
   await integ.notify({ userId: order.supplier_id, channel: 'telegram', type: 'order_update', text });
   await integ.notify({ userId: order.supplier_id, channel: 'log', type: 'order_update', text });
@@ -480,8 +505,8 @@ const server = http.createServer(async (req, res) => {
         return send(res, e.http || 500, { error: e.message || 'خطأ في إنشاء الطلب' });
       }
       for (const o of created) {
-        await notifyOrderParties(o, `طلب جديد ${o.ref} بمبلغ ${o.total} دج بانتظار تأكيدك في لوحة المورد — SOUQAR`);
-        await notifyAdmin(`🛒 طلب جديد في منصة SOUQAR: ${o.ref} — ${o.total} دج — ولاية ${o.wilaya}`);
+        await notifyOrderParties(o, orderDigest(o, true) + '\nبانتظار تأكيدك في لوحة المورد — SOUQAR');
+        await notifyAdmin(orderDigest(o, false));
         audit(s ? s.userId : null, 'order_create', 'order', o.id, o.ref);
       }
       return send(res, 201, { ok: true, orders: created.map((o) => ({ ref: o.ref, total: o.total, delivery_fee: o.delivery_fee, subtotal: o.subtotal, status: o.status, status_label: ORDER_STATUSES[o.status] })) });
@@ -714,6 +739,14 @@ const server = http.createServer(async (req, res) => {
       const r = changeOrderStatus(o, String(b.status || ''), s.userId, b.note || null, b.reason || null, s.role === 'admin');
       if (r.error) return send(res, 400, { error: r.error });
       await notifyOrderParties(o, `تغيّرت حالة الطلب ${o.ref} إلى: ${ORDER_STATUSES[b.status]}`);
+      if (b.status === 'delivered_collected' && o.marketer_id) {
+        const cm = db.prepare('SELECT amount FROM commissions WHERE order_id = ?').get(o.id);
+        if (cm && cm.amount > 0) {
+          const mkText = `💰 طلبك ${o.ref} سُلّم وحُصّل بنجاح — عمولتك ${cm.amount} دج أصبحت موافقاً عليها في محفظتك في SOUQAR`;
+          await integ.notify({ userId: o.marketer_id, channel: 'telegram', type: 'order_update', text: mkText });
+          await integ.notify({ userId: o.marketer_id, channel: 'log', type: 'order_update', text: mkText });
+        }
+      }
       return send(res, 200, { ok: true });
     }
     if (p === '/api/supplier/reports' && req.method === 'GET') {
