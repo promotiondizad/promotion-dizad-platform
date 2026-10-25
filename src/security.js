@@ -41,12 +41,13 @@ function destroySession(token) {
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token));
 }
 
-// رموز مصادقة من 6 أرقام (تأكيد البريد / استعادة كلمة المرور) — تُحفظ مجزّأة، صالحة 15 دقيقة، 5 محاولات كحد أقصى
+// رموز مصادقة من 6 أرقام (تأكيد البريد / استعادة كلمة المرور) — تُحفظ مجزّأة بملح عشوائي لكل رمز، صالحة 15 دقيقة، 5 محاولات كحد أقصى
 function createAuthCode(userId, purpose) {
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  const salt = newToken(8);
   db.prepare('DELETE FROM auth_codes WHERE user_id = ? AND purpose = ?').run(userId, purpose);
   db.prepare('INSERT INTO auth_codes(user_id,purpose,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,0,?)')
-    .run(userId, purpose, hashToken(purpose + ':' + code), Date.now() + 15 * 60e3, Date.now());
+    .run(userId, purpose, salt + ':' + hashToken(salt + ':' + purpose + ':' + code), Date.now() + 15 * 60e3, Date.now());
   return code;
 }
 function verifyAuthCode(userId, purpose, code) {
@@ -54,8 +55,10 @@ function verifyAuthCode(userId, purpose, code) {
   if (!row) return { ok: false, error: 'لا يوجد رمز صالح — اطلب رمزاً جديداً' };
   if (row.expires_at < Date.now()) return { ok: false, error: 'انتهت صلاحية الرمز — اطلب رمزاً جديداً' };
   if (row.attempts >= 5) return { ok: false, error: 'تجاوزت عدد المحاولات المسموح — اطلب رمزاً جديداً' };
-  const calc = Buffer.from(hashToken(purpose + ':' + String(code || '').trim()), 'hex');
-  const stored = Buffer.from(row.code_hash, 'hex');
+  const parts = String(row.code_hash).split(':');
+  const expected = parts.length === 2 ? hashToken(parts[0] + ':' + purpose + ':' + String(code || '').trim()) : hashToken(purpose + ':' + String(code || '').trim());
+  const calc = Buffer.from(expected, 'hex');
+  const stored = Buffer.from(parts.length === 2 ? parts[1] : parts[0], 'hex');
   const match = calc.length === stored.length && crypto.timingSafeEqual(calc, stored);
   if (!match) {
     db.prepare('UPDATE auth_codes SET attempts = attempts + 1 WHERE id = ?').run(row.id);

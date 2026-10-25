@@ -200,6 +200,26 @@ db.exec(`CREATE TABLE IF NOT EXISTS invite_bonuses (
   settlement_id INTEGER REFERENCES settlements(id),
   created_at INTEGER NOT NULL
 )`);
+// طلبات سحب الأرباح (قرار المستخدم 2026-10-25 ~14:46 — يلغي «لا طلبات» السابقة): المسوّق يطلب، الإدارة تدفع خارج المنصة وتوثّق بالطريقة والمرجع
+db.exec(`CREATE TABLE IF NOT EXISTS payout_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  marketer_id INTEGER NOT NULL REFERENCES users(id),
+  amount INTEGER NOT NULL,
+  method TEXT NOT NULL,
+  details TEXT,
+  state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','paid','rejected')),
+  admin_method TEXT, admin_reference TEXT, admin_note TEXT,
+  settlement_id INTEGER REFERENCES settlements(id),
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+)`);
+try { db.exec('ALTER TABLE commissions ADD COLUMN payout_request_id INTEGER'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE invite_bonuses ADD COLUMN payout_request_id INTEGER'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE notifications ADD COLUMN read_at INTEGER'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE password_resets ADD COLUMN salt TEXT'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE orders ADD COLUMN ship_ref TEXT'); } catch { /* العمود موجود */ }
+try { db.exec('ALTER TABLE support_messages ADD COLUMN reply TEXT'); } catch { /* العمود موجود */ }
+// تنظيف أمني: أي توكن استعادة قديم مخزّن نصياً يُمحى (الاستعمال بالتجزئة فقط)
+try { db.exec("UPDATE password_resets SET token = '' WHERE token != ''"); } catch { /* الجدول غير جاهز */ }
 db.exec(`CREATE TABLE IF NOT EXISTS auth_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

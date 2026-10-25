@@ -105,8 +105,8 @@ async function renderOverview(box) {
     <div class="stat">إشعارات فاشلة/غير مضبوطة<b>${ov.failedNotifications}</b></div>
     <div class="stat">طلبات متأخرة (+48 سا)<b>${ov.lateOrders.length}</b></div>
   </div>
-  <div class="card"><h3>مستخدمون حسب الدور</h3>${Object.entries(ov.usersByRole || {}).map(([k, v]) => `<p>${esc(ROLE_AR[k] || k)}: <strong>${v}</strong></p>`).join('')}</div>
-  <div class="card"><h3>طلبات حسب الحالة</h3>${Object.entries(ov.ordersByStatus || {}).map(([k, v]) => `<p>${esc(k)}: <strong>${v}</strong></p>`).join('') || '<p class="muted">لا طلبات بعد.</p>'}</div>
+  <div class="card"><h3>مستخدمون حسب الدور والحالة</h3>${(ov.usersByRole || []).map((r) => `<p>${esc(ROLE_AR[r.role] || r.role)} — ${esc(r.status)}: <strong>${r.c}</strong></p>`).join('') || '<p class="muted">لا مستخدمين بعد.</p>'}</div>
+  <div class="card"><h3>طلبات حسب الحالة</h3>${(ov.ordersByStatus || []).map((r) => `<p>${esc(STATUS_AR[r.status] || r.status)}: <strong>${r.c}</strong> طلباً — ${fmt(r.sum)}</p>`).join('') || '<p class="muted">لا طلبات بعد.</p>'}</div>
   ${ov.lateOrders.length ? `<div class="card"><h3>⚠️ طلبات متأخرة</h3>${ov.lateOrders.map((o) => `<p>${esc(o.ref)} — ${esc(o.status)} — منذ ${new Date(o.created_at).toLocaleString('ar-DZ')}</p>`).join('')}</div>` : ''}`;
 }
 
@@ -136,6 +136,7 @@ async function renderProducts(box) {
 }
 
 const ROLE_AR = { admin: 'المدير', supplier: 'مورد', marketer: 'مسوق', buyer: 'مشتري' };
+const STATUS_AR = { pending_supplier: 'جديد — بانتظار تأكيد المورد', confirmed: 'مؤكد', preparing: 'قيد التجهيز', handed: 'سُلّم لشركة التوصيل', out_for_delivery: 'خرج للتوصيل', delivered_collected: 'تم التسليم والتحصيل', cancelled: 'أُلغي', rejected: 'مرفوض', failed_delivery: 'تعذر التسليم', returned: 'مرتجع' };
 function userRow(u) {
   return `<tr><td>${esc(u.name)}</td><td>${esc(ROLE_AR[u.role] || u.role)}</td><td>${esc(u.phone)}</td>
   <td>${u.email ? esc(u.email) : '<span class="muted">—</span>'}</td><td>${esc(u.status)}</td>
@@ -177,7 +178,7 @@ async function renderUsers(box) {
 
 async function renderOrders(box) {
   const { orders } = await api('/api/admin/orders');
-  box.innerHTML = `<div class="card"><h3>كل الطلبات (${orders.length})</h3>
+  box.innerHTML = `<div class="card"><h3>كل الطلبات (${orders.length}) <a class="btn small light" href="/api/admin/export/orders.csv" style="float:left">⬇️ تصدير CSV</a></h3>
     <input id="aOrderQ" type="search" placeholder="🔍 ابحث برقم الطلبية…" style="margin-bottom:10px">
     <div id="aOrdersList">${orders.slice(0, 80).map((o) => `
     <details class="order-det"><summary><strong>${esc(o.ref)}</strong> — ${esc(o.status_label)} — ${fmt(o.total)} — مورد #${o.supplier_id} — ${o.marketer_id ? 'مسوق #' + o.marketer_id + ' (' + esc(o.ref_code || '') + ')' : 'مباشر'}
@@ -199,17 +200,44 @@ async function renderOrders(box) {
         ${d.items.map((i) => `<tr><td>${esc(i.name)}${i.size ? ' · ' + esc(i.size) : ''}${i.color ? ' · ' + esc(i.color) : ''}</td><td>${i.qty}</td><td>${fmt(i.customer_price)}</td><td>${fmt(i.wholesale_price || 0)}</td><td>${fmt(i.platform_margin || 0)}</td><td>${fmt(i.marketer_commission || 0)}</td></tr>`).join('')}</table></div>
         <p>مجموع المنتجات: ${fmt(o.subtotal)} · التوصيل: ${fmt(o.delivery_fee)} · <strong>الإجمالي: ${fmt(o.total)}</strong><br>
         مجموع الجملة: ${fmt(o.wholesale_total || 0)} · هامش المنصة: ${fmt(o.margin_total || 0)} · عمولات: ${fmt(o.commission_total || 0)} · <strong>صافي المنصة: ${fmt(o.platform_net || 0)}</strong></p>
-        <p class="muted">المورد: ${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')} · المسوق: ${o.marketer ? esc(o.marketer.name) : 'بيع مباشر'}</p>
+        <p class="muted">المورد: ${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')} · المسوق: ${o.marketer ? esc(o.marketer.name) : 'بيع مباشر'}${o.ship_ref ? ' · 🚚 رقم تتبع الشحنة: ' + esc(o.ship_ref) : ''}</p>
+        <div class="row-form">
+          <select id="ast-${o.id}">${Object.keys(STATUS_AR).map((st) => `<option value="${st}" ${st === o.status ? 'selected' : ''}>${STATUS_AR[st]}</option>`).join('')}</select>
+          <input id="ars-${o.id}" placeholder="سبب (للرفض/الإلغاء)">
+          <button class="btn small" data-astatus="${o.id}" type="button">تغيير الحالة (إدارة)</button>
+        </div>
         ${d.history.map((h) => `<p class="small">${new Date(h.created_at).toLocaleString('ar-DZ')} — ${esc(h.label)}${h.note ? ' · ' + esc(h.note) : ''}</p>`).join('')}`;
+      const sb = target.querySelector('[data-astatus]');
+      if (sb) sb.addEventListener('click', async () => {
+        try { await api(`/api/supplier/orders/${o.id}/status`, { method: 'POST', body: { status: $('#ast-' + o.id).value, reason: $('#ars-' + o.id).value } }); toast('حُدّثت حالة الطلب'); render(); }
+        catch (e) { toast(e.message, true); }
+      });
     } catch (e) { target.innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; }
   }));
 }
 
 async function renderSettlements(box) {
-  const { payable, payments } = await api('/api/admin/settlements');
+  const { payable, payments, payoutRequests } = await api('/api/admin/settlements');
   const METHODS = ['تحويل بريدي موب', 'تحويل البريد الجاري', 'التحصيل من مقر المنصة', 'Enveloppe', 'Flexy', 'نقداً عند الاستلام من الإدارة'];
-  box.innerHTML = `<div class="card"><h3>مستحقات المسوقين — قابلة للدفع الآن</h3>
-    <p class="muted small">لا توجد طلبات تسوية. الدفع الفعلي يتم خارج المنصة (CCP / بريدي موب / Flexy…) حسب الاتفاق ووسيلة المسوق المسجّلة — زر التأكيد يوثّق فقط ما حدث فعلاً بطريقته ومرجعه.</p>
+  const pendingPR = (payoutRequests || []).filter((r) => r.state === 'pending');
+  const pastPR = (payoutRequests || []).filter((r) => r.state !== 'pending');
+  box.innerHTML = `<div class="card"><h3>💸 طلبات سحب الأرباح المعلّقة (${pendingPR.length})</h3>
+    <p class="muted small">المسوق يطلب سحب أرباحه من محفظته — ادفع له فعلياً خارج المنصة (بريدي موب / CCP / Flexy…) ثم أكّد هنا بالطريقة والمرجع فيُوثَّق الدفع وتتحول عمولاته إلى «مدفوعة». الرفض يحرّر عمولاته ليطلب من جديد.</p>
+    ${pendingPR.length ? pendingPR.map((r) => `
+    <div class="ord-card">
+      <div class="ord-head"><strong>#${r.id} — ${esc(r.marketer_name)}</strong><span class="muted small">${esc(r.marketer_phone)}</span><strong style="color:#0d9d63">${fmt(r.amount)}</strong></div>
+      <p class="small">وسيلة الطلب: <strong>${esc(r.method)}</strong>${r.details ? ' — ' + esc(r.details) : ''}<br><span class="muted">طُلب في ${new Date(r.created_at).toLocaleString('ar-DZ')}</span></p>
+      <div class="row-form">
+        <select id="prm-${r.id}">${METHODS.map((x) => `<option ${r.method === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+        <input id="prr-${r.id}" placeholder="مرجع العملية (إلزامي للتحويلات)">
+        <button class="btn small gold" data-prconf="${r.id}" type="button">✅ دفعتُ فعلاً — تأكيد وتوثيق</button>
+        <button class="btn small danger" data-prrej="${r.id}" type="button">رفض</button>
+      </div>
+    </div>`).join('') : '<p class="muted">لا طلبات سحب معلّقة.</p>'}
+    ${pastPR.length ? `<details><summary>سجل طلبات السحب السابقة (${pastPR.length})</summary>${pastPR.map((r) => `<p class="small">#${r.id} — ${esc(r.marketer_name)} — ${fmt(r.amount)} — ${r.state === 'paid' ? 'مدفوع ✅ عبر ' + esc(r.admin_method || r.method) + (r.admin_reference ? ' · مرجع: ' + esc(r.admin_reference) : '') : 'مرفوض ❌' + (r.admin_note ? ' — ' + esc(r.admin_note) : '')} <span class="muted">${new Date(r.updated_at).toLocaleDateString('ar-DZ')}</span></p>`).join('')}</details>` : ''}
+  </div>
+  <div class="card"><h3>مستحقات المسوقين — قابلة للدفع المباشر الآن</h3>
+    <p class="muted small">دفع مباشر بلا طلب سحب (للأرصدة غير المرتبطة بطلب معلّق). الدفع الفعلي يتم خارج المنصة حسب وسيلة المسوق المسجّلة — زر التأكيد يوثّق فقط ما حدث فعلاً بطريقته ومرجعه. <a class="btn small light" href="/api/admin/export/payments.csv">⬇️ تصدير سجل المدفوعات CSV</a></p>
     ${payable.length ? payable.map((m) => `
     <div class="ord-card">
       <div class="ord-head"><strong>${esc(m.name)}</strong><span class="muted small">${esc(m.phone)}</span><strong style="color:#0d9d63">${fmt(m.total)}</strong></div>
@@ -229,6 +257,19 @@ async function renderSettlements(box) {
       const r = await api('/api/admin/payments/confirm', { method: 'POST', body: { marketerId: Number(id), method: $('#pm-' + id).value, reference: $('#pr-' + id).value, note: $('#pn-' + id).value } });
       toast('وُثّق الدفع #' + r.settlementId + ' بمبلغ ' + fmt(r.amount)); render();
     } catch (e) { toast(e.message, true); }
+  }));
+  $$('[data-prconf]', box).forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.prconf;
+    try {
+      const r = await api(`/api/admin/payout-requests/${id}/confirm`, { method: 'POST', body: { method: $('#prm-' + id).value, reference: $('#prr-' + id).value } });
+      toast('وُثّق دفع طلب السحب #' + id + ' بمبلغ ' + fmt(r.amount)); render();
+    } catch (e) { toast(e.message, true); }
+  }));
+  $$('[data-prrej]', box).forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.prrej;
+    const reason = prompt('سبب رفض طلب السحب (يصل للمسوق):'); if (reason === null) return;
+    try { await api(`/api/admin/payout-requests/${id}/reject`, { method: 'POST', body: { reason } }); toast('رُفض الطلب وحُرّرت عمولاته'); render(); }
+    catch (e) { toast(e.message, true); }
   }));
 }
 
@@ -268,13 +309,30 @@ async function renderIntegrations(box) {
 
 async function renderSupport(box) {
   const { messages } = await api('/api/admin/support');
-  box.innerHTML = `<div class="card"><h3>رسائل الدعم</h3>${messages.length ? messages.map((m) => `<p><strong>${esc(m.name)}</strong> (${esc(m.phone)}): ${esc(m.message)}</p>`).join('') : '<p class="muted">لا رسائل.</p>'}</div>`;
+  const ST = { open: '🆕 جديدة', replied: '↩️ تم الرد', closed: '✅ مغلقة' };
+  box.innerHTML = `<div class="card"><h3>رسائل الدعم</h3>${messages.length ? messages.map((m) => `
+    <div class="ord-card">
+      <div class="ord-head"><strong>${esc(m.name)}</strong><span class="muted small">${esc(m.phone)} · ${new Date(m.created_at).toLocaleString('ar-DZ')}</span><span class="badge">${ST[m.status] || m.status}</span></div>
+      <p>${esc(m.message)}</p>
+      ${m.reply ? `<p class="small" style="background:#f2fbf5;border-radius:9px;padding:8px">💬 ردّك: ${esc(m.reply)}</p>` : ''}
+      ${m.status !== 'closed' ? `<div class="row-form"><input id="sr-${m.id}" placeholder="اكتب ردك (يصل لصاحب الحساب إن وُجد)"><button class="btn small" data-sreply="${m.id}" type="button">إرسال الرد</button><button class="btn small light" data-sclose="${m.id}" type="button">إغلاق</button></div>` : ''}
+    </div>`).join('') : '<p class="muted">لا رسائل.</p>'}</div>`;
+  $$('[data-sreply]', box).forEach((b) => b.addEventListener('click', async () => {
+    try { await api(`/api/admin/support/${b.dataset.sreply}/reply`, { method: 'POST', body: { text: $('#sr-' + b.dataset.sreply).value } }); toast('أُرسل الرد'); render(); }
+    catch (e) { toast(e.message, true); }
+  }));
+  $$('[data-sclose]', box).forEach((b) => b.addEventListener('click', async () => {
+    try { await api(`/api/admin/support/${b.dataset.sclose}/close`, { method: 'POST', body: {} }); toast('أُغلقت الرسالة'); render(); }
+    catch (e) { toast(e.message, true); }
+  }));
 }
 
 async function renderTools(box) {
-  const auditL = await api('/api/admin/audit');
+  const [auditL, cats] = await Promise.all([api('/api/admin/audit'), api('/api/categories')]);
   box.innerHTML = `<div class="card"><h3>أدوات</h3>
+    <h4>التصنيفات (الأقسام)</h4>
     <form id="catForm" class="row-form"><input id="catName" placeholder="تصنيف جديد"><button class="btn" type="submit">إضافة تصنيف</button></form>
+    ${cats.categories.map((c) => `<p class="small">#${c.id} — <strong>${esc(c.name)}</strong> <button class="btn small light" data-catren="${c.id}" data-name="${esc(c.name)}" type="button">✏️ إعادة تسمية</button> <button class="btn small danger" data-catdel="${c.id}" type="button">حذف</button></p>`).join('')}
     <p><button class="btn light" id="backupBtn" type="button">إنشاء نسخة احتياطية من قاعدة البيانات</button></p>
     <details><summary>سجل العمليات الإدارية (تدقيق)</summary>${auditL.logs.slice(0, 40).map((l) => `<p class="small">#${l.id} ${esc(l.action)} · ${esc(l.entity || '')} ${esc(l.entity_id || '')} · ${new Date(l.created_at).toLocaleString('ar-DZ')}</p>`).join('')}</details>
   </div>`;
@@ -283,6 +341,16 @@ async function renderTools(box) {
     try { await api('/api/admin/categories', { method: 'POST', body: { name: $('#catName').value } }); toast('أُضيف التصنيف'); render(); }
     catch (e) { toast(e.message, true); }
   });
+  $$('[data-catren]', box).forEach((b) => b.addEventListener('click', async () => {
+    const name = prompt('الاسم الجديد للتصنيف:', b.dataset.name); if (!name) return;
+    try { await api(`/api/admin/categories/${b.dataset.catren}`, { method: 'PATCH', body: { name } }); toast('أُعيدت التسمية'); render(); }
+    catch (e) { toast(e.message, true); }
+  }));
+  $$('[data-catdel]', box).forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('حذف هذا التصنيف؟ (يُرفض إن كان فيه منتجات)')) return;
+    try { await api(`/api/admin/categories/${b.dataset.catdel}`, { method: 'DELETE' }); toast('حُذف التصنيف'); render(); }
+    catch (e) { toast(e.message, true); }
+  }));
   $('#backupBtn').addEventListener('click', async () => {
     try { const r = await api('/api/admin/backup', { method: 'POST', body: {} }); toast('أُنشئت النسخة: ' + r.file); }
     catch (e) { toast(e.message, true); }

@@ -326,6 +326,25 @@ html,body{overflow-x:clip}
 .tile.green{background:linear-gradient(135deg,#43a047,#2e7d32)}
 .tile.teal{background:linear-gradient(135deg,#26a69a,#00796b)}
 .tile.purple{background:linear-gradient(135deg,#8e24aa,#6a1b9a)}
+.tile.orange{background:linear-gradient(135deg,#fb8c00,#e65100)}
+/* شارة الجرس + عناصر إشعارات غير مقروءة */
+.bell-badge{position:absolute;top:-4px;inset-inline-start:-4px;background:#e53935;color:#fff;font-size:11px;font-weight:800;min-width:19px;height:19px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;padding:0 4px}
+.bell-badge[hidden]{display:none}
+.bell-item.unread{background:#f2fbf5;border-radius:8px;padding:8px}
+/* إعدادات: عناوين الحقول فوق مدخلاتها */
+#dashSettings .stack label{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:14px}
+/* صورة مصغرة في جدول منتجات المسوق */
+.mk-thumb{display:inline-flex;width:42px;height:42px;border-radius:9px;background:#eef2f5;align-items:center;justify-content:center;vertical-align:middle;overflow:hidden;font-size:20px}
+.mk-thumb img{width:100%;height:100%;object-fit:cover}
+/* جداول اللوحات كبطاقات على الهاتف (class=rt مع data-l على الخلايا) */
+@media(max-width:640px){
+  table.rt, table.rt tbody, table.rt tr, table.rt td{display:block;width:100%}
+  table.rt tr{border:1px solid var(--line);border-radius:13px;padding:9px 12px;margin-bottom:10px;background:#fff}
+  table.rt tr:first-child{display:none}
+  table.rt td{border:none!important;padding:4px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:end}
+  table.rt td::before{content:attr(data-l);font-weight:800;color:var(--muted,#667);font-size:12.5px;text-align:start}
+  table.rt td[data-l=""]::before, table.rt td:not([data-l])::before{content:none}
+}
 .menu-list{display:flex;flex-direction:column}
 .menu-row{display:flex;align-items:center;gap:11px;padding:13px 6px;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700;background:none;border-top:none;border-left:none;border-right:none;width:100%;text-align:start;font-size:15px;cursor:pointer;font-family:inherit}
 .menu-row span{flex:1}

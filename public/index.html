@@ -6,6 +6,12 @@
 <title>SOUQAR سوقار — سوق واحد، تجارة تجمع الجميع | منصة التجارة والتسويق بالعمولة في الجزائر</title>
 <meta name="description" content="SOUQAR — منصة تجارة إلكترونية جزائرية تجمع الموردين وتجار الجملة والمسوقين بالعمولة والزبائن. الدفع عند الاستلام، توصيل لـ58 ولاية، وتتبع مباشر لطلبك.">
 <meta name="theme-color" content="#06392b">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SOUQAR سوقار">
+<meta property="og:title" content="SOUQAR سوقار — سوق واحد، تجارة تجمع الجميع">
+<meta property="og:description" content="منصة تجارة إلكترونية وتسويق بالعمولة في الجزائر — الدفع عند الاستلام، توصيل لـ58 ولاية، وعمولة حرة للمسوقين.">
+<meta property="og:image" content="/icons/icon-512.png">
+<meta name="twitter:card" content="summary">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -48,7 +54,7 @@
     </nav>
     <div class="topbar-actions">
       <button class="icon-btn" id="themeBtn" type="button" title="الوضع المظلم / الفاتح">🌙</button>
-      <span style="position:relative"><button class="icon-btn" id="bellBtn" type="button" hidden title="إشعاراتي">🔔</button><span id="bellPanel" hidden></span></span>
+      <span style="position:relative"><button class="icon-btn" id="bellBtn" type="button" hidden title="إشعاراتي">🔔<span id="bellBadge" class="bell-badge" hidden></span></button><span id="bellPanel" hidden></span></span>
       <button class="icon-btn" id="cartBtn" type="button">🛒 السلة <span class="cart-count" id="cartCount" hidden>0</span></button>
       <button class="icon-btn gold" id="authBtn" type="button">دخول / تسجيل</button>
       <button class="icon-btn" id="dashBtn" type="button" hidden>لوحتي</button>
@@ -114,6 +120,8 @@
         </select>
         <select id="sortSel">
           <option value="">الترتيب: الأحدث</option>
+          <option value="sold">الأكثر مبيعاً</option>
+          <option value="rating">الأعلى تقييماً</option>
           <option value="price_asc">السعر: من الأقل</option>
           <option value="price_desc">السعر: من الأعلى</option>
         </select>
@@ -242,8 +250,8 @@
     <h2 id="dashTitle">لوحتي</h2>
     <p class="muted" id="dashUser"></p>
     <nav id="dashNav" class="dash-nav" hidden></nav>
-    <div id="dashSettings"></div>
     <div id="dashContent"></div>
+    <div id="dashSettings"></div>
   </section>
 </main>
 

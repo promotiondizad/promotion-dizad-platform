@@ -203,7 +203,9 @@ try {
   r = await lock.post('/api/auth/forgot', { phone: '0600000004' });
   ok(r.status === 200, 'طلب استعادة كلمة المرور');
   const resetRow = db.prepare('SELECT token FROM password_resets ORDER BY id DESC LIMIT 1').get();
-  r = await lock.post('/api/auth/reset', { token: resetRow.token, password: 'newbuyer123', passwordConfirm: 'newbuyer123' });
+  ok(resetRow.token === '', 'توكن الاستعادة لا يُخزَّن نصياً أبداً (تجزئة فقط — تدقيق 2026-10-25)');
+  const buyerCode = lastOutboxCode('password_reset', '0600000004');
+  r = await lock.post('/api/auth/reset', { phone: '0600000004', code: buyerCode, password: 'newbuyer123', passwordConfirm: 'newbuyer123' });
   ok(r.status === 200, 'تغيير كلمة المرور بالرمز');
   r = await lock.post('/api/auth/login', { phone: '0600000004', password: 'newbuyer123' });
   ok(r.status === 200, 'الدخول بكلمة المرور الجديدة');
@@ -303,7 +305,7 @@ try {
   const admOrders = await admin.get('/api/admin/orders');
   const guestOrder = admOrders.data.orders.find((o) => o.ref === orderRef);
   r = await marketer.get(`/api/orders/${guestOrder.id}/details`);
-  ok(r.status === 200 && r.data.order.commission_total === 175 && r.data.order.buyer_phone === undefined, 'المسوق المعني يرى عمولته دون هاتف المشتري');
+  ok(r.status === 200 && r.data.order.commission_total === 175 && r.data.order.buyer_phone === '0600000011', 'المسوق المعني يرى عمولته وبيانات زبونه الذي أدخله بنفسه (تدقيق 2026-10-25)');
   r = await anon.get(`/api/orders/${myOrder.id}/details`);
   ok(r.status === 401, 'الزائر ممنوع من تفاصيل الطلبية');
   r = await buyer.get(`/api/orders/${myOrder.id}/details`);
@@ -482,6 +484,206 @@ try {
   {
     const pub = await anon.get(`/api/suppliers/${supIdMain}/public`);
     ok(pub.status === 200 && pub.data.supplier.rating_count >= 1 && typeof pub.data.supplier.coverage_count === 'number' && Array.isArray(pub.data.supplier.reviews), 'صفحة المتجر تعرض ملخص التقييمات وعدد ولايات التغطية');
+  }
+
+  console.log('— إصلاحات تدقيق 2026-10-25 —');
+  {
+    // مخزون وفير لطلبات هذا القسم (تعديل مخزون فقط بنفس الاسم والسعر — لا يعيد المراجعة... وإن أعادها نعتمد من جديد)
+    await supplier.put('/api/supplier/products/' + prodId, { name: 'منتج المثال', wholesalePrice: 9000, stock: 60, description: 'للاختبار' });
+    await admin.post(`/api/admin/products/${prodId}/review`, { action: 'approve', platformMargin: 500 });
+    // مورد ثانٍ لاختبار السلة المختلطة
+    const supB = new Client();
+    r = await supB.post('/api/auth/register', { role: 'supplier', name: 'مورد ب', phone: '0600000031', password: 'supplier123', passwordConfirm: 'supplier123', terms: true, activity: 'عام', businessName: 'متجر ب' });
+    const supBRow = (await admin.get('/api/admin/users?role=supplier')).data.users.find((u) => u.phone === '0600000031');
+    await admin.post(`/api/admin/users/${supBRow.id}/action`, { action: 'approve' });
+    await supB.post('/api/auth/login', { phone: '0600000031', password: 'supplier123' });
+    await supB.put('/api/supplier/coverage', { coverage: [{ wilaya_code: 16, delivery_fee: 400 }] });
+    r = await supB.post('/api/supplier/products', { name: 'منتج المورد ب', wholesalePrice: 2000, stock: 5 });
+    const prodB = r.data.id;
+    await admin.post(`/api/admin/products/${prodB}/review`, { action: 'approve', platformMargin: 300 });
+
+    // سلة مختلطة: منتج من موردين ← طلبيتان لا خطأ 500، والتكرار لا يضاعف الأرقام
+    const splitBody = { customer: { name: 'زبون مختلط', phone: '0600000032', wilaya: 16, commune: 'باب الزوار', address: 'حي' }, items: [{ productId: prodId, qty: 1 }, { productId: prodB, qty: 1 }], idempotencyKey: 'audit-split-1' };
+    r = await anon.post('/api/orders', splitBody);
+    ok(r.status === 201 && r.data.orders.length === 2, 'سلة متعددة الموردين تنشئ طلبيتين (إصلاح انهيار 500)');
+    r = await anon.post('/api/orders', splitBody);
+    ok(r.status === 200 && r.data.duplicate === true && r.data.orders.length === 2, 'إعادة الإرسال: duplicate يعرض كل طلب مرة واحدة');
+
+    // CSRF على النقاط المعدِّلة كلها
+    const mkRaw = new Client();
+    await mkRaw.post('/api/auth/login', { phone: '0600000003', password: 'marketer123' });
+    mkRaw.csrf = null;
+    r = await mkRaw.req('PATCH', '/api/me', { paymentDetails: 'CSRF-PROBE' });
+    ok(r.status === 403, 'PATCH /api/me بلا CSRF ← 403');
+    const meProbe = await marketer.get('/api/me');
+    ok(meProbe.data.user.payment_details !== 'CSRF-PROBE', 'تفاصيل الدفع لم تُخترق');
+    r = await mkRaw.post('/api/me/password', { currentPassword: 'marketer123', password: 'newpass12345', passwordConfirm: 'newpass12345' });
+    ok(r.status === 403, 'تغيير كلمة المرور بلا CSRF ← 403');
+    r = await mkRaw.post('/api/orders', { customer: { name: 'x', phone: '0600000032', wilaya: 16, commune: 'باب الزوار', address: 'حي' }, items: [{ productId: prodId, qty: 1 }] });
+    ok(r.status === 403, 'إنشاء طلب بجلسة بلا CSRF ← 403');
+
+    // تحقق الإعدادات
+    r = await marketer.req('PATCH', '/api/me', { paymentMethod: 'Bitcoin' });
+    ok(r.status === 400, 'وسيلة دفع خارج القائمة ← 400');
+    r = await marketer.req('PATCH', '/api/me', { wilaya: 999 });
+    ok(r.status === 400, 'ولاية 999 ← 400');
+    r = await marketer.req('PATCH', '/api/me', { wilaya: 16, commune: 'حاسي مسعود' });
+    ok(r.status === 400, 'بلدية لا تنتمي للولاية ← 400');
+
+    // لا هوامش في طلبات المورد
+    const soA = await supplier.get('/api/supplier/orders');
+    const itA = (soA.data.orders[0] || {}).items || [];
+    ok(itA.length > 0 && !('platform_margin' in itA[0]) && !('marketer_commission' in itA[0]), 'أصناف طلبات المورد بلا هامش منصة ولا عمولة مسوق');
+
+    // تغطية فاسدة لا تمسح السليمة
+    const covCountBefore = (await supB.get('/api/supplier/coverage')).data.coverage.length;
+    r = await supB.put('/api/supplier/coverage', { coverage: [{ wilaya_code: 99, delivery_fee: 100 }] });
+    ok(r.status === 400, 'تغطية بولاية 99 ← 400');
+    ok((await supB.get('/api/supplier/coverage')).data.coverage.length === covCountBefore, 'التغطية السليمة لم تُمسح');
+
+    // رفع صورة مزيفة
+    r = await supplier.post('/api/upload', { dataUrl: 'data:image/png;base64,' + Buffer.from('not an image').toString('base64') });
+    ok(r.status === 400, 'رفع «صورة» مزيفة (نص) ← 400');
+
+    // JSON فاسد ← 400 لا 500
+    const rawBad = await fetch(BASE + '/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{oops' });
+    ok(rawBad.status === 400, 'JSON فاسد ← 400');
+
+    // المسوق يرى بيانات زبونه هو — ومسوق آخر لا يرى الطلب أصلاً
+    const mkOrders1 = await marketer.get('/api/marketer/orders');
+    const ownOrder = mkOrders1.data.orders[0];
+    const det = await marketer.get('/api/orders/' + ownOrder.id + '/details');
+    ok(det.status === 200 && !!det.data.order.buyer_phone, 'المسوق يرى هاتف زبونه في طلبه');
+    const mkOther = new Client();
+    await mkOther.post('/api/auth/register', { role: 'marketer', name: 'مسوق آخر', phone: '0600000033', password: 'marketer123', passwordConfirm: 'marketer123', terms: true });
+    await mkOther.post('/api/auth/login', { phone: '0600000033', password: 'marketer123' });
+    r = await mkOther.get('/api/orders/' + ownOrder.id + '/details');
+    ok(r.status === 404, 'مسوق آخر لا يصل لطلب غيره ← 404');
+
+    // عمولة جديدة قابلة للسحب لدورة طلب السحب
+    const prodNow2 = await anon.get('/api/products/' + prodId);
+    const baseNow = prodNow2.data.product.customer_price;
+    const mkOrder = { customer: { name: 'زبون سحب', phone: '0600000034', wilaya: 16, commune: 'باب الزوار', address: 'حي' }, items: [{ productId: prodId, qty: 1, sellPrice: baseNow + 500 }], idempotencyKey: 'audit-payout-1' };
+    r = await marketer.post('/api/orders', mkOrder);
+    ok(r.status === 201, 'طلب مسوق جديد لدورة السحب');
+    const supOrdersNow = await supplier.get('/api/supplier/orders');
+    const poId = supOrdersNow.data.orders.find((o) => o.ref === r.data.orders[0].ref).id;
+    for (const st of ['confirmed', 'preparing', 'handed', 'out_for_delivery', 'delivered_collected']) await supplier.post(`/api/supplier/orders/${poId}/status`, { status: st });
+    let wal = (await marketer.get('/api/my/wallet')).data.wallet;
+    const balBefore = wal.balance - 500;
+    ok(wal.balance === balBefore + 500 && balBefore >= 0, 'رصيد قابل للسحب ازداد 500 بعد التسليم (فيه مكوّنات سابقة كالدعوات)');
+    r = await marketer.post('/api/my/payout-requests', { amount: 99999, method: 'Flexy', details: '0661111111' });
+    ok(r.status === 400, 'طلب سحب أكبر من الرصيد ← 400');
+    r = await marketer.post('/api/my/payout-requests', { amount: 500, method: 'Flexy', details: '0661111111' });
+    ok(r.status === 201 && r.data.amount === 500, 'طلب سحب صحيح ← 201');
+    wal = (await marketer.get('/api/my/wallet')).data.wallet;
+    ok(wal.balance === balBefore && wal.requested === 500, 'المحفظة: 500 قيد السحب والمتاح عاد لما قبل الطلب الجديد');
+    r = await marketer.post('/api/my/payout-requests', { amount: 100, method: 'Flexy', details: '0661111111' });
+    ok(r.status === 409, 'طلب سحب ثانٍ أثناء معلّق ← 409');
+    const prId = (await marketer.get('/api/my/payout-requests')).data.requests.find((x) => x.state === 'pending').id;
+    let admS = await admin.get('/api/admin/settlements');
+    ok(admS.data.payoutRequests.some((x) => x.id === prId && x.state === 'pending'), 'الإدارة ترى طلب السحب معلّقاً');
+    const directRow = admS.data.payable.find((x) => x.marketer_id === mkMe.data.user.id);
+    ok(!directRow || directRow.total === balBefore, 'الدفع المباشر يعرض فقط غير المرتبط بطلب سحب');
+    r = await admin.post(`/api/admin/payout-requests/${prId}/confirm`, { method: 'Flexy' });
+    ok(r.status === 400, 'تأكيد سحب Flexy بلا مرجع ← 400');
+    r = await admin.post(`/api/admin/payout-requests/${prId}/confirm`, { method: 'Flexy', reference: 'FX-TEST-9' });
+    ok(r.status === 201 && r.data.amount === 500, 'الإدارة تؤكد دفع طلب السحب بالمرجع');
+    wal = (await marketer.get('/api/my/wallet')).data.wallet;
+    ok(wal.requested === 0 && wal.paid >= 500, 'بعد دفع الطلب: مدفوع ارتفع وقيد السحب صفر');
+    const myReqs = await marketer.get('/api/my/payout-requests');
+    ok(myReqs.data.requests.find((x) => x.id === prId).state === 'paid', 'المسوق يرى طلبه مدفوعاً');
+
+    // رفض طلب يحرّر العمولات
+    r = await marketer.post('/api/orders', { ...mkOrder, idempotencyKey: 'audit-payout-2', items: [{ productId: prodId, qty: 1, sellPrice: baseNow + 600 }] });
+    const po2Ref = r.data.orders[0].ref;
+    const po2Id = (await supplier.get('/api/supplier/orders')).data.orders.find((o) => o.ref === po2Ref).id;
+    for (const st of ['confirmed', 'preparing', 'handed', 'out_for_delivery', 'delivered_collected']) await supplier.post(`/api/supplier/orders/${po2Id}/status`, { status: st });
+    r = await marketer.post('/api/my/payout-requests', { amount: 600, method: 'Flexy', details: '0661111111' });
+    const pr2Id = r.data.requestId;
+    await admin.post(`/api/admin/payout-requests/${pr2Id}/reject`, { reason: 'تفاصيل ناقصة' });
+    wal = (await marketer.get('/api/my/wallet')).data.wallet;
+    ok(wal.balance === balBefore + 600 && wal.requested === 0, 'رفض الإدارة يحرّر العمولة للرصيد من جديد');
+
+    // failed_delivery في بلاطة قيد الانتظار
+    r = await marketer.post('/api/orders', { ...mkOrder, idempotencyKey: 'audit-fail-1', items: [{ productId: prodId, qty: 1, sellPrice: baseNow + 700 }] });
+    const fRef = r.data.orders[0].ref;
+    const fId = (await supplier.get('/api/supplier/orders')).data.orders.find((o) => o.ref === fRef).id;
+    for (const st of ['confirmed', 'preparing', 'handed', 'out_for_delivery', 'failed_delivery']) await supplier.post(`/api/supplier/orders/${fId}/status`, { status: st });
+    wal = (await marketer.get('/api/my/wallet')).data.wallet;
+    ok(wal.waiting >= 700, 'عمولة تعذّر التسليم ظاهرة في المحفظة (قيد الانتظار)');
+
+    // إرجاع بعد التسليم قبل الدفع يلغي العمولة — وبعد الدفع ممنوع حتى بقوة الإدارة
+    r = await supplier.post(`/api/supplier/orders/${po2Id}/status`, { status: 'returned' });
+    ok(r.status === 200, 'إرجاع طلب مسلّم غير مدفوع العمولة مسموح');
+    const commAfterRet = await marketer.get('/api/marketer/commissions');
+    const retComm = commAfterRet.data.commissions.find((c) => c.order_id === po2Id);
+    ok(retComm && retComm.state === 'cancelled', 'عمولة المرتجع بعد التسليم أُلغيت');
+    r = await admin.post(`/api/supplier/orders/${oid}/status`, { status: 'cancelled' });
+    ok(r.status === 400, 'طلب عمولته مدفوعة لا يُلغى حتى بقوة الإدارة');
+
+    // إشعارات المشتري داخل التطبيق + غير المقروء
+    r = await buyer.post('/api/orders', { customer: { name: 'مشتري تجريبي', phone: '0600000004', wilaya: 16, commune: 'باب الزوار', address: 'حي' }, items: [{ productId: prodId, qty: 1 }], idempotencyKey: 'audit-buyer-1' });
+    ok(r.status === 201, 'المشتري يطلب من حسابه');
+    const bOrderId = (await supplier.get('/api/supplier/orders')).data.orders.find((o) => o.ref === r.data.orders[0].ref).id;
+    await supplier.post(`/api/supplier/orders/${bOrderId}/status`, { status: 'confirmed' });
+    const bNotif = await buyer.get('/api/my/notifications');
+    ok(bNotif.data.notifications.some((n) => n.type === 'order_update'), 'المشتري يتلقى إشعاراً داخل التطبيق عن طلبه');
+    ok(bNotif.data.unread >= 1, 'عداد غير المقروء يعمل');
+    ok(bNotif.data.notifications.every((n) => !('channel' in n)), 'الجرس بلا سباكة قنوات');
+    await buyer.post('/api/my/notifications/read', {});
+    ok((await buyer.get('/api/my/notifications')).data.unread === 0, 'تعليم الكل كمقروء');
+
+    // رمز الاستعادة لا يظهر في الجرس
+    await anon.post('/api/auth/forgot', { phone: '0600000003' });
+    const resetCode = lastOutboxCode('password_reset', '0600000003') || lastOutboxCode('password_reset');
+    const mkNotif = await marketer.get('/api/my/notifications');
+    const resetEntry = mkNotif.data.notifications.find((n) => n.type === 'password_reset');
+    ok(!!resetEntry && (!resetCode || !resetEntry.text.includes(resetCode)), 'رمز الاستعادة غير مكشوف في جرس الإشعارات');
+
+    // حد محاولات الاستعادة
+    let saw429 = false;
+    for (let i = 0; i < 11 && !saw429; i++) { const rr = await anon.post('/api/auth/forgot', { phone: '0600000099' }); if (rr.status === 429) saw429 = true; }
+    ok(saw429, 'حد محاولات /api/auth/forgot يعمل (429)');
+
+    // أقسام: CRUD
+    r = await admin.post('/api/admin/categories', { name: 'قسم اختبار' });
+    ok(r.status === 201, 'إنشاء قسم');
+    const testCatId = r.data.id;
+    r = await admin.req('PATCH', `/api/admin/categories/${testCatId}`, { name: 'قسم اختبار معاد' });
+    ok(r.status === 200, 'إعادة تسمية قسم');
+    const usedCatId = (await anon.get('/api/categories')).data.categories.find((c) => c.name === 'عام').id;
+    r = await admin.req('DELETE', `/api/admin/categories/${usedCatId}`);
+    ok(r.status === 409, 'حذف قسم فيه منتجات ← 409');
+    r = await admin.req('DELETE', `/api/admin/categories/${testCatId}`);
+    ok(r.status === 200, 'حذف قسم فارغ');
+
+    // جلسات
+    const sessList = await marketer.get('/api/me/sessions');
+    ok(sessList.data.sessions.some((x) => x.current), 'قائمة الجلسات تميّز الحالية');
+    const curKey = sessList.data.sessions.find((x) => x.current).key;
+    r = await marketer.req('DELETE', `/api/me/sessions/${curKey}`);
+    ok(r.status === 400, 'إنهاء الجلسة الحالية من القائمة ممنوع');
+
+    // دعم: ردّ وإغلاق + اتصال موثّق + ترتيب + CSV
+    await anon.post('/api/support', { name: 'زائر', phone: '0600000035', message: 'سؤال اختبار' });
+    const msgs = await admin.get('/api/admin/support');
+    const msgId = msgs.data.messages[0].id;
+    r = await admin.post(`/api/admin/support/${msgId}/reply`, { text: 'جواب اختبار' });
+    ok(r.status === 200, 'الإدارة ترد على رسالة دعم');
+    r = await admin.post(`/api/admin/support/${msgId}/close`, {});
+    ok(r.status === 200, 'الإدارة تغلق رسالة الدعم');
+    r = await supplier.post(`/api/supplier/orders/${bOrderId}/contact`, { result: 'answered' });
+    ok(r.status === 201, 'المورد يوثّق اتصالاً بالزبون');
+    r = await supplier.post(`/api/supplier/orders/${bOrderId}/contact`, { result: 'bad' });
+    ok(r.status === 400, 'نتيجة اتصال غير معروفة ← 400');
+    r = await anon.get('/api/products?sort=sold');
+    ok(r.status === 200 && Array.isArray(r.data.products), 'ترتيب الأكثر مبيعاً');
+    r = await anon.get('/api/products?sort=rating');
+    ok(r.status === 200, 'ترتيب الأعلى تقييماً');
+    const csvRes = await fetch(BASE + '/api/admin/export/payments.csv', { headers: { Cookie: admin.cookie } });
+    const csvText = await csvRes.text();
+    ok(csvRes.status === 200 && csvText.includes('REF-TEST-1'), 'تصدير CSV للمدفوعات الموثّقة');
   }
 
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);

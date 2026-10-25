@@ -43,7 +43,7 @@ const TRANSITIONS = {
   handed: ['out_for_delivery', 'cancelled'],
   out_for_delivery: ['delivered_collected', 'failed_delivery'],
   failed_delivery: ['out_for_delivery', 'returned'],
-  delivered_collected: [], cancelled: [], rejected: [], returned: []
+  delivered_collected: ['returned'], cancelled: [], rejected: [], returned: []
 };
 
 function send(res, code, obj, headers = {}) {
@@ -82,6 +82,17 @@ function publicUser(u) {
 }
 function getUser(id) { return db.prepare('SELECT * FROM users WHERE id = ?').get(id); }
 function customerPrice(p) { return p.wholesale_price + p.platform_margin; }
+const PAY_METHODS = ['تحويل بريدي موب', 'تحويل البريد الجاري', 'التحصيل من مقر المنصة', 'Enveloppe', 'Flexy', 'نقداً عند الاستلام من الإدارة'];
+function communesOf(w) {
+  try {
+    if (!globalThis.__communes) globalThis.__communes = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'communes.json'), 'utf8'));
+    return globalThis.__communes[String(w)] || [];
+  } catch { return []; }
+}
+function validCommune(w, name) {
+  if (!name) return true;
+  return communesOf(w).some((c) => c.ar === name || c.fr === name);
+}
 
 async function notifyAdmin(text) {
   const chat = integ.adminChatId();
@@ -112,10 +123,26 @@ function orderDigest(o, forSupplier) {
   }
   return lines.join('\n');
 }
-async function notifyOrderParties(order, text) {
-  await integ.notify({ userId: order.supplier_id, channel: 'telegram', type: 'order_update', text });
-  await integ.notify({ userId: order.supplier_id, channel: 'log', type: 'order_update', text });
-  if (order.marketer_id) await integ.notify({ userId: order.marketer_id, channel: 'log', type: 'order_update', text });
+// إشعارات حدث طلب — نصّ لكل دور بما يخصّه فقط (تدقيق 2026-10-25: كان نص المورد يصل للمسوق، والمشتري لا يُشعَر أبداً)
+async function notifyOrderEvent(order, kind, statusLabel) {
+  const supText = kind === 'created'
+    ? orderDigest(order, true) + '\nبانتظار تأكيدك في لوحة المورد — SOUQAR'
+    : `تغيّرت حالة الطلب ${order.ref} إلى: ${statusLabel}`;
+  await integ.notify({ userId: order.supplier_id, channel: 'telegram', type: 'order_update', text: supText });
+  await integ.notify({ userId: order.supplier_id, channel: 'log', type: 'order_update', text: supText });
+  if (order.marketer_id) {
+    const cm = db.prepare('SELECT amount FROM commissions WHERE order_id = ?').get(order.id);
+    const mkText = kind === 'created'
+      ? `🧾 طلب جديد من زبونك في SOUQAR: ${order.ref} — بانتظار تأكيد المورد. عمولتك المتوقعة: ${cm ? cm.amount : 0} دج — تابع حالته من لوحتك.`
+      : `تغيّرت حالة طلب زبونك ${order.ref} إلى: ${statusLabel}`;
+    await integ.notify({ userId: order.marketer_id, channel: 'log', type: 'order_update', text: mkText });
+  }
+  if (order.buyer_id) {
+    const byText = kind === 'created'
+      ? `🧾 استلمنا طلبك ${order.ref} في SOUQAR — بانتظار تأكيد المورد. تتبّع حالته من حسابك أو صفحة «تتبع طلبك».`
+      : `📦 تحديث طلبك ${order.ref}: ${statusLabel} — SOUQAR`;
+    await integ.notify({ userId: order.buyer_id, channel: 'log', type: 'order_update', text: byText });
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -187,8 +214,9 @@ const server = http.createServer(async (req, res) => {
       sec.registerLoginSuccess(user);
       const { token, csrf } = sec.createSession(user.id);
       audit(user.id, 'login', 'user', user.id, null);
+      const secureFlag = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
       return send(res, 200, { ok: true, user: publicUser(user), csrf }, {
-        'Set-Cookie': `pd_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${7 * 24 * 3600}`
+        'Set-Cookie': `pd_session=${token}; HttpOnly; SameSite=Lax${secureFlag}; Path=/; Max-Age=${7 * 24 * 3600}`
       });
     }
     if (p === '/api/auth/logout' && req.method === 'POST') {
@@ -196,15 +224,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true }, { 'Set-Cookie': 'pd_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
     }
     if (p === '/api/auth/forgot' && req.method === 'POST') {
+      if (!sec.rateLimit('forgot:' + req.socket.remoteAddress, 10, 3600e3)) return send(res, 429, { error: 'طلبات كثيرة — حاول بعد قليل' });
       const b = await readBody(req);
       let user = null;
       if (b.email) user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(b.email).trim().toLowerCase());
       else if (b.phone) user = db.prepare('SELECT * FROM users WHERE phone = ?').get(sec.cleanPhone(b.phone));
-      if (user) {
+      if (user && Date.now() - sec.lastAuthCodeAt(user.id, 'reset_password') > 60e3) {
         const token = sec.newToken(20);
+        // يُخزَّن التجزئة فقط — النص الصريح لا يُكتب في القاعدة أبداً (تدقيق 2026-10-25)
         db.prepare('INSERT INTO password_resets(user_id,token,token_hash,expires_at,created_at) VALUES(?,?,?,?,?)')
-          .run(user.id, token, sec.hashToken(token), Date.now() + 30 * 60e3, Date.now());
-        await integ.notify({ userId: user.id, channel: 'log', type: 'password_reset', text: `رمز استعادة كلمة المرور (صالح 30 دقيقة): ${token}` });
+          .run(user.id, '', sec.hashToken(token), Date.now() + 30 * 60e3, Date.now());
+        // سجل التطبيق لا يحمل أي سرّ — الرمز يصل عبر القنوات الخارجية المضبوطة فقط
+        await integ.notify({ userId: user.id, channel: 'log', type: 'password_reset', text: '🔐 طُلبت استعادة كلمة مرور حسابك — أُرسل الرمز عبر قنواتك المضبوطة (تيليغرام/بريد/واتساب). إن لم تطلبها تجاهل هذه الرسالة.' });
         if (user.telegram_chat_id) await integ.notify({ userId: user.id, channel: 'telegram', type: 'password_reset', text: `SOUQAR — رمز استعادة كلمة المرور (30 دقيقة): ${token}` });
         // رمز قصير من 6 أرقام عبر القناة المطلوبة: البريد الإلكتروني أو الهاتف (تيليغرام/واتساب حسب المضبوط)
         const code = sec.createAuthCode(user.id, 'reset_password');
@@ -249,8 +280,7 @@ const server = http.createServer(async (req, res) => {
     }
     // تعديل بيانات الحساب من داخل اللوحة (الهاتف يبقى ثابتاً لأنه معرّف الدخول)
     if (p === '/api/me' && req.method === 'PATCH') {
-      const s = sessionOf(req);
-      if (!s) return send(res, 401, { error: 'يجب تسجيل الدخول أولاً' });
+      const s = requireAuth(req, res); if (!s) return;
       const me = getUser(s.userId);
       const b = await readBody(req);
       const name = b.name !== undefined ? String(b.name).trim() : me.name;
@@ -263,23 +293,42 @@ const server = http.createServer(async (req, res) => {
         emailChanged = ne !== me.email;
         email = ne;
       }
+      // تحقق صارم من القيم (تدقيق 2026-10-25): ولاية/بلدية/وسيلة دفع لا تُحفظ إلا صحيحة
+      let wilaya = me.wilaya;
+      if (b.wilaya !== undefined) {
+        if (b.wilaya === '' || b.wilaya === null) wilaya = null;
+        else { wilaya = Number(b.wilaya); if (!Number.isInteger(wilaya) || wilaya < 1 || wilaya > 58) return send(res, 400, { error: 'اختر ولاية صحيحة من القائمة' }); }
+      }
+      let commune = me.commune;
+      if (b.commune !== undefined) commune = b.commune ? String(b.commune).trim() : null;
+      if (commune && wilaya && !validCommune(wilaya, commune)) return send(res, 400, { error: 'البلدية لا تنتمي للولاية المختارة — اخترها من القائمة' });
+      if (commune && !wilaya) return send(res, 400, { error: 'اختر الولاية أولاً ثم البلدية' });
+      let payMethod = me.payment_method;
+      if (b.paymentMethod !== undefined) {
+        payMethod = b.paymentMethod ? String(b.paymentMethod).trim() : null;
+        if (payMethod && !PAY_METHODS.includes(payMethod)) return send(res, 400, { error: 'اختر وسيلة استلام الأرباح من القائمة' });
+      }
+      let payDetails = me.payment_details;
+      if (b.paymentDetails !== undefined) {
+        payDetails = b.paymentDetails ? String(b.paymentDetails).trim().slice(0, 200) : null;
+        if (payDetails && !payMethod) return send(res, 400, { error: 'اختر وسيلة الاستلام أولاً ثم اكتب تفاصيلها' });
+      }
+      let telegram = me.telegram_chat_id;
+      if (b.telegramChatId !== undefined) {
+        telegram = b.telegramChatId ? String(b.telegramChatId).trim() : null;
+        if (telegram && !/^-?\d{5,15}$/.test(telegram)) return send(res, 400, { error: 'معرّف تيليغرام يجب أن يكون رقماً' });
+      }
       db.prepare('UPDATE users SET name = ?, email = ?, email_verified = ?, wilaya = ?, commune = ?, address = ?, business_name = ?, telegram_chat_id = ?, payment_method = ?, payment_details = ? WHERE id = ?')
-        .run(name, email, 1,
-          b.wilaya !== undefined ? (b.wilaya ? Number(b.wilaya) : null) : me.wilaya,
-          b.commune !== undefined ? (b.commune || null) : me.commune,
-          b.address !== undefined ? (b.address || null) : me.address,
+        .run(name, email, 1, wilaya, commune,
+          b.address !== undefined ? (b.address ? String(b.address).trim().slice(0, 300) : null) : me.address,
           b.businessName !== undefined ? (b.businessName || null) : me.business_name,
-          b.telegramChatId !== undefined ? (b.telegramChatId || null) : me.telegram_chat_id,
-          b.paymentMethod !== undefined ? (b.paymentMethod || null) : me.payment_method,
-          b.paymentDetails !== undefined ? (b.paymentDetails || null) : me.payment_details,
-          me.id);
+          telegram, payMethod, payDetails, me.id);
       audit(me.id, 'profile_update', 'user', me.id, emailChanged ? 'email_changed' : null);
       return send(res, 200, { ok: true, user: publicUser(getUser(me.id)), message: 'تم حفظ بياناتك.' });
     }
     // تغيير كلمة المرور من داخل الحساب (بكلمة المرور الحالية)
     if (p === '/api/me/password' && req.method === 'POST') {
-      const s = sessionOf(req);
-      if (!s) return send(res, 401, { error: 'يجب تسجيل الدخول أولاً' });
+      const s = requireAuth(req, res); if (!s) return;
       const me = getUser(s.userId);
       const b = await readBody(req);
       if (!sec.verifyPassword(b.currentPassword || '', me.password_hash)) return send(res, 401, { error: 'كلمة المرور الحالية غير صحيحة' });
@@ -311,7 +360,11 @@ const server = http.createServer(async (req, res) => {
       if (q) { sql += ' AND (p.name LIKE ? OR p.description LIKE ?)'; args.push('%' + q + '%', '%' + q + '%'); }
       if (cat) { sql += ' AND p.category_id = ?'; args.push(Number(cat)); }
       const sort = url.searchParams.get('sort');
-      sql += sort === 'price_asc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) ASC' : sort === 'price_desc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) DESC' : ' ORDER BY p.id DESC';
+      sql += sort === 'price_asc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) ASC'
+        : sort === 'price_desc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) DESC'
+        : sort === 'sold' ? ' ORDER BY sold DESC, p.id DESC'
+        : sort === 'rating' ? ' ORDER BY (rating_avg IS NULL), rating_avg DESC, p.id DESC'
+        : ' ORDER BY p.id DESC';
       const rows = db.prepare(sql).all(...args).map((r) => ({
         id: r.id, supplier_id: r.supplier_id, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name,
         supplier_name: r.supplier_name, business_name: r.business_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sold: r.sold, rating_avg: r.rating_avg, rating_count: r.rating_count, created_at: r.created_at,
@@ -394,12 +447,21 @@ const server = http.createServer(async (req, res) => {
 
     // ---------- إنشاء الطلبات (توجيه آلي للمورد + عمولات snapshot) ----------
     if (p === '/api/orders' && req.method === 'POST') {
-      if (!sec.rateLimit('ord:' + req.socket.remoteAddress, 30, 3600e3)) return send(res, 429, { error: 'طلبات كثيرة — حاول لاحقاً' });
+      // 120/ساعة: مسوّق نشط يُدخل طلبات زبائنه بنفسه وقد يشارك IP مع غيره — 30 كانت تخنق الاستعمال المشروع (ظهر في اختبارات التدقيق)
+      if (!sec.rateLimit('ord:' + req.socket.remoteAddress, 120, 3600e3)) return send(res, 429, { error: 'طلبات كثيرة — حاول لاحقاً' });
       const b = await readBody(req);
       const s = sessionOf(req);
+      // من له جلسة يخضع لفحص CSRF وحالة الحساب (الضيف بلا جلسة — تدقيق 2026-10-25)
+      if (s) {
+        if (s.status !== 'active') return send(res, 403, { error: 'الحساب غير مفعّل بعد أو موقوف' });
+        if (req.headers['x-csrf'] !== s.csrf) return send(res, 403, { error: 'رمز حماية الجلسة غير صالح — حدّث الصفحة وحاول مجدداً' });
+      }
       if (b.idempotencyKey) {
-        const existing = db.prepare('SELECT * FROM orders WHERE idempotency_key = ?').all(String(b.idempotencyKey))
-          .concat(db.prepare('SELECT * FROM orders WHERE group_ref = ?').all(String(b.idempotencyKey)));
+        const key = String(b.idempotencyKey);
+        const seen = new Set(); const existing = [];
+        for (const o of db.prepare('SELECT * FROM orders WHERE group_ref = ? OR idempotency_key = ? OR idempotency_key LIKE ?').all(key, key, key + ':%')) {
+          if (!seen.has(o.id)) { seen.add(o.id); existing.push(o); }
+        }
         if (existing.length) return send(res, 200, { ok: true, duplicate: true, orders: existing.map((o) => ({ ref: o.ref, total: o.total, status: o.status })) });
       }
       const cust = b.customer || {};
@@ -424,7 +486,8 @@ const server = http.createServer(async (req, res) => {
         for (const it of b.items) {
           const prod = db.prepare("SELECT * FROM products WHERE id = ? AND status = 'approved'").get(Number(it.productId));
           if (!prod) throw Object.assign(new Error('أحد المنتجات غير متاح'), { http: 400 });
-          const qty = Math.max(1, Math.min(99, Number(it.qty) || 1));
+          const qty = Number(it.qty);
+          if (!Number.isInteger(qty) || qty < 1 || qty > 99) throw Object.assign(new Error(`كمية غير صحيحة لمنتج: ${prod.name} (بين 1 و99)`), { http: 400 });
           if (prod.stock < qty) throw Object.assign(new Error(`المخزون غير كافٍ لمنتج: ${prod.name}`), { http: 400 });
           if (!bySupplier.has(prod.supplier_id)) bySupplier.set(prod.supplier_id, []);
           bySupplier.get(prod.supplier_id).push({ prod, qty, size: it.size || null, color: it.color || null, sellPrice: it.sellPrice });
@@ -458,7 +521,7 @@ const server = http.createServer(async (req, res) => {
           const info = db.prepare(`INSERT INTO orders(ref,group_ref,buyer_id,guest_name,guest_phone,wilaya,commune,address,supplier_id,marketer_id,ref_code,subtotal,delivery_fee,total,status,idempotency_key,created_at,updated_at)
             VALUES('TEMP',?,?,?,?,?,?,?,?,?,?,?,?,?,'pending_supplier',?,?,?)`)
             .run(groupRef, s && s.role === 'buyer' ? s.userId : null, name, phone, wilaya, String(cust.commune).trim(), String(cust.address).trim(),
-              supplierId, marketerId, refCode, subtotal, deliveryFee, total, groupRef, Date.now(), Date.now());
+              supplierId, marketerId, refCode, subtotal, deliveryFee, total, groupRef + ':' + supplierId, Date.now(), Date.now());
           const oid = Number(info.lastInsertRowid);
           const ref = `PD-${new Date().getFullYear()}-${String(oid).padStart(6, '0')}`;
           db.prepare('UPDATE orders SET ref = ? WHERE id = ?').run(ref, oid);
@@ -484,7 +547,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, e.http || 500, { error: e.message || 'خطأ في إنشاء الطلب' });
       }
       for (const o of created) {
-        await notifyOrderParties(o, orderDigest(o, true) + '\nبانتظار تأكيدك في لوحة المورد — SOUQAR');
+        await notifyOrderEvent(o, 'created');
         await notifyAdmin(orderDigest(o, false));
         audit(s ? s.userId : null, 'order_create', 'order', o.id, o.ref);
       }
@@ -554,7 +617,7 @@ const server = http.createServer(async (req, res) => {
       const marketer = o.marketer_id ? getUser(o.marketer_id) : null;
       const buyerAcc = o.buyer_id ? getUser(o.buyer_id) : null;
       const itemsRaw = db.prepare('SELECT oi.*, pr.name FROM order_items oi JOIN products pr ON pr.id = oi.product_id WHERE oi.order_id = ?').all(o.id);
-      const seeContact = s.role === 'admin' || s.role === 'supplier' || (s.role === 'buyer' && o.buyer_id === s.userId);
+      const seeContact = s.role === 'admin' || s.role === 'supplier' || (s.role === 'buyer' && o.buyer_id === s.userId) || (s.role === 'marketer' && o.marketer_id === s.userId);
       const items = itemsRaw.map((i) => ({
         product_id: i.product_id, name: i.name, qty: i.qty, size: i.size, color: i.color, customer_price: i.customer_price,
         line_total: i.customer_price * i.qty,
@@ -573,7 +636,7 @@ const server = http.createServer(async (req, res) => {
           created_at: o.created_at, updated_at: o.updated_at,
           wilaya: o.wilaya, wilaya_name: wilaya ? wilaya.name_ar : '', commune: o.commune,
           subtotal: o.subtotal, delivery_fee: o.delivery_fee, total: o.total,
-          reject_reason: o.reject_reason || null,
+          reject_reason: o.reject_reason || null, ship_ref: o.ship_ref || null,
           ...(seeContact ? {
             buyer_name: o.guest_name || (buyerAcc ? buyerAcc.name : null),
             buyer_phone: o.guest_phone || (buyerAcc ? buyerAcc.phone : null),
@@ -588,13 +651,37 @@ const server = http.createServer(async (req, res) => {
         items, history: hist
       });
     }
-    // إشعارات المستخدم داخل التطبيق (سجل ما وصله عبر القنوات)
+    // إشعارات المستخدم داخل التطبيق — قناة التطبيق فقط، بلا سباكة قنوات ولا أسرار (تدقيق 2026-10-25)
     if (p === '/api/my/notifications' && req.method === 'GET') {
       const s = sessionOf(req);
       if (!s) return send(res, 401, { error: 'يجب تسجيل الدخول أولاً' });
-      const rows = db.prepare('SELECT id, channel, type, payload, status, created_at FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 30').all(s.userId)
-        .map((n) => { let text = ''; try { text = JSON.parse(n.payload).text || ''; } catch {} return { id: n.id, channel: n.channel, type: n.type, text, status: n.status, created_at: n.created_at }; });
-      return send(res, 200, { notifications: rows });
+      const mask = (t) => String(t || '').replace(/هو:?\s*\d{6}/g, 'هو: ••••••').replace(/(رمز[^:：]*[:：]\s*)\S+/g, '$1••••••');
+      const rows = db.prepare("SELECT id, type, payload, created_at, read_at FROM notifications WHERE user_id = ? AND channel = 'log' ORDER BY id DESC LIMIT 30").all(s.userId)
+        .map((n) => { let text = ''; try { text = JSON.parse(n.payload).text || ''; } catch {} return { id: n.id, type: n.type, text: n.type === 'password_reset' ? mask(text) : text, created_at: n.created_at, read: !!n.read_at }; });
+      const unread = db.prepare("SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND channel = 'log' AND read_at IS NULL").get(s.userId).c;
+      return send(res, 200, { notifications: rows, unread });
+    }
+    if (p === '/api/my/notifications/read' && req.method === 'POST') {
+      const s = requireAuth(req, res); if (!s) return;
+      db.prepare("UPDATE notifications SET read_at = ? WHERE user_id = ? AND channel = 'log' AND read_at IS NULL").run(Date.now(), s.userId);
+      return send(res, 200, { ok: true });
+    }
+    // جلساتي النشطة (عرض/إنهاء) — المعرّف بصمة قصيرة من تجزئة الجلسة، لا التوكن نفسه
+    if (p === '/api/me/sessions' && req.method === 'GET') {
+      const s = requireAuth(req, res); if (!s) return;
+      const myHash = sec.hashToken(s.token);
+      const rows = db.prepare('SELECT token_hash, created_at, expires_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC').all(s.userId)
+        .map((r) => ({ key: r.token_hash.slice(0, 10), created_at: r.created_at, expires_at: r.expires_at, current: r.token_hash === myHash }));
+      return send(res, 200, { sessions: rows });
+    }
+    const sessDelM = p.match(/^\/api\/me\/sessions\/([a-f0-9]{10})$/);
+    if (sessDelM && req.method === 'DELETE') {
+      const s = requireAuth(req, res); if (!s) return;
+      const row = db.prepare('SELECT * FROM sessions WHERE user_id = ? AND substr(token_hash, 1, 10) = ?').get(s.userId, sessDelM[1]);
+      if (!row) return send(res, 404, { error: 'الجلسة غير موجودة' });
+      if (row.token_hash === sec.hashToken(s.token)) return send(res, 400, { error: 'هذه جلستك الحالية — استعمل تسجيل الخروج لإنهائها' });
+      db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(row.token_hash);
+      return send(res, 200, { ok: true });
     }
     // أسعار التوصيل العامة: أرخص رسم لكل ولاية عبر الموردين النشطين (لصفحة أسعار التوصيل)
     if (p === '/api/communes' && req.method === 'GET') {
@@ -627,6 +714,7 @@ const server = http.createServer(async (req, res) => {
       if (!o) return send(res, 404, { error: 'الطلب غير موجود' });
       const r = changeOrderStatus(o, 'cancelled', s.userId, 'ألغاه المشتري');
       if (r.error) return send(res, 400, { error: r.error });
+      await notifyOrderEvent(o, 'status', ORDER_STATUSES.cancelled);
       return send(res, 200, { ok: true });
     }
 
@@ -639,15 +727,22 @@ const server = http.createServer(async (req, res) => {
       const s = requireAuth(req, res, ['supplier']); if (!s) return;
       const b = await readBody(req);
       if (!Array.isArray(b.coverage)) return send(res, 400, { error: 'بيانات التغطية غير صحيحة' });
+      // تحقق كامل قبل أي حذف: صف فاسد واحد يرفض الحفظ كله وتبقى التغطية السابقة سليمة (تدقيق 2026-10-25)
+      const clean = [];
+      for (const c of b.coverage) {
+        const w = Number(c.wilaya_code), f = Number(c.delivery_fee);
+        const fo = c.fee_office != null && c.fee_office !== '' ? Number(c.fee_office) : null;
+        if (!Number.isInteger(w) || w < 1 || w > 58) return send(res, 400, { error: `ولاية غير صحيحة في التغطية: ${c.wilaya_code}` });
+        if (!Number.isFinite(f) || f < 0) return send(res, 400, { error: `رسم توصيل غير صحيح لولاية ${w}` });
+        if (fo != null && (!Number.isFinite(fo) || fo < 0)) return send(res, 400, { error: `رسم مكتب غير صحيح لولاية ${w}` });
+        clean.push([s.userId, w, Math.round(f), fo != null ? Math.round(fo) : null, c.duration ? String(c.duration).slice(0, 40) : null]);
+      }
+      if (!clean.length && b.clear !== true) return send(res, 400, { error: 'أرسل ولاية واحدة على الأقل — لم تُمسح تغطيتك الحالية' });
       db.exec('BEGIN IMMEDIATE');
       try {
         db.prepare('DELETE FROM supplier_coverage WHERE supplier_id = ?').run(s.userId);
         const ins = db.prepare('INSERT INTO supplier_coverage(supplier_id,wilaya_code,delivery_fee,fee_office,duration) VALUES(?,?,?,?,?)');
-        for (const c of b.coverage) {
-          const w = Number(c.wilaya_code), f = Number(c.delivery_fee);
-          const fo = c.fee_office != null && c.fee_office !== '' ? Number(c.fee_office) : null;
-          if (w >= 1 && w <= 58 && Number.isFinite(f) && f >= 0) ins.run(s.userId, w, Math.round(f), fo != null && Number.isFinite(fo) && fo >= 0 ? Math.round(fo) : null, c.duration ? String(c.duration).slice(0, 40) : null);
-        }
+        for (const row of clean) ins.run(...row);
         db.exec('COMMIT');
       } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'خطأ في حفظ التغطية' }); }
       audit(s.userId, 'coverage_update', 'supplier', s.userId, null);
@@ -660,7 +755,13 @@ const server = http.createServer(async (req, res) => {
       if (!m) return send(res, 400, { error: 'صورة غير صالحة — PNG أو JPG أو WebP فقط' });
       const buf = Buffer.from(m[2], 'base64');
       if (buf.length > 1.5 * 1024 * 1024) return send(res, 400, { error: 'الصورة أكبر من 1.5MB' });
-      const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+      // فحص التوقيع الحقيقي للملف (magic bytes) — بادئة الـdata URL وحدها لا تكفي (تدقيق 2026-10-25)
+      const isPng = buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+      const isJpg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+      const isWebp = buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+      const kind = isPng ? 'png' : isJpg ? 'jpg' : isWebp ? 'webp' : null;
+      if (!kind) return send(res, 400, { error: 'الملف المرفوع ليس صورة حقيقية (PNG/JPG/WebP)' });
+      const ext = kind;
       const fname = `${Date.now()}-${sec.newToken(6)}.${ext}`;
       fs.writeFileSync(path.join(UPLOADS, fname), buf);
       return send(res, 201, { ok: true, url: '/uploads/' + fname });
@@ -705,7 +806,8 @@ const server = http.createServer(async (req, res) => {
       const s = requireAuth(req, res, ['supplier']); if (!s) return;
       const rows = db.prepare('SELECT * FROM orders WHERE supplier_id = ? ORDER BY id DESC').all(s.userId).map((o) => ({
         ...o, status_label: ORDER_STATUSES[o.status],
-        items: db.prepare('SELECT oi.*, p.name FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?').all(o.id)
+        // تشكيل صريح: هامش المنصة وعمولة المسوق تفاصيل داخلية لا تصل للمورد (تدقيق 2026-10-25)
+        items: db.prepare('SELECT oi.id, oi.order_id, oi.product_id, oi.qty, oi.size, oi.color, oi.wholesale_price, oi.customer_price, p.name FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?').all(o.id)
       }));
       return send(res, 200, { orders: rows });
     }
@@ -717,7 +819,8 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const r = changeOrderStatus(o, String(b.status || ''), s.userId, b.note || null, b.reason || null, s.role === 'admin');
       if (r.error) return send(res, 400, { error: r.error });
-      await notifyOrderParties(o, `تغيّرت حالة الطلب ${o.ref} إلى: ${ORDER_STATUSES[b.status]}`);
+      if (b.shipRef && ['handed', 'out_for_delivery'].includes(b.status)) db.prepare('UPDATE orders SET ship_ref = ? WHERE id = ?').run(String(b.shipRef).slice(0, 60), o.id);
+      await notifyOrderEvent(o, 'status', ORDER_STATUSES[b.status]);
       if (b.status === 'delivered_collected' && o.marketer_id) {
         const cm = db.prepare('SELECT amount FROM commissions WHERE order_id = ?').get(o.id);
         if (cm && cm.amount > 0) {
@@ -727,6 +830,20 @@ const server = http.createServer(async (req, res) => {
         }
       }
       return send(res, 200, { ok: true });
+    }
+    // توثيق محاولة اتصال بالزبون (ضد الطلبات الوهمية) — تُسجَّل في الخط الزمني للطلب
+    const supContactM = p.match(/^\/api\/supplier\/orders\/(\d+)\/contact$/);
+    if (supContactM && req.method === 'POST') {
+      const s = requireAuth(req, res, ['supplier', 'admin']); if (!s) return;
+      const o = db.prepare('SELECT * FROM orders WHERE id = ?').get(Number(supContactM[1]));
+      if (!o || (s.role === 'supplier' && o.supplier_id !== s.userId)) return send(res, 404, { error: 'الطلب غير موجود' });
+      const b = await readBody(req);
+      const RESULTS = { answered: '📞 اتصلت بالزبون: ردّ وأكّد الطلب', no_answer: '📞 اتصلت بالزبون: لا يرد', wrong_number: '📞 اتصلت بالزبون: رقم خاطئ/مغلق', postponed: '📞 الزبون طلب تأجيل التسليم' };
+      if (!RESULTS[b.result]) return send(res, 400, { error: 'اختر نتيجة الاتصال' });
+      db.prepare('INSERT INTO order_history(order_id,status,actor_id,note,created_at) VALUES(?,?,?,?,?)')
+        .run(o.id, o.status, s.userId, RESULTS[b.result] + (b.note ? ' — ' + String(b.note).slice(0, 200) : ''), Date.now());
+      audit(s.userId, 'order_contact', 'order', o.id, b.result);
+      return send(res, 201, { ok: true });
     }
     if (p === '/api/supplier/reports' && req.method === 'GET') {
       const s = requireAuth(req, res, ['supplier']); if (!s) return;
@@ -753,15 +870,61 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/my/wallet' && req.method === 'GET') {
       const s = requireAuth(req, res, ['marketer']); if (!s) return;
       const sum = (sql, ...a) => db.prepare(sql).get(...a).s;
-      const waiting = sum(`SELECT COALESCE(SUM(cm.amount),0) s FROM commissions cm JOIN orders o ON o.id = cm.order_id WHERE cm.marketer_id = ? AND cm.state = 'expected' AND o.status IN ('pending_supplier','confirmed','preparing')`, s.userId);
+      const waiting = sum(`SELECT COALESCE(SUM(cm.amount),0) s FROM commissions cm JOIN orders o ON o.id = cm.order_id WHERE cm.marketer_id = ? AND cm.state = 'expected' AND o.status IN ('pending_supplier','confirmed','preparing','failed_delivery')`, s.userId);
       const inDelivery = sum(`SELECT COALESCE(SUM(cm.amount),0) s FROM commissions cm JOIN orders o ON o.id = cm.order_id WHERE cm.marketer_id = ? AND cm.state = 'expected' AND o.status IN ('handed','out_for_delivery')`, s.userId);
       const approved = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'payable'", s.userId);
       const paid = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'paid'", s.userId);
-      const payableFree = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL", s.userId);
-      const bonusesFree = sum('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL', s.userId);
+      const commFree = sum("SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL AND payout_request_id IS NULL", s.userId);
+      const bonusesFree = sum('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL AND payout_request_id IS NULL', s.userId);
+      const requested = sum(`SELECT COALESCE(SUM(amount),0) s FROM commissions WHERE marketer_id = ? AND payout_request_id IN (SELECT id FROM payout_requests WHERE state = 'pending')`, s.userId)
+        + sum(`SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ? AND payout_request_id IN (SELECT id FROM payout_requests WHERE state = 'pending')`, s.userId);
       const bonusesTotal = sum('SELECT COALESCE(SUM(amount),0) s FROM invite_bonuses WHERE inviter_id = ?', s.userId);
-      const balance = payableFree + bonusesFree;
-      return send(res, 200, { wallet: { waiting, inDelivery, approved, paid, bonuses: bonusesTotal, balance } });
+      const balance = commFree + bonusesFree;
+      const earned = waiting + inDelivery + approved + paid + bonusesTotal;
+      return send(res, 200, { wallet: { waiting, inDelivery, approved, paid, requested, bonuses: bonusesTotal, balance, earned } });
+    }
+    // طلبات سحب الأرباح — المسوّق يطلب، والإدارة تدفع خارج المنصة وتوثّق (قرار المستخدم 2026-10-25)
+    if (p === '/api/my/payout-requests' && req.method === 'GET') {
+      const s = requireAuth(req, res, ['marketer']); if (!s) return;
+      const rows = db.prepare('SELECT * FROM payout_requests WHERE marketer_id = ? ORDER BY id DESC LIMIT 30').all(s.userId);
+      return send(res, 200, { requests: rows });
+    }
+    if (p === '/api/my/payout-requests' && req.method === 'POST') {
+      const s = requireAuth(req, res, ['marketer']); if (!s) return;
+      const me = getUser(s.userId);
+      const b = await readBody(req);
+      const method = b.method ? String(b.method).trim() : (me.payment_method || '');
+      if (!PAY_METHODS.includes(method)) return send(res, 400, { error: 'اختر وسيلة السحب: بريدي موب / البريد الجاري (CCP) / Flexy / Enveloppe / من مقر المنصة / نقداً من الإدارة' });
+      const details = (b.details ? String(b.details).trim() : (me.payment_details || '')).slice(0, 200);
+      const needsDetails = !['التحصيل من مقر المنصة', 'نقداً عند الاستلام من الإدارة'].includes(method);
+      if (needsDetails && !details) return send(res, 400, { error: 'اكتب تفاصيل وسيلة السحب (رقم الحساب/الهاتف) — أو اضبطها أولاً في إعدادات حسابك' });
+      const amount = Math.round(Number(b.amount));
+      const pending = db.prepare("SELECT id FROM payout_requests WHERE marketer_id = ? AND state = 'pending'").get(s.userId);
+      if (pending) return send(res, 409, { error: 'عندك طلب سحب قيد المعالجة — انتظر نتيجته قبل طلب جديد' });
+      const commFree = db.prepare("SELECT * FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL AND payout_request_id IS NULL ORDER BY id").all(s.userId);
+      const bonFree = db.prepare('SELECT * FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL AND payout_request_id IS NULL ORDER BY id').all(s.userId);
+      const available = commFree.reduce((a, c) => a + c.amount, 0) + bonFree.reduce((a, c) => a + c.amount, 0);
+      if (!Number.isFinite(amount) || amount < 1) return send(res, 400, { error: 'اكتب مبلغ السحب' });
+      if (amount > available) return send(res, 400, { error: `المبلغ أكبر من رصيدك القابل للسحب الآن: ${available} دج` });
+      db.exec('BEGIN IMMEDIATE');
+      let reqId;
+      try {
+        const info = db.prepare('INSERT INTO payout_requests(marketer_id,amount,method,details,state,created_at,updated_at) VALUES(?,?,?,?,\'pending\',?,?)')
+          .run(s.userId, amount, method, details || null, Date.now(), Date.now());
+        reqId = Number(info.lastInsertRowid);
+        let left = amount;
+        for (const c of commFree) { if (left <= 0) break; db.prepare('UPDATE commissions SET payout_request_id = ? WHERE id = ?').run(reqId, c.id); left -= c.amount; }
+        for (const bn of bonFree) { if (left <= 0) break; db.prepare('UPDATE invite_bonuses SET payout_request_id = ? WHERE id = ?').run(reqId, bn.id); left -= bn.amount; }
+        // العمولة لا تتجزأ: المبلغ الفعلي = مجموع العمولات/المكافآت المرتبطة كاملة (قد يتجاوز المطلوب بقليل) — يُعلن للمسوّق كما هو
+        const eff = db.prepare('SELECT (SELECT COALESCE(SUM(amount),0) FROM commissions WHERE payout_request_id = ?) + (SELECT COALESCE(SUM(amount),0) FROM invite_bonuses WHERE payout_request_id = ?) s').get(reqId, reqId).s;
+        db.prepare('UPDATE payout_requests SET amount = ? WHERE id = ?').run(eff, reqId);
+        db.exec('COMMIT');
+        var effectiveAmount = eff;
+      } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'تعذر إنشاء طلب السحب' }); }
+      audit(s.userId, 'payout_request', 'payout_request', reqId, `${effectiveAmount} via ${method}`);
+      await notifyAdmin(`💸 طلب سحب أرباح جديد #${reqId} — ${me.name} (${me.phone}) — ${effectiveAmount} دج — ${method}${details ? ' — ' + details : ''} — عالِجه من لوحة الإدارة ← المدفوعات`);
+      await integ.notify({ userId: s.userId, channel: 'log', type: 'payout', text: `📨 استلمنا طلب سحبك #${reqId} بمبلغ ${effectiveAmount} دج عبر ${method} — قيد المعالجة، وسيصلك تأكيد عند الدفع.` });
+      return send(res, 201, { ok: true, requestId: reqId, amount: effectiveAmount, message: 'وصل طلب سحبك — قيد المعالجة عند الإدارة.' });
     }
     if (p === '/api/my/invite' && req.method === 'GET') {
       const s = requireAuth(req, res); if (!s) return;
@@ -861,6 +1024,26 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { ok: true, id: Number(info.lastInsertRowid) });
       } catch { return send(res, 409, { error: 'التصنيف موجود مسبقاً' }); }
     }
+    const catAdmM = p.match(/^\/api\/admin\/categories\/(\d+)$/);
+    if (catAdmM && req.method === 'PATCH') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const b = await readBody(req);
+      const name = String(b.name || '').trim();
+      if (!name) return send(res, 400, { error: 'اسم التصنيف مطلوب' });
+      try {
+        const r = db.prepare('UPDATE categories SET name = ? WHERE id = ?').run(name, Number(catAdmM[1]));
+        if (!r.changes) return send(res, 404, { error: 'التصنيف غير موجود' });
+        return send(res, 200, { ok: true });
+      } catch { return send(res, 409, { error: 'يوجد تصنيف آخر بهذا الاسم' }); }
+    }
+    if (catAdmM && req.method === 'DELETE') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const cid = Number(catAdmM[1]);
+      const used = db.prepare('SELECT COUNT(*) c FROM products WHERE category_id = ?').get(cid).c;
+      if (used) return send(res, 409, { error: `لا يمكن حذف تصنيف فيه ${used} منتجاً — انقل منتجاته لتصنيف آخر أولاً` });
+      db.prepare('DELETE FROM categories WHERE id = ?').run(cid);
+      return send(res, 200, { ok: true });
+    }
     if (p === '/api/admin/orders' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
       const rows = db.prepare('SELECT * FROM orders ORDER BY id DESC LIMIT 300').all()
@@ -870,12 +1053,59 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/admin/settlements' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
       const payable = db.prepare(`SELECT u.id AS marketer_id, u.name, u.phone, u.payment_method, u.payment_details,
-        (SELECT COALESCE(SUM(amount),0) FROM commissions WHERE marketer_id = u.id AND state = 'payable' AND settlement_id IS NULL) AS commissions_sum,
-        (SELECT COALESCE(SUM(amount),0) FROM invite_bonuses WHERE inviter_id = u.id AND settlement_id IS NULL) AS bonuses_sum
+        (SELECT COALESCE(SUM(amount),0) FROM commissions WHERE marketer_id = u.id AND state = 'payable' AND settlement_id IS NULL AND payout_request_id IS NULL) AS commissions_sum,
+        (SELECT COALESCE(SUM(amount),0) FROM invite_bonuses WHERE inviter_id = u.id AND settlement_id IS NULL AND payout_request_id IS NULL) AS bonuses_sum
         FROM users u WHERE u.role = 'marketer'`).all()
         .map((r) => ({ ...r, total: r.commissions_sum + r.bonuses_sum })).filter((r) => r.total > 0);
       const payments = db.prepare(`SELECT st.*, u.name AS marketer_name, u.phone AS marketer_phone FROM settlements st JOIN users u ON u.id = st.marketer_id WHERE st.state = 'paid' ORDER BY st.id DESC`).all();
-      return send(res, 200, { payable, payments });
+      const payoutRequests = db.prepare(`SELECT pr.*, u.name AS marketer_name, u.phone AS marketer_phone FROM payout_requests pr JOIN users u ON u.id = pr.marketer_id ORDER BY (pr.state = 'pending') DESC, pr.id DESC LIMIT 50`).all();
+      return send(res, 200, { payable, payments, payoutRequests });
+    }
+    // معالجة طلب سحب: تأكيد بعد دفع فعلي خارج المنصة (بالطريقة والمرجع) أو رفض يحرّر العمولات
+    const prActM = p.match(/^\/api\/admin\/payout-requests\/(\d+)\/(confirm|reject)$/);
+    if (prActM && req.method === 'POST') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const pr = db.prepare('SELECT * FROM payout_requests WHERE id = ?').get(Number(prActM[1]));
+      if (!pr) return send(res, 404, { error: 'طلب السحب غير موجود' });
+      if (pr.state !== 'pending') return send(res, 409, { error: 'هذا الطلب عولج من قبل' });
+      const b = await readBody(req);
+      if (prActM[2] === 'reject') {
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          db.prepare('UPDATE commissions SET payout_request_id = NULL WHERE payout_request_id = ?').run(pr.id);
+          db.prepare('UPDATE invite_bonuses SET payout_request_id = NULL WHERE payout_request_id = ?').run(pr.id);
+          db.prepare("UPDATE payout_requests SET state = 'rejected', admin_note = ?, updated_at = ? WHERE id = ?").run(b.reason ? String(b.reason).slice(0, 300) : 'رُفض من الإدارة', Date.now(), pr.id);
+          db.exec('COMMIT');
+        } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'خطأ في رفض الطلب' }); }
+        audit(s.userId, 'payout_reject', 'payout_request', pr.id, b.reason || null);
+        await integ.notify({ userId: pr.marketer_id, channel: 'log', type: 'payout', text: `❌ رُفض طلب سحبك #${pr.id} (${pr.amount} دج)${b.reason ? ' — السبب: ' + b.reason : ''}. رصيدك بقي كما هو في محفظتك.` });
+        return send(res, 200, { ok: true });
+      }
+      const method = b.method ? String(b.method).trim() : pr.method;
+      if (!PAY_METHODS.includes(method)) return send(res, 400, { error: 'اختر طريقة الدفع الفعلية' });
+      if (['تحويل بريدي موب', 'تحويل البريد الجاري', 'Flexy'].includes(method) && !(b.reference && String(b.reference).trim())) return send(res, 400, { error: 'مرجع العملية مطلوب لتوثيق الدفع (رقم التحويل أو العملية)' });
+      const comms = db.prepare("SELECT * FROM commissions WHERE payout_request_id = ? AND state = 'payable'").all(pr.id);
+      const bons = db.prepare('SELECT * FROM invite_bonuses WHERE payout_request_id = ? AND settlement_id IS NULL').all(pr.id);
+      const amount = comms.reduce((a, c) => a + c.amount, 0) + bons.reduce((a, x) => a + x.amount, 0);
+      if (!amount) return send(res, 400, { error: 'لا عمولات مرتبطة قابلة للدفع في هذا الطلب (ربما أُلغيت طلباتها)' });
+      db.exec('BEGIN IMMEDIATE');
+      let sid;
+      try {
+        const info = db.prepare(`INSERT INTO settlements(marketer_id,amount,state,method,reference,note,created_at,updated_at) VALUES(?,?,'paid',?,?,?,?,?)`)
+          .run(pr.marketer_id, amount, method, b.reference ? String(b.reference).trim() : null, (b.note || ('طلب سحب #' + pr.id)), Date.now(), Date.now());
+        sid = Number(info.lastInsertRowid);
+        const upd = db.prepare("UPDATE commissions SET settlement_id = ?, state = 'paid', payout_request_id = NULL, updated_at = ? WHERE id = ?");
+        for (const c of comms) upd.run(sid, Date.now(), c.id);
+        const updB = db.prepare('UPDATE invite_bonuses SET settlement_id = ?, payout_request_id = NULL WHERE id = ?');
+        for (const bn of bons) updB.run(sid, bn.id);
+        db.prepare("UPDATE payout_requests SET state = 'paid', admin_method = ?, admin_reference = ?, admin_note = ?, settlement_id = ?, updated_at = ? WHERE id = ?")
+          .run(method, b.reference ? String(b.reference).trim() : null, b.note || null, sid, Date.now(), pr.id);
+        db.exec('COMMIT');
+      } catch (e) { db.exec('ROLLBACK'); return send(res, 500, { error: 'خطأ في توثيق دفع طلب السحب' }); }
+      audit(s.userId, 'payout_confirm', 'payout_request', pr.id, b.reference || method);
+      await integ.notify({ userId: pr.marketer_id, channel: 'log', type: 'payout', text: `✅ دُفع طلب سحبك #${pr.id}: ${amount} دج عبر ${method}${b.reference ? ' — مرجع العملية: ' + b.reference : ''}. تجده في سجل مدفوعاتك.` });
+      await integ.notify({ userId: pr.marketer_id, channel: 'telegram', type: 'payout', text: `✅ دُفع طلب سحبك #${pr.id} في SOUQAR: ${amount} دج عبر ${method}${b.reference ? ' — مرجع: ' + b.reference : ''}` });
+      return send(res, 201, { ok: true, settlementId: sid, amount });
     }
     if (p === '/api/admin/payments/confirm' && req.method === 'POST') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
@@ -885,8 +1115,9 @@ const server = http.createServer(async (req, res) => {
       if (['تحويل بريدي موب', 'تحويل البريد الجاري', 'Flexy'].includes(b.method) && !(b.reference && String(b.reference).trim())) return send(res, 400, { error: 'مرجع العملية مطلوب لتوثيق الدفع (رقم التحويل أو العملية)' });
       const marketer = getUser(Number(b.marketerId));
       if (!marketer || marketer.role !== 'marketer') return send(res, 404, { error: 'المسوق غير موجود' });
-      const payable = db.prepare("SELECT * FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL").all(marketer.id);
-      const bonuses = db.prepare('SELECT * FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL').all(marketer.id);
+      // العمولات المرتبطة بطلب سحب معلّق تُدفع من مسار الطلب فقط — لا تُدفع مرتين من هنا
+      const payable = db.prepare("SELECT * FROM commissions WHERE marketer_id = ? AND state = 'payable' AND settlement_id IS NULL AND payout_request_id IS NULL").all(marketer.id);
+      const bonuses = db.prepare('SELECT * FROM invite_bonuses WHERE inviter_id = ? AND settlement_id IS NULL AND payout_request_id IS NULL').all(marketer.id);
       const amount = payable.reduce((a, c) => a + c.amount, 0) + bonuses.reduce((a, x) => a + x.amount, 0);
       if (!amount) return send(res, 400, { error: 'لا رصيد قابل للدفع لهذا المسوق حالياً' });
       db.exec('BEGIN IMMEDIATE');
@@ -948,6 +1179,50 @@ const server = http.createServer(async (req, res) => {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
       return send(res, 200, { messages: db.prepare('SELECT * FROM support_messages ORDER BY id DESC LIMIT 100').all() });
     }
+    // ردّ/إغلاق رسالة دعم — الرد يُحفظ ويُشعَر صاحب الحساب إن وُجد برقم هاتفه
+    const supMsgM = p.match(/^\/api\/admin\/support\/(\d+)\/(reply|close)$/);
+    if (supMsgM && req.method === 'POST') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const msg = db.prepare('SELECT * FROM support_messages WHERE id = ?').get(Number(supMsgM[1]));
+      if (!msg) return send(res, 404, { error: 'الرسالة غير موجودة' });
+      const b = await readBody(req);
+      if (supMsgM[2] === 'reply') {
+        const text = String(b.text || '').trim();
+        if (!text) return send(res, 400, { error: 'اكتب نص الرد' });
+        db.prepare("UPDATE support_messages SET reply = ?, status = 'replied' WHERE id = ?").run(text.slice(0, 2000), msg.id);
+        const u = db.prepare('SELECT id FROM users WHERE phone = ?').get(msg.phone);
+        if (u) await integ.notify({ userId: u.id, channel: 'log', type: 'support', text: `💬 ردّ الدعم على رسالتك («${msg.message.slice(0, 60)}…»): ${text.slice(0, 300)}` });
+        audit(s.userId, 'support_reply', 'support_message', msg.id, null);
+        return send(res, 200, { ok: true });
+      }
+      db.prepare("UPDATE support_messages SET status = 'closed' WHERE id = ?").run(msg.id);
+      return send(res, 200, { ok: true });
+    }
+    // تصدير CSV (Excel يفتحه بالعربية مع BOM)
+    function csvOut(res2, name, header, lines) {
+      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const body = '﻿' + header.map(esc).join(',') + '\n' + lines.map((r) => r.map(esc).join(',')).join('\n');
+      res2.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}"` });
+      return res2.end(body);
+    }
+    if (p === '/api/admin/export/orders.csv' && req.method === 'GET') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const rows = db.prepare(`SELECT o.*, u.name AS supplier_name, m.name AS marketer_name FROM orders o JOIN users u ON u.id = o.supplier_id LEFT JOIN users m ON m.id = o.marketer_id ORDER BY o.id DESC LIMIT 2000`).all();
+      return csvOut(res, 'orders.csv', ['المرجع', 'التاريخ', 'الحالة', 'المشتري', 'الهاتف', 'الولاية', 'البلدية', 'المورد', 'المسوق', 'المجموع الفرعي', 'التوصيل', 'الإجمالي'],
+        rows.map((o) => [o.ref, new Date(o.created_at).toISOString().slice(0, 10), ORDER_STATUSES[o.status] || o.status, o.guest_name || '', o.guest_phone || '', o.wilaya, o.commune || '', o.supplier_name, o.marketer_name || '', o.subtotal, o.delivery_fee, o.total]));
+    }
+    if (p === '/api/admin/export/payments.csv' && req.method === 'GET') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const rows = db.prepare(`SELECT st.*, u.name AS marketer_name, u.phone FROM settlements st JOIN users u ON u.id = st.marketer_id WHERE st.state = 'paid' ORDER BY st.id DESC`).all();
+      return csvOut(res, 'payments.csv', ['رقم الدفع', 'التاريخ', 'المسوق', 'الهاتف', 'المبلغ', 'الطريقة', 'المرجع', 'ملاحظة'],
+        rows.map((r) => [r.id, new Date(r.created_at).toISOString().slice(0, 10), r.marketer_name, r.phone, r.amount, r.method || '', r.reference || '', r.note || '']));
+    }
+    if (p === '/api/supplier/export/orders.csv' && req.method === 'GET') {
+      const s = requireAuth(req, res, ['supplier']); if (!s) return;
+      const rows = db.prepare('SELECT * FROM orders WHERE supplier_id = ? ORDER BY id DESC LIMIT 2000').all(s.userId);
+      return csvOut(res, 'my-orders.csv', ['المرجع', 'التاريخ', 'الحالة', 'المشتري', 'الهاتف', 'الولاية', 'البلدية', 'العنوان', 'الإجمالي'],
+        rows.map((o) => [o.ref, new Date(o.created_at).toISOString().slice(0, 10), ORDER_STATUSES[o.status] || o.status, o.guest_name || '', o.guest_phone || '', o.wilaya, o.commune || '', o.address || '', o.total]));
+    }
     if (p === '/api/admin/backup' && req.method === 'POST') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
       const fname = `platform-${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
@@ -984,6 +1259,8 @@ const server = http.createServer(async (req, res) => {
     }
     return send(res, 404, { error: 'غير موجود' });
   } catch (e) {
+    if (e && e.message === 'bad_json') { if (!res.headersSent) send(res, 400, { error: 'جسم الطلب ليس JSON صالحاً' }); return; }
+    if (e && e.message === 'too_large') { if (!res.headersSent) send(res, 413, { error: 'حجم الطلب أكبر من المسموح' }); return; }
     console.error('server error', e);
     try {
       db.prepare('INSERT INTO notifications(channel,type,payload,status,created_at) VALUES(?,?,?,?,?)')
@@ -1008,6 +1285,10 @@ function validateProduct(b) {
     const c = db.prepare('SELECT id FROM categories WHERE id = ?').get(Number(b.categoryId));
     if (!c) return { error: 'التصنيف غير موجود' };
     category_id = c.id;
+  } else {
+    // بلا تصنيف مختار → «عام» حتى لا يبقى أي منتج بلا قسم (تدقيق 2026-10-25)
+    const g = db.prepare("SELECT id FROM categories WHERE name = 'عام'").get();
+    category_id = g ? g.id : null;
   }
   const compare = b.comparePrice != null && b.comparePrice !== '' ? Math.round(Number(b.comparePrice)) : null;
   return { name, wholesale_price: wholesale, stock, images, sizes, colors, category_id, description: String(b.description || '').slice(0, 5000), compare_price: compare != null && Number.isFinite(compare) && compare > 0 ? compare : null };
@@ -1032,6 +1313,12 @@ function changeOrderStatus(o, newStatus, actorId, note, reason, force = false) {
   if (!force && !allowed.includes(newStatus)) return { error: `لا يمكن الانتقال من «${ORDER_STATUSES[o.status]}» إلى «${ORDER_STATUSES[newStatus]}»` };
   if ((newStatus === 'rejected' || newStatus === 'cancelled') && o.status === 'pending_supplier' && !reason && !note)
     return { error: 'اذكر سبب الرفض أو الإلغاء' };
+  // حرّاس مالية (تدقيق 2026-10-25): عمولة مدفوعة وموثّقة لا تُكسر بأي انتقال — ولا حتى بقوة الإدارة
+  const negTarget = ['cancelled', 'rejected', 'returned'].includes(newStatus);
+  if (negTarget) {
+    const cm0 = db.prepare('SELECT state FROM commissions WHERE order_id = ?').get(o.id);
+    if (cm0 && cm0.state === 'paid') return { error: 'عمولة هذا الطلب مدفوعة وموثّقة بسجل دفع — لا يمكن إلغاء الطلب أو إرجاعه آلياً؛ عالِجها يدوياً مع المسوّق' };
+  }
   db.exec('BEGIN IMMEDIATE');
   try {
     const negative = ['cancelled', 'rejected', 'returned'].includes(newStatus);
@@ -1048,6 +1335,16 @@ function changeOrderStatus(o, newStatus, actorId, note, reason, force = false) {
     if (negative) {
       const cm = db.prepare('SELECT * FROM commissions WHERE order_id = ?').get(o.id);
       if (cm && ['expected', 'confirmed', 'payable'].includes(cm.state)) {
+        if (cm.payout_request_id) {
+          // فكّ ارتباط طلب السحب وإنقاص مبلغه بقدر هذه العمولة — وإن صفر المبلغ يُغلق الطلب تلقائياً
+          const pr = db.prepare("SELECT * FROM payout_requests WHERE id = ? AND state = 'pending'").get(cm.payout_request_id);
+          if (pr) {
+            const newAmt = Math.max(0, pr.amount - cm.amount);
+            if (newAmt <= 0) db.prepare("UPDATE payout_requests SET state = 'rejected', amount = 0, admin_note = 'أُلغي تلقائياً: أُلغيت/رُجعت كل طلبات هذا السحب', updated_at = ? WHERE id = ?").run(Date.now(), pr.id);
+            else db.prepare('UPDATE payout_requests SET amount = ?, updated_at = ? WHERE id = ?').run(newAmt, Date.now(), pr.id);
+          }
+          db.prepare('UPDATE commissions SET payout_request_id = NULL WHERE id = ?').run(cm.id);
+        }
         if (cm.settlement_id) {
           const st = db.prepare('SELECT * FROM settlements WHERE id = ?').get(cm.settlement_id);
           if (st && st.state !== 'paid') {

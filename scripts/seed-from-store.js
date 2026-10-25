@@ -32,8 +32,17 @@ const HOME_FEE = 500, OFFICE_FEE = 300, DURATION = '24-72 ساعة', DEFAULT_STO
     console.log('أُنشئ حساب المورد Promotion Dizad برقم', info.lastInsertRowid);
   } else console.log('مورد Promotion Dizad موجود برقم', supplier.id);
 
-  let cat = db.prepare('SELECT id FROM categories WHERE name = ?').get('منتجات المتجر');
-  if (!cat) { const c = db.prepare('INSERT INTO categories(name,created_at) VALUES(?,?)').run('منتجات المتجر', now); cat = { id: c.lastInsertRowid }; }
+  const { categorize } = require('../src/categories-map');
+  const catCache = new Map();
+  function catIdFor(name) {
+    const cn = categorize(name);
+    if (!catCache.has(cn)) {
+      let c = db.prepare('SELECT id FROM categories WHERE name = ?').get(cn);
+      if (!c) { const r = db.prepare('INSERT INTO categories(name,created_at) VALUES(?,?)').run(cn, now); c = { id: r.lastInsertRowid }; }
+      catCache.set(cn, c.id);
+    }
+    return catCache.get(cn);
+  }
 
   const cov = db.prepare('INSERT OR REPLACE INTO supplier_coverage(supplier_id,wilaya_code,delivery_fee,fee_office,duration) VALUES(?,?,?,?,?)');
   for (let w = 1; w <= 58; w++) cov.run(supplier.id, w, HOME_FEE, OFFICE_FEE, DURATION);
@@ -56,7 +65,7 @@ const HOME_FEE = 500, OFFICE_FEE = 300, DURATION = '24-72 ساعة', DEFAULT_STO
       const contents = (p.contents && Array.isArray(p.contents.ar)) ? p.contents.ar : [];
       const desc = [tagline, contents.length ? 'محتويات الباك: ' + contents.join(' • ') : '', p.count && p.count.ar ? 'العدد: ' + p.count.ar : ''].filter(Boolean).join('\n');
       const images = Array.isArray(p.images) ? p.images.filter((x) => typeof x === 'string' && x.startsWith('http')).slice(0, 6) : [];
-      insert.run(supplier.id, cat.id, name, desc, wholesale, margin, DEFAULT_STOCK, JSON.stringify(images), now, now);
+      insert.run(supplier.id, catIdFor(name), name, desc, wholesale, margin, DEFAULT_STOCK, JSON.stringify(images), now, now);
       added++;
     }
     db.exec('COMMIT');
