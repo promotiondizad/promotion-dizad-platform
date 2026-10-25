@@ -463,6 +463,13 @@ try {
     ok(!!commMsg, 'المسوق يصله إشعار عمولته عند التسليم والتحصيل');
   }
 
+
+  console.log('— صفحة المتجر: تقييمات وبيانات موسعة —');
+  {
+    const pub = await anon.get(`/api/suppliers/${supIdMain}/public`);
+    ok(pub.status === 200 && pub.data.supplier.rating_count >= 1 && typeof pub.data.supplier.coverage_count === 'number' && Array.isArray(pub.data.supplier.reviews), 'صفحة المتجر تعرض ملخص التقييمات وعدد ولايات التغطية');
+  }
+
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;
 } catch (e) {

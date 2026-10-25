@@ -198,7 +198,7 @@ summary{cursor:pointer;font-weight:700}
 .role-tabs .tab.active{border-color:var(--gold);background:var(--navy);color:#fff}
 .role-tabs .tab.active small{color:#bfe9d2}
 /* شاشة الترحيب الأولى */
-#splash{position:fixed;inset:0;z-index:200;background:linear-gradient(180deg,#0d5a41,#042a1f);color:#fff;display:flex;align-items:center;justify-content:center;padding:22px}
+#splash{position:fixed;inset:0;z-index:200;background:linear-gradient(180deg,rgba(13,90,65,.88),rgba(4,42,31,.96)),url('https://upload.wikimedia.org/wikipedia/commons/0/0c/Maqam_Echahid.jpg') center/cover no-repeat;color:#fff;display:flex;align-items:center;justify-content:center;padding:22px}
 #splash .sp-box{text-align:center;max-width:420px;width:100%}
 #splash .sp-logo{font-size:64px;font-weight:900;letter-spacing:1px}
 #splash .sp-logo span{color:var(--gold2)}
@@ -215,3 +215,13 @@ summary{cursor:pointer;font-weight:700}
 .chip-row{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
 .chip{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 14px;font-size:13.5px;font-weight:700;cursor:pointer}
 .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* مركز الحساب وقوائم التنقل */
+.avatar-circle{width:52px;height:52px;border-radius:50%;background:var(--navy);color:#fff;font-size:24px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.hub-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.menu-list{display:flex;flex-direction:column}
+.menu-row{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:right;background:none;border:none;border-bottom:1px solid var(--line);padding:13px 4px;font-size:15.5px;font-weight:700;color:var(--ink);cursor:pointer;text-decoration:none}
+.menu-row:last-child{border-bottom:none}
+.menu-row span{color:var(--ink2);font-size:20px}
+.cat-tile.has-img{background-size:cover;background-position:center;border-color:transparent}
+.cat-tile.has-img span{color:#e6f7ee}

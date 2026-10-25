@@ -147,9 +147,34 @@ async function openStore(supplierId) {
         <p><span class="badge">مورد موثّق من إدارة SOUQAR ✅</span></p>
         <p><button class="btn small" id="followBtn" type="button">➕ متابعة المتجر</button> <span class="muted small" id="followCount"></span></p>
       </div>
-      <h3>منتجات المتجر</h3>
-      <div class="grid" id="storeGrid">${products.length ? products.map(productCard).join('') : '<p class="muted">لا منتجات معروضة حالياً في هذا المتجر.</p>'}</div>`;
+      <div class="chip-row" id="storeTabs">
+        <button class="chip on" data-stab="products" type="button">المنتجات</button>
+        <button class="chip" data-stab="info" type="button">المعلومات</button>
+        <button class="chip" data-stab="reviews" type="button">التقييمات</button>
+      </div>
+      <div id="stab-products">
+        <div class="grid" id="storeGrid">${products.length ? products.map(productCard).join('') : '<p class="muted">لا منتجات معروضة حالياً في هذا المتجر.</p>'}</div>
+      </div>
+      <div id="stab-info" hidden>
+        <div class="card">
+          <p>🏪 <strong>${esc(s.business_name || s.name)}</strong></p>
+          ${s.activity ? '<p>النشاط: ' + esc(s.activity) + '</p>' : ''}
+          <p>📍 الولاية: ${esc(s.wilaya_name || '—')} · يوصّل إلى ${s.coverage_count || 0} ولاية</p>
+          <p>🗓️ عضو منذ ${new Date(s.member_since).toLocaleDateString('ar-DZ')} · ${s.products_count} منتج معروض</p>
+          <p>🚚 الرسوم الدقيقة لكل ولاية تظهر عند إتمام الطلب قبل التأكيد.</p>
+        </div>
+      </div>
+      <div id="stab-reviews" hidden>
+        <div class="card">
+          <h4>⭐ تقييمات منتجات هذا المتجر ${s.rating_count ? '(' + s.rating_count + ')' : ''}</h4>
+          ${s.rating_count ? '<p>' + starsHtml(s.rating_avg, s.rating_count) + '</p>' + (s.reviews || []).map((r) => '<div class="rev"><b>' + esc(r.user_name) + '</b> ' + starsOnly(r.stars) + ' <span class="muted small">عن: ' + esc(r.product_name) + '</span>' + (r.comment ? '<p>' + esc(r.comment) + '</p>' : '') + '</div>').join('') : '<p class="muted">لا تقييمات بعد على منتجات هذا المتجر.</p>'}
+        </div>
+      </div>`;
     wireCards('storeGrid');
+    $$('#storeTabs .chip').forEach((ch) => ch.addEventListener('click', () => {
+      $$('#storeTabs .chip').forEach((x) => x.classList.toggle('on', x === ch));
+      for (const k of ['products', 'info', 'reviews']) { const el = $('#stab-' + k); if (el) el.hidden = k !== ch.dataset.stab; }
+    }));
     try {
       const fs = await api('/api/suppliers/' + supplierId + '/follow');
       const fb = $('#followBtn'), fc = $('#followCount');
@@ -170,6 +195,7 @@ async function openPage(key) {
     try {
       const { coverage } = await api('/api/delivery-coverage');
       $('#pageContent').innerHTML = `<h2>أسعار التوصيل حسب الولاية</h2>
+      <iframe title="خريطة الجزائر" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=-8.7%2C18.9%2C12.0%2C37.1&amp;layer=mapnik" style="width:100%;height:250px;border:1px solid var(--line);border-radius:14px;margin-bottom:12px"></iframe>
       <p>الجدول يعرض <strong>أرخص الأسعار المتاحة</strong> لكل ولاية عبر موردينا النشطين: سعر التوصيل <strong>إلى المنزل</strong> وسعر التوصيل <strong>إلى مكتب</strong> شركة التوصيل ومدة التوصيل التقديرية. الرسم الدقيق لطلبك يظهر قبل تأكيد الطلب حسب مورد المنتج.</p>
       ${coverage.length ? `<div class="tablewrap"><table><tr><th>الولاية</th><th>🏠 منزل</th><th>🏢 مكتب</th><th>المدة</th><th>موردون</th></tr>${coverage.map((c) => `<tr><td>${c.wilaya_code} — ${esc(c.name_ar)}</td><td>${fmt(c.min_fee)}</td><td>${fmt(c.min_office_fee)}</td><td>${esc(c.duration || '—')}</td><td>${c.suppliers}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد تغطية مضبوطة بعد — تُبنى القائمة تلقائياً من تغطية الموردين.</p>'}`;
     } catch (e) { $('#pageContent').innerHTML = '<h2>أسعار التوصيل</h2><p class="muted">تعذر التحميل الآن.</p>'; }
@@ -262,7 +288,7 @@ async function loadProducts() {
     const iconFor = (name) => { for (const [k, ic] of CAT_ICONS) if (name.includes(k)) return ic; return '🛍️'; };
     const tiles = CATEGORIES.map((c) => ({ c, n: PRODUCTS.filter((p) => p.category_id === c.id).length })).filter((x) => x.n);
     $('#secCats').hidden = !tiles.length;
-    $('#catTiles').innerHTML = tiles.map(({ c, n }) => `<div class="cat-tile" data-tile="${c.id}"><span class="ic">${iconFor(c.name)}</span><b>${esc(c.name)}</b><span>${n} منتج</span></div>`).join('');
+    $('#catTiles').innerHTML = tiles.map(({ c, n }) => { const fp = PRODUCTS.find((x) => x.category_id === c.id && x.images && x.images.length); const bg = fp ? ` style="background-image:linear-gradient(rgba(6,57,43,.42),rgba(6,57,43,.82)),url('${esc(fp.images[0])}');color:#fff"` : ''; return `<div class="cat-tile${fp ? ' has-img' : ''}" data-tile="${c.id}"${bg}>${fp ? '' : `<span class="ic">${iconFor(c.name)}</span>`}<b>${esc(c.name)}</b><span>${n} منتج</span></div>`; }).join('');
     $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
   } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
@@ -638,10 +664,26 @@ async function renderDash() {
 }
 async function renderBuyer(box) {
   const { orders } = await api('/api/my/orders');
-  box.innerHTML = `<div class="card"><h3>طلباتي</h3>${orders.length ? `<div class="tablewrap"><table>
+  box.innerHTML = `<div class="card account-hub">
+      <div class="hub-head"><span class="avatar-circle">${esc((ME.name || '؟').trim().charAt(0))}</span><div><strong>${esc(ME.name)}</strong><br><span class="muted small">حساب زبون${ME.wilaya ? ' · ' + esc(ME.wilaya) : ''}</span></div></div>
+      <div class="menu-list">
+        <button class="menu-row" id="hubOrders" type="button">🧾 طلباتي <span>‹</span></button>
+        <button class="menu-row" id="hubSettings" type="button">⚙️ الإعدادات وعناويني <span>‹</span></button>
+        <button class="menu-row" id="hubBell" type="button">🔔 الإشعارات <span>‹</span></button>
+        <a class="menu-row" href="#" data-nav="support">💬 المساعدة والدعم <span>‹</span></a>
+        <a class="menu-row" href="#" data-nav="faq">❓ الأسئلة الشائعة <span>‹</span></a>
+        <button class="menu-row" id="hubLogout" type="button">🚪 تسجيل الخروج <span>‹</span></button>
+      </div>
+    </div>
+    <div class="card" id="buyerOrders"><h3>طلباتي</h3>${orders.length ? `<div class="tablewrap"><table>
     <tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th><th>التاريخ</th><th></th></tr>
     ${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td>${new Date(o.created_at).toLocaleDateString('ar-DZ')}</td>
     <td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button> <button class="btn small" data-reorder="${o.id}">🔁 اطلب مجدداً</button> ${o.status === 'pending_supplier' ? `<button class="btn small danger" data-cancel="${o.id}">إلغاء</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد طلبات بعد.</p>'}</div>`;
+  const hub = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
+  hub('#hubOrders', () => $('#buyerOrders').scrollIntoView({ behavior: 'smooth' }));
+  hub('#hubSettings', () => $('#dashSettings').scrollIntoView({ behavior: 'smooth' }));
+  hub('#hubBell', () => $('#bellBtn').click());
+  hub('#hubLogout', () => $('#logoutBtn').click());
   $$('#dashContent [data-cancel]').forEach((b) => b.addEventListener('click', async () => {
     try { await api(`/api/my/orders/${b.dataset.cancel}/cancel`, { method: 'POST', body: {} }); toast('أُلغي الطلب'); renderDash(); }
     catch (e) { toast(e.message, true); }

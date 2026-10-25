@@ -378,7 +378,10 @@ const server = http.createServer(async (req, res) => {
         FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.supplier_id = ? AND p.status = 'approved' ORDER BY p.id DESC`).all(sup.id)
         .map((r) => ({ id: r.id, supplier_id: r.supplier_id, name: r.name, description: r.description, category_id: r.category_id, category_name: r.category_name, customer_price: customerPrice(r), compare_price: r.compare_price, stock: r.stock, sold: r.sold, sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images), in_stock: r.stock > 0 }));
       const wilayaRow = sup.wilaya ? db.prepare('SELECT name_ar FROM wilayas WHERE code = ?').get(sup.wilaya) : null;
-      return send(res, 200, { supplier: { id: sup.id, name: sup.name, business_name: sup.business_name, activity: sup.activity, wilaya_name: wilayaRow ? wilayaRow.name_ar : null, member_since: sup.created_at, products_count: rows.length }, products: rows });
+      const storeRating = db.prepare('SELECT AVG(pr.stars) a, COUNT(*) c FROM product_reviews pr JOIN products p ON p.id = pr.product_id WHERE p.supplier_id = ?').get(sup.id);
+      const storeReviews = db.prepare('SELECT pr.stars, pr.comment, pr.created_at, u.name AS user_name, p.name AS product_name FROM product_reviews pr JOIN products p ON p.id = pr.product_id JOIN users u ON u.id = pr.user_id WHERE p.supplier_id = ? ORDER BY pr.id DESC LIMIT 10').all(sup.id);
+      const covCount = db.prepare('SELECT COUNT(*) c FROM supplier_coverage WHERE supplier_id = ?').get(sup.id).c;
+      return send(res, 200, { supplier: { id: sup.id, name: sup.name, business_name: sup.business_name, activity: sup.activity, wilaya_name: wilayaRow ? wilayaRow.name_ar : null, member_since: sup.created_at, products_count: rows.length, rating_avg: storeRating.a, rating_count: storeRating.c, coverage_count: covCount, reviews: storeReviews }, products: rows });
     }
     // رابط إحالة: عدّ النقرة + كوكي 30 يوماً + تحويل للمتجر
     const rm = p.match(/^\/r\/([A-Za-z0-9]+)$/);
