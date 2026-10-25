@@ -13,6 +13,7 @@ a{color:var(--navysoft)}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:15px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;width:100%}
 textarea{min-height:80px}
+[hidden]{display:none !important}
 label.check{display:flex;gap:8px;align-items:flex-start;font-size:14px}
 label.check input{width:auto;margin-top:5px}
 .muted{color:var(--ink2)} .small{font-size:13px}

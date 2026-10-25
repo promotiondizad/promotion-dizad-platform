@@ -216,7 +216,7 @@ function addToCart(productId, qty, size, color) {
 }
 async function renderCart() {
   const box = $('#cartItems');
-  if (!CART.length) { box.innerHTML = '<p class="muted">السلة فارغة.</p>'; $('#coTotals').innerHTML = ''; return; }
+  if (!CART.length) { box.innerHTML = '<p class="muted">السلة فارغة.</p>'; const t = $('#coTotals'); t.innerHTML = ''; t.hidden = true; return; }
   box.innerHTML = CART.map((i, idx) => `
     <div class="cart-item">
       ${i.image ? `<img src="${esc(i.image)}" alt="">` : ''}
@@ -230,6 +230,7 @@ async function renderCart() {
   await updateTotals();
 }
 async function updateTotals() {
+  $('#coTotals').hidden = false;
   const w = Number($('#coWilaya').value);
   const subtotal = CART.reduce((a, i) => a + i.price * i.qty, 0);
   let html = `<div>مجموع المنتجات: <strong>${fmt(subtotal)}</strong></div>`;
