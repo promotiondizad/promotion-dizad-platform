@@ -1070,6 +1070,8 @@ function changeOrderStatus(o, newStatus, actorId, note, reason, force = false) {
 }
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`SOUQAR platform running on http://localhost:${PORT}`));
+  const BIND_HOST = process.env.HOST || process.env.IP || null;
+  if (BIND_HOST) server.listen(PORT, BIND_HOST, () => console.log(`SOUQAR platform running on http://${BIND_HOST}:${PORT}`));
+  else server.listen(PORT, () => console.log(`SOUQAR platform running on http://localhost:${PORT}`));
 }
 module.exports = { server, ORDER_STATUSES };
