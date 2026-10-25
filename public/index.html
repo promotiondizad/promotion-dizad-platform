@@ -58,16 +58,20 @@
 </header>
 
 <main id="view-home">
-  <section class="hero">
-    <div class="hero-in">
-      <h1><span class="gold">SOUQAR</span> — سوق واحد، تجارة تجمع الجميع</h1>
-      <p>منصة جزائرية تجمع المورّدين وتجار الجملة والمسوّقين بالعمولة والزبائن: المورد يجهّز، المسوق يروّج بعمولة يختارها، وأنت تطلب والدفع عند الاستلام. توصيل لـ58 ولاية وبلا أسعار مخفية.</p>
-      <div class="hero-cta">
-        <a class="btn gold" href="#products">تصفح المنتجات</a>
-        <button class="btn ghost" id="joinMarketer" type="button">سجّل كمسوق واربح عمولة</button>
-        <button class="btn ghost" id="joinSupplier" type="button">سجّل كمورد وبع منتجاتك</button>
+  <section class="wrap" style="padding-top:14px">
+    <div class="promo-banner">
+      <div class="promo-txt">
+        <span class="promo-badge">%</span>
+        <h1>عروض خاصة</h1>
+        <p>منتجات مختارة بأفضل الأسعار — والدفع عند الاستلام</p>
+        <a class="btn white" href="#products">تسوّق الآن</a>
       </div>
-      <p class="hero-note" id="refBanner" hidden></p>
+      <img id="promoImg" alt="" hidden>
+    </div>
+    <p class="hero-note" id="refBanner" hidden></p>
+    <div class="join-row">
+      <button class="btn light" id="joinMarketer" type="button">📣 سجّل كمسوّق واربح عمولة</button>
+      <button class="btn light" id="joinSupplier" type="button">🏭 سجّل كمورّد وبِع منتجاتك</button>
     </div>
   </section>
 
@@ -82,17 +86,17 @@
 
   <section class="wrap" id="secCats" hidden>
     <div class="section-head"><h2>🗂️ تسوق حسب القسم</h2></div>
-    <div id="catTiles" class="cat-tiles"></div>
+    <div id="catTiles" class="cat-circles"></div>
   </section>
 
   <section class="wrap" id="secNew" hidden>
     <div class="section-head"><h2>🆕 وصل حديثاً</h2></div>
-    <div id="railNew" class="grid"></div>
+    <div id="railNew" class="rail"></div>
   </section>
 
   <section class="wrap" id="secTop" hidden>
     <div class="section-head"><h2>🔥 الأكثر طلباً</h2></div>
-    <div id="railTop" class="grid"></div>
+    <div id="railTop" class="rail"></div>
   </section>
 
   <section class="wrap" id="products">

@@ -235,19 +235,24 @@ function priceHtml(p) {
   return `<span class="price">${fmt(p.customer_price)}</span>`;
 }
 function productCard(p) {
+  const disc = p.compare_price && p.compare_price > p.customer_price ? Math.round((1 - p.customer_price / p.compare_price) * 100) : 0;
   return `
     <article class="pcard">
-      ${p.images && p.images.length ? `<img src="${esc(p.images[0])}" alt="${esc(p.name)}" loading="lazy">` : '<div class="noimg">📦</div>'}
+      <div class="pcard-media">
+        ${p.images && p.images.length ? `<img src="${esc(p.images[0])}" alt="${esc(p.name)}" loading="lazy">` : '<div class="noimg">📦</div>'}
+        ${disc ? `<span class="disc-badge">-${disc}%</span>` : ''}
+        <button class="fav-btn" data-fav="${p.id}" type="button" aria-label="المفضلة">${FAVS.has(p.id) ? '❤️' : '🤍'}</button>
+        ${p.sold >= 3 ? `<span class="sold-badge">🔥 الأكثر مبيعاً</span>` : ''}
+      </div>
       <div class="pcard-body">
         <h3>${esc(p.name)}</h3>
-        <span class="muted small">${esc(p.category_name || '')}</span>
-        ${priceHtml(p)}
-        ${starsHtml(p.rating_avg, p.rating_count)}
-        ${p.stock > 0 ? '<span class="badge">متوفر</span>' + (p.stock <= 3 ? ' <span class="badge out">بقي ' + p.stock + ' فقط</span>' : '') : '<span class="badge out">نفد المخزون</span>'}
-        ${p.sold >= 3 ? `<span class="badge">🔥 الأكثر مبيعاً · بيعت ${p.sold} مرة</span>` : (p.sold > 0 ? `<span class="badge">بيعت ${p.sold} مرة</span>` : '')}
-        <button class="btn" data-view="${p.id}">عرض التفاصيل</button>
-        <button class="btn gold" data-add="${p.id}" ${p.stock <= 0 ? 'disabled' : ''}>أضف إلى السلة</button>
-        <button class="btn light" data-fav="${p.id}">${FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'}</button>
+        ${p.rating_count ? starsHtml(p.rating_avg, p.rating_count) : `<span class="muted small">${esc(p.category_name || '')}</span>`}
+        <div class="pcard-foot">
+          ${priceHtml(p)}
+          <button class="add-btn" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''} aria-label="أضف إلى السلة">🛒</button>
+        </div>
+        ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="badge">متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
+        <button class="btn light small" data-view="${p.id}" type="button" style="width:100%;margin-top:8px">عرض التفاصيل</button>
       </div>
     </article>`;
 }
@@ -288,7 +293,8 @@ async function loadProducts() {
     const iconFor = (name) => { for (const [k, ic] of CAT_ICONS) if (name.includes(k)) return ic; return '🛍️'; };
     const tiles = CATEGORIES.map((c) => ({ c, n: PRODUCTS.filter((p) => p.category_id === c.id).length })).filter((x) => x.n);
     $('#secCats').hidden = !tiles.length;
-    $('#catTiles').innerHTML = tiles.map(({ c, n }) => { const fp = PRODUCTS.find((x) => x.category_id === c.id && x.images && x.images.length); const bg = fp ? ` style="background-image:linear-gradient(rgba(6,57,43,.42),rgba(6,57,43,.82)),url('${esc(fp.images[0])}');color:#fff"` : ''; return `<div class="cat-tile${fp ? ' has-img' : ''}" data-tile="${c.id}"${bg}>${fp ? '' : `<span class="ic">${iconFor(c.name)}</span>`}<b>${esc(c.name)}</b><span>${n} منتج</span></div>`; }).join('');
+    $('#catTiles').innerHTML = tiles.map(({ c, n }) => { const fp = PRODUCTS.find((x) => x.category_id === c.id && x.images && x.images.length); return `<button class="cat-circle" data-tile="${c.id}" type="button">${fp ? `<img class="cc-img" src="${esc(fp.images[0])}" alt="" loading="lazy">` : `<span class="cc-img cc-emoji">${iconFor(c.name)}</span>`}<b>${esc(c.name)}</b><span>${n} منتج</span></button>`; }).join('');
+    const pi = $('#promoImg'); const fpp = PRODUCTS.find((x) => x.images && x.images.length); if (pi && fpp) { pi.src = fpp.images[0]; pi.hidden = false; }
     $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
   } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
