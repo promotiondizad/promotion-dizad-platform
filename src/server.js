@@ -244,6 +244,53 @@ const server = http.createServer(async (req, res) => {
       if (!s) return send(res, 200, { user: null });
       return send(res, 200, { user: publicUser(getUser(s.userId)), csrf: s.csrf });
     }
+    // تعديل بيانات الحساب من داخل اللوحة (الهاتف يبقى ثابتاً لأنه معرّف الدخول)
+    if (p === '/api/me' && req.method === 'PATCH') {
+      const s = sessionOf(req);
+      if (!s) return send(res, 401, { error: 'يجب تسجيل الدخول أولاً' });
+      const me = getUser(s.userId);
+      const b = await readBody(req);
+      const name = b.name !== undefined ? String(b.name).trim() : me.name;
+      if (!name) return send(res, 400, { error: 'الاسم مطلوب' });
+      let email = me.email, emailChanged = false;
+      if (b.email !== undefined) {
+        const ne = b.email ? String(b.email).trim().toLowerCase() : null;
+        if (ne && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(ne)) return send(res, 400, { error: 'بريد إلكتروني غير صحيح' });
+        if (ne && ne !== me.email && db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(ne, me.id)) return send(res, 409, { error: 'هذا البريد مسجل لحساب آخر' });
+        emailChanged = ne !== me.email;
+        email = ne;
+      }
+      db.prepare('UPDATE users SET name = ?, email = ?, email_verified = ?, wilaya = ?, commune = ?, address = ?, business_name = ?, telegram_chat_id = ? WHERE id = ?')
+        .run(name, email, emailChanged ? (email ? 0 : 1) : me.email_verified,
+          b.wilaya !== undefined ? (b.wilaya ? Number(b.wilaya) : null) : me.wilaya,
+          b.commune !== undefined ? (b.commune || null) : me.commune,
+          b.address !== undefined ? (b.address || null) : me.address,
+          b.businessName !== undefined ? (b.businessName || null) : me.business_name,
+          b.telegramChatId !== undefined ? (b.telegramChatId || null) : me.telegram_chat_id,
+          me.id);
+      audit(me.id, 'profile_update', 'user', me.id, emailChanged ? 'email_changed' : null);
+      let verificationRequired = false;
+      if (emailChanged && email) {
+        verificationRequired = true;
+        const code = sec.createAuthCode(me.id, 'verify_email');
+        await integ.notify({ userId: me.id, channel: 'email', type: 'email_verification', target: email, text: `رمز تأكيد بريدك الجديد في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله في خانة «تأكيد الحساب» مع رقم هاتفك.` });
+      }
+      return send(res, 200, { ok: true, verificationRequired, user: publicUser(getUser(me.id)), message: verificationRequired ? 'تم الحفظ. غيّرت بريدك — أكّده بالرمز المرسل إليه قبل الدخول القادم.' : 'تم حفظ بياناتك.' });
+    }
+    // تغيير كلمة المرور من داخل الحساب (بكلمة المرور الحالية)
+    if (p === '/api/me/password' && req.method === 'POST') {
+      const s = sessionOf(req);
+      if (!s) return send(res, 401, { error: 'يجب تسجيل الدخول أولاً' });
+      const me = getUser(s.userId);
+      const b = await readBody(req);
+      if (!sec.verifyPassword(b.currentPassword || '', me.password_hash)) return send(res, 401, { error: 'كلمة المرور الحالية غير صحيحة' });
+      if (!sec.strongPassword(b.password || '')) return send(res, 400, { error: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل' });
+      if (b.password !== b.passwordConfirm) return send(res, 400, { error: 'تأكيد كلمة المرور غير مطابق' });
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(sec.hashPassword(b.password), me.id);
+      db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(me.id, sec.hashToken(s.token));
+      audit(me.id, 'password_change', 'user', me.id, null);
+      return send(res, 200, { ok: true, message: 'تم تغيير كلمة المرور — أُنهيت جلساتك الأخرى.' });
+    }
 
     // ---------- بيانات عامة ----------
     if (p === '/api/wilayas' && req.method === 'GET') {
@@ -261,7 +308,8 @@ const server = http.createServer(async (req, res) => {
       const args = [];
       if (q) { sql += ' AND (p.name LIKE ? OR p.description LIKE ?)'; args.push('%' + q + '%', '%' + q + '%'); }
       if (cat) { sql += ' AND p.category_id = ?'; args.push(Number(cat)); }
-      sql += ' ORDER BY p.id DESC';
+      const sort = url.searchParams.get('sort');
+      sql += sort === 'price_asc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) ASC' : sort === 'price_desc' ? ' ORDER BY (p.wholesale_price + p.platform_margin) DESC' : ' ORDER BY p.id DESC';
       const rows = db.prepare(sql).all(...args).map((r) => ({
         ...r, customer_price: customerPrice(r),
         sizes: JSON.parse(r.sizes), colors: JSON.parse(r.colors), images: JSON.parse(r.images),
@@ -446,7 +494,7 @@ const server = http.createServer(async (req, res) => {
       const itemsRaw = db.prepare('SELECT oi.*, pr.name FROM order_items oi JOIN products pr ON pr.id = oi.product_id WHERE oi.order_id = ?').all(o.id);
       const seeContact = s.role === 'admin' || s.role === 'supplier' || (s.role === 'buyer' && o.buyer_id === s.userId);
       const items = itemsRaw.map((i) => ({
-        name: i.name, qty: i.qty, size: i.size, color: i.color, customer_price: i.customer_price,
+        product_id: i.product_id, name: i.name, qty: i.qty, size: i.size, color: i.color, customer_price: i.customer_price,
         line_total: i.customer_price * i.qty,
         ...(s.role === 'admin' || s.role === 'supplier' ? { wholesale_price: i.wholesale_price } : {}),
         ...(s.role === 'admin' ? { platform_margin: i.platform_margin, marketer_commission: i.marketer_commission } : {}),

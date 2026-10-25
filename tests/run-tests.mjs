@@ -314,6 +314,33 @@ try {
   ok(r.status === 200 && r.data.order.commission_total === 200 && r.data.order.buyer_phone === undefined, 'المسوق المعني يرى عمولته دون هاتف المشتري');
   r = await anon.get(`/api/orders/${myOrder.id}/details`);
   ok(r.status === 401, 'الزائر ممنوع من تفاصيل الطلبية');
+  r = await buyer.get(`/api/orders/${myOrder.id}/details`);
+  ok(r.data.items[0].product_id === prodId, 'تفاصيل الطلبية تحمل معرّف المنتج (لإعادة الطلب)');
+
+  console.log('— إعدادات الحساب والتسهيلات —');
+  r = await admin.req('PATCH', '/api/me', { name: 'المدير العام' });
+  ok(r.status === 200 && r.data.user.name === 'المدير العام', 'تعديل بيانات الحساب من اللوحة');
+  r = await mkMail.post('/api/me/password', { currentPassword: 'wrong-old', password: 'mkfinalpass1', passwordConfirm: 'mkfinalpass1' });
+  ok(r.status === 401, 'تغيير كلمة المرور يرفض الحالية الخاطئة');
+  r = await mkMail.post('/api/me/password', { currentPassword: 'mknewpass99', password: 'mkfinalpass1', passwordConfirm: 'mkfinalpass1' });
+  ok(r.status === 200, 'تغيير كلمة المرور من داخل الحساب');
+  r = await mkMail.get('/api/me');
+  ok(r.status === 200 && r.data.user && r.data.user.phone === '0600000021', 'الجلسة الحالية تبقى صالحة بعد تغيير كلمة المرور');
+  r = await new Client().post('/api/auth/login', { phone: '0600000021', password: 'mkfinalpass1' });
+  ok(r.status === 200, 'الدخول بكلمة المرور المعدّلة من الإعدادات');
+  r = await mk3.req('PATCH', '/api/me', { email: 'mk3new@test.dz' });
+  ok(r.status === 200 && r.data.verificationRequired === true, 'تغيير البريد يتطلب تأكيداً جديداً');
+  r = await new Client().post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
+  ok(r.status === 403 && r.data.code === 'email_unverified', 'الدخول محظور حتى تأكيد البريد الجديد');
+  const nvcode = lastOutboxCode('email_verification', 'mk3new@test.dz');
+  r = await mk3.post('/api/auth/verify-email', { phone: '0600000023', code: nvcode });
+  ok(r.status === 200, 'تأكيد البريد الجديد بالرمز');
+  r = await new Client().post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
+  ok(r.status === 200, 'الدخول بعد تأكيد البريد الجديد');
+  r = await anon.get('/api/products?sort=price_asc');
+  ok(r.status === 200 && r.data.products.length >= 1, 'ترتيب المنتجات بالسعر يعمل');
+  const ascPrices = (await anon.get('/api/products?sort=price_asc')).data.products.map((p) => p.customer_price);
+  ok(ascPrices.every((v, i, a) => i === 0 || a[i - 1] <= v), 'الأسعار مرتبة تصاعدياً فعلاً');
 
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;

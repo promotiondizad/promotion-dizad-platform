@@ -140,7 +140,7 @@ function openPage(key) {
 // ---------- المنتجات ----------
 async function loadProducts() {
   const q = $('#searchInput').value.trim(), cat = $('#catFilter').value;
-  const data = await api('/api/products?' + new URLSearchParams({ search: q, category: cat }));
+  const data = await api('/api/products?' + new URLSearchParams({ search: q, category: cat, sort: $('#sortSel').value }));
   PRODUCTS = data.products;
   const [min, max] = ($('#priceFilter').value || '-').split('-').map(Number);
   const list = PRODUCTS.filter((p) => !$('#priceFilter').value || (p.customer_price >= min && p.customer_price <= max));
@@ -151,7 +151,7 @@ async function loadProducts() {
         <h3>${esc(p.name)}</h3>
         <span class="muted small">${esc(p.category_name || '')}</span>
         <span class="price">${fmt(p.customer_price)}</span>
-        ${p.stock > 0 ? '<span class="badge">متوفر</span>' : '<span class="badge out">نفد المخزون</span>'}
+        ${p.stock > 0 ? '<span class="badge">متوفر</span>' + (p.stock <= 3 ? ' <span class="badge out">بقي ' + p.stock + ' فقط</span>' : '') : '<span class="badge out">نفد المخزون</span>'}
         <button class="btn" data-view="${p.id}">عرض التفاصيل</button>
         <button class="btn gold" data-add="${p.id}" ${p.stock <= 0 ? 'disabled' : ''}>أضف إلى السلة</button>
       </div>
@@ -265,7 +265,7 @@ async function openOrderDetails(id) {
       ...(o.commission_total !== undefined && o.margin_total === undefined ? [['عمولتك من هذه الطلبية', fmt(o.commission_total)]] : [])
     ];
     $('#orderModalBox').innerHTML = `
-      <div class="drawer-head"><h3>📋 طلبية رقم ${esc(o.ref)}</h3><button class="icon-btn dark" id="closeOrderModal" type="button">✕</button></div>
+      <div class="drawer-head"><h3>📋 طلبية رقم ${esc(o.ref)}</h3><span><button class="btn small light" id="printReceipt" type="button">🖨 طباعة الوصل</button> <button class="icon-btn dark" id="closeOrderModal" type="button">✕</button></span></div>
       <p><span class="badge">${esc(o.status_label)}</span> <span class="muted">أُنشئت: ${new Date(o.created_at).toLocaleString('ar-DZ')} · آخر تحديث: ${new Date(o.updated_at).toLocaleString('ar-DZ')}</span></p>
       ${o.buyer_name ? `<div class="card"><h4>المشتري والتوصيل</h4>
         <p>الاسم: <strong>${esc(o.buyer_name || '')}</strong><br>الهاتف: <strong>${esc(o.buyer_phone || '')}</strong><br>
@@ -284,11 +284,46 @@ async function openOrderDetails(id) {
         ${d.history.length ? d.history.map((h) => `<p class="small">${new Date(h.created_at).toLocaleString('ar-DZ')} — ${esc(h.label)}${h.note ? ' · ' + esc(h.note) : ''}</p>`).join('') : '<p class="muted">لا سجل بعد.</p>'}</div>`;
     $('#orderModal').hidden = false;
     $('#closeOrderModal').addEventListener('click', () => { $('#orderModal').hidden = true; });
+    $('#printReceipt').addEventListener('click', () => printReceipt(d));
+  } catch (e) { toast(e.message, true); }
+}
+function printReceipt(d) {
+  const o = d.order;
+  const w = window.open('', '_blank', 'width=720,height=900');
+  if (!w) return toast('اسمح بالنوافذ المنبثقة للطباعة', true);
+  w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>وصل طلبية ${esc(o.ref)}</title>
+  <style>body{font-family:Tahoma,Arial;padding:24px;color:#122}h1{font-size:20px}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{border:1px solid #bbb;padding:7px;text-align:right}.tot{text-align:left;font-weight:bold}</style></head><body>
+  <h1>Promotion Dizad — وصل طلبية</h1>
+  <p>رقم الطلبية: <strong>${esc(o.ref)}</strong><br>التاريخ: ${new Date(o.created_at).toLocaleString('ar-DZ')}<br>الحالة: ${esc(o.status_label)}</p>
+  ${o.buyer_name ? `<p>المشتري: ${esc(o.buyer_name)} — ${esc(o.buyer_phone || '')}<br>الولاية: ${esc(o.wilaya_name)} · البلدية: ${esc(o.commune)}<br>العنوان: ${esc(o.address || '')}</p>` : ''}
+  <table><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr>
+  ${d.items.map((i) => `<tr><td>${esc(i.name)}${i.size ? ' · ' + esc(i.size) : ''}${i.color ? ' · ' + esc(i.color) : ''}</td><td>${i.qty}</td><td>${fmt(i.customer_price)}</td><td>${fmt(i.line_total)}</td></tr>`).join('')}</table>
+  <p class="tot">مجموع المنتجات: ${fmt(o.subtotal)}<br>التوصيل: ${fmt(o.delivery_fee)}<br>الإجمالي عند الاستلام: ${fmt(o.total)}</p>
+  <p>المورد: ${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')}</p>
+  <p>شكراً لثقتكم — Promotion Dizad</p>
+  <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.close();
+}
+async function reorder(orderId, btn) {
+  try {
+    const d = await api('/api/orders/' + orderId + '/details');
+    const { products } = await api('/api/products');
+    let added = 0, missing = [];
+    for (const i of d.items) {
+      const p = products.find((x) => x.id === i.product_id);
+      if (p && p.stock > 0) { addToCart(p.id, Math.min(i.qty, p.stock), i.size || undefined, i.color || undefined); added++; }
+      else missing.push(i.name);
+    }
+    if (added) { toast('أُضيف ' + added + ' منتج من الطلبية السابقة إلى السلة'); renderCart(); $('#cartDrawer').hidden = false; }
+    if (missing.length) toast('غير متوفر حالياً: ' + missing.join('، '), true);
+    if (!added && !missing.length) toast('لا منتجات في هذه الطلبية', true);
   } catch (e) { toast(e.message, true); }
 }
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-details]');
-  if (b) { e.preventDefault(); openOrderDetails(b.dataset.details); }
+  if (b) { e.preventDefault(); openOrderDetails(b.dataset.details); return; }
+  const rb = e.target.closest('[data-reorder]');
+  if (rb) { e.preventDefault(); reorder(rb.dataset.reorder, rb); return; }
   if (e.target.id === 'orderModal') $('#orderModal').hidden = true;
 });
 
@@ -322,9 +357,50 @@ async function refreshMe() {
 const STATUS_FLOW = ['pending_supplier', 'confirmed', 'preparing', 'handed', 'out_for_delivery', 'delivered_collected', 'failed_delivery', 'returned', 'cancelled', 'rejected'];
 const STATUS_AR = { pending_supplier: 'جديد — بانتظار تأكيد المورد', confirmed: 'مؤكد', preparing: 'قيد التجهيز', handed: 'سُلّم لشركة التوصيل', out_for_delivery: 'خرج للتوصيل', delivered_collected: 'تم التسليم والتحصيل', cancelled: 'أُلغي', rejected: 'مرفوض', failed_delivery: 'تعذر التسليم', returned: 'مرتجع' };
 
+function renderSettings() {
+  const box = $('#dashSettings');
+  if (!ME) { box.innerHTML = ''; return; }
+  box.innerHTML = `
+  <details class="card"><summary><strong>⚙️ إعدادات حسابي</strong> — الاسم: ${esc(ME.name)} · الهاتف: ${esc(ME.phone)}${ME.email ? ' · البريد: ' + esc(ME.email) + (ME.email_verified ? ' (مؤكد ✅)' : ' (غير مؤكد)') : ''}</summary>
+    <form id="profileForm" class="stack" style="margin-top:12px">
+      <input id="pfName" value="${esc(ME.name)}" placeholder="الاسم الكامل">
+      <input id="pfEmail" type="email" value="${esc(ME.email || '')}" placeholder="البريد الإلكتروني">
+      <select id="pfWilaya"><option value="">— الولاية —</option>${WILAYAS.map((w) => `<option value="${w.code}" ${ME.wilaya === w.code ? 'selected' : ''}>${w.code} — ${esc(w.name_ar)}</option>`).join('')}</select>
+      <input id="pfCommune" value="${esc(ME.commune || '')}" placeholder="البلدية">
+      <input id="pfAddress" value="${esc(ME.address || '')}" placeholder="العنوان">
+      ${ME.role === 'supplier' ? `<input id="pfBusiness" value="${esc(ME.business_name || '')}" placeholder="اسم النشاط/المتجر">` : ''}
+      <input id="pfTelegram" value="${esc(ME.telegram_chat_id || '')}" placeholder="معرّف تيليغرام الرقمي (لإشعارات فورية — اختياري)">
+      <button class="btn" type="submit">حفظ البيانات</button>
+      <p class="muted small">رقم الهاتف هو معرّف الدخول ولا يتغير من هنا. تغيير البريد يتطلب تأكيده برمز جديد.</p>
+    </form>
+    <form id="pwForm" class="stack">
+      <h4>تغيير كلمة المرور</h4>
+      <input id="pwCur" type="password" placeholder="كلمة المرور الحالية" autocomplete="current-password">
+      <input id="pwNew" type="password" placeholder="كلمة المرور الجديدة (8 أحرف على الأقل)" autocomplete="new-password">
+      <input id="pwNew2" type="password" placeholder="تأكيد كلمة المرور الجديدة" autocomplete="new-password">
+      <button class="btn gold" type="submit">تغيير كلمة المرور</button>
+    </form>
+  </details>`;
+  $('#profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api('/api/me', { method: 'PATCH', body: { name: $('#pfName').value, email: $('#pfEmail').value, wilaya: $('#pfWilaya').value, commune: $('#pfCommune').value, address: $('#pfAddress').value, businessName: $('#pfBusiness') ? $('#pfBusiness').value : undefined, telegramChatId: $('#pfTelegram').value } });
+      toast(r.message); await refreshMe(); renderDash();
+      if (r.verificationRequired) openAuth('verify', null, ME.phone);
+    } catch (err) { toast(err.message, true); }
+  });
+  $('#pwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api('/api/me/password', { method: 'POST', body: { currentPassword: $('#pwCur').value, password: $('#pwNew').value, passwordConfirm: $('#pwNew2').value } });
+      toast(r.message); e.target.reset();
+    } catch (err) { toast(err.message, true); }
+  });
+}
 async function renderDash() {
   if (!ME) return openAuth('login');
   show('dash');
+  renderSettings();
   const box = $('#dashContent');
   if (ME.role === 'buyer') return renderBuyer(box);
   if (ME.role === 'marketer') return renderMarketer(box);
@@ -336,7 +412,7 @@ async function renderBuyer(box) {
   box.innerHTML = `<div class="card"><h3>طلباتي</h3>${orders.length ? `<div class="tablewrap"><table>
     <tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th><th>التاريخ</th><th></th></tr>
     ${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td>${new Date(o.created_at).toLocaleDateString('ar-DZ')}</td>
-    <td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button> ${o.status === 'pending_supplier' ? `<button class="btn small danger" data-cancel="${o.id}">إلغاء</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد طلبات بعد.</p>'}</div>`;
+    <td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button> <button class="btn small" data-reorder="${o.id}">🔁 اطلب مجدداً</button> ${o.status === 'pending_supplier' ? `<button class="btn small danger" data-cancel="${o.id}">إلغاء</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد طلبات بعد.</p>'}</div>`;
   $$('#dashContent [data-cancel]').forEach((b) => b.addEventListener('click', async () => {
     try { await api(`/api/my/orders/${b.dataset.cancel}/cancel`, { method: 'POST', body: {} }); toast('أُلغي الطلب'); renderDash(); }
     catch (e) { toast(e.message, true); }
@@ -360,7 +436,7 @@ async function renderMarketer(box) {
       <td><button class="btn small" data-link="${p.id}">إنشاء / نسخ رابط الإحالة</button></td>
       <td><button class="btn small light" data-share="${p.id}">مشاركة</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
     <p class="muted small">قاعدة الإحالة: آخر رابط صالح نقره المشتري خلال 30 يوماً هو المعتمد.</p></div>
-  <div class="card"><h3>روابطي ونقراتها</h3>${links.length ? links.map((l) => `<p><code>${location.origin}/r/${l.code}</code> — ${l.product_id ? 'منتج #' + l.product_id : 'رابط عام'} — نقرات: ${l.clicks}</p>`).join('') : '<p class="muted">لا روابط بعد.</p>'}</div>
+  <div class="card"><h3>روابطي ونقراتها</h3>${links.length ? links.map((l) => `<p><code>${location.origin}/r/${l.code}</code> — ${l.product_id ? 'منتج #' + l.product_id : 'رابط عام'} — نقرات: ${l.clicks} ${l.product_id ? `<button class="btn small light" data-copymsg="${l.id}">📋 نسخ رسالة مشاركة جاهزة</button>` : ''}</p>`).join('') : '<p class="muted">لا روابط بعد.</p>'}</div>
   <div class="card"><h3>طلباتي وحالاتها</h3>${orders.length ? `<div class="tablewrap"><table><tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th><th></th></tr>${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
   <div class="card"><h3>عمولاتي وتسوياتي</h3>
     ${commissions.length ? `<div class="tablewrap"><table><tr><th>الطلب</th><th>العمولة</th><th>الحالة</th></tr>${commissions.map((c) => `<tr><td>${esc(c.ref)}</td><td>${fmt(c.amount)}</td><td>${({ expected: 'متوقعة', confirmed: 'مثبتة', payable: 'مستحقة', paid: 'مدفوعة', cancelled: 'ملغاة' })[c.state]}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا عمولات بعد.</p>'}
@@ -375,6 +451,14 @@ async function renderMarketer(box) {
       toast('رابط الإحالة: ' + full + ' (نُسخ إن سمح المتصفح)');
       renderDash();
     } catch (e) { toast(e.message, true); }
+  }));
+  $$('#dashContent [data-copymsg]').forEach((b) => b.addEventListener('click', async () => {
+    const l = links.find((x) => x.id === Number(b.dataset.copymsg));
+    const p = products.find((x) => x.id === l.product_id);
+    const full = location.origin + '/r/' + l.code;
+    const msg = `🔥 ${p ? p.name : 'منتج مميز'} — ${p ? fmt(p.customer_price) : ''}\nجودة مضمونة والدفع عند الاستلام 🚚💵\nاطلب من هنا: ${full}`;
+    await navigator.clipboard.writeText(msg).catch(() => {});
+    toast('نُسخت الرسالة الجاهزة مع رابطك — الصقها أين تشاء');
   }));
   $$('#dashContent [data-share]').forEach((b) => b.addEventListener('click', async () => {
     const p = products.find((x) => x.id === Number(b.dataset.share));
@@ -511,11 +595,11 @@ async function renderAdmin(box) {
     <button class="btn small danger" data-preject="${p.id}">رفض</button></p>`).join('') : '<p class="muted">لا منتجات بانتظار الاعتماد.</p>'}
     <details><summary>كل المنتجات (${products.products.length})</summary><div class="tablewrap"><table><tr><th>المنتج</th><th>الحالة</th><th>الجملة</th><th>الهامش</th><th>العمولة</th><th>سعر الزبون</th><th>صافي المنصة</th></tr>
     ${products.products.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.status)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>${fmt(p.marketer_commission)}</td><td>${fmt(p.customer_price)}</td><td>${fmt(p.platform_net)}</td></tr>`).join('')}</table></div></details></div>
-  <div class="card"><h3>المستخدمون</h3><div class="tablewrap"><table><tr><th>الاسم</th><th>الدور</th><th>الهاتف</th><th>البريد وتأكيده</th><th>الحالة</th><th></th></tr>
+  <div class="card"><h3>المستخدمون</h3><input id="admUserQ" type="search" placeholder="🔍 ابحث بالاسم أو الهاتف أو البريد…" style="margin-bottom:10px"><div class="tablewrap"><table id="admUsersTable"><tr><th>الاسم</th><th>الدور</th><th>الهاتف</th><th>البريد وتأكيده</th><th>الحالة</th><th></th></tr>
     ${users.users.filter((u) => u.role !== 'admin').map((u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.role)}</td><td>${esc(u.phone)}</td>
     <td>${u.email ? esc(u.email) + (u.email_verified ? ' <span class="badge">مؤكد ✅</span>' : ' <span class="badge out">غير مؤكد</span>') : '<span class="muted">—</span>'}</td><td>${esc(u.status)}</td>
     <td>${u.email && !u.email_verified ? `<button class="btn small gold" data-verify-user="${u.id}">تأكيد البريد يدوياً</button> ` : ''}${u.status === 'suspended' ? `<button class="btn small" data-uact="activate" data-uid="${u.id}">إعادة تفعيل</button>` : `<button class="btn small light" data-uact="suspend" data-uid="${u.id}">تعليق</button>`}</td></tr>`).join('')}</table></div></div>
-  <div class="card"><h3>كل الطلبات ومصادرها</h3><div class="tablewrap"><table><tr><th>الرقم</th><th>الحالة</th><th>المورد</th><th>المسوق</th><th>الإجمالي</th></tr>
+  <div class="card"><h3>كل الطلبات ومصادرها</h3><input id="admOrderQ" type="search" placeholder="🔍 ابحث برقم الطلبية…" style="margin-bottom:10px"><div class="tablewrap"><table id="admOrdersTable"><tr><th>الرقم</th><th>الحالة</th><th>المورد</th><th>المسوق</th><th>الإجمالي</th><th></th></tr>
     ${orders.orders.slice(0, 60).map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>#${o.supplier_id}</td><td>${o.marketer_id ? '#' + o.marketer_id + ' (' + esc(o.ref_code || '') + ')' : 'مباشر'}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div></div>
   <div class="card"><h3>تسويات المسوقين</h3>${settlements.settlements.length ? settlements.settlements.map((s) => `
     <p>#${s.id} — ${esc(s.marketer_name)} — ${fmt(s.amount)} — ${esc(s.state)} ${s.state === 'requested' || s.state === 'approved' ? `
@@ -531,6 +615,15 @@ async function renderAdmin(box) {
     <p><button class="btn light" id="backupBtn" type="button">إنشاء نسخة احتياطية من قاعدة البيانات</button></p>
     <details><summary>سجل العمليات الإدارية (تدقيق)</summary>${auditL.logs.slice(0, 40).map((l) => `<p class="small">#${l.id} ${esc(l.action)} · ${esc(l.entity || '')} ${esc(l.entity_id || '')} · ${new Date(l.created_at).toLocaleString('ar-DZ')}</p>`).join('')}</details>
   </div>`;
+  const filterRows = (inputId, tableId) => {
+    const inp = $(inputId); if (!inp) return;
+    inp.addEventListener('input', () => {
+      const q = inp.value.trim();
+      $$('#dashContent ' + tableId + ' tr').forEach((tr, i) => { if (i > 0) tr.style.display = !q || tr.textContent.includes(q) ? '' : 'none'; });
+    });
+  };
+  filterRows('#admUserQ', '#admUsersTable');
+  filterRows('#admOrderQ', '#admOrdersTable');
   $$('#dashContent [data-verify-user]').forEach((b) => b.addEventListener('click', async () => {
     try { await api(`/api/admin/users/${b.dataset.verifyUser}/verify-email`, { method: 'POST', body: {} }); toast('تم تأكيد بريد المستخدم'); renderDash(); }
     catch (e) { toast(e.message, true); }
@@ -603,6 +696,7 @@ $('#coWilaya').addEventListener('change', updateTotals);
 $('#searchInput').addEventListener('input', () => loadProducts().catch(() => {}));
 $('#catFilter').addEventListener('change', () => loadProducts().catch(() => {}));
 $('#priceFilter').addEventListener('change', () => loadProducts().catch(() => {}));
+$('#sortSel').addEventListener('change', () => loadProducts().catch(() => {}));
 
 $('#checkoutForm').addEventListener('submit', async (e) => {
   e.preventDefault();

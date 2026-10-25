@@ -71,6 +71,11 @@
           <option value="3000-5000">3000 – 5000 دج</option>
           <option value="5000-99999999">أكثر من 5000 دج</option>
         </select>
+        <select id="sortSel">
+          <option value="">الترتيب: الأحدث</option>
+          <option value="price_asc">السعر: من الأقل</option>
+          <option value="price_desc">السعر: من الأعلى</option>
+        </select>
       </div>
     </div>
     <div id="productGrid" class="grid"><p class="muted">جارٍ تحميل المنتجات…</p></div>
@@ -206,6 +211,7 @@
   <section class="wrap">
     <h2 id="dashTitle">لوحتي</h2>
     <p class="muted" id="dashUser"></p>
+    <div id="dashSettings"></div>
     <div id="dashContent"></div>
   </section>
 </main>
@@ -231,6 +237,8 @@
 <div class="modal" id="productModal" hidden><div class="modal-box" id="productModalBox"></div></div>
 
 <div class="modal" id="orderModal" hidden><div class="modal-box" id="orderModalBox"></div></div>
+
+<a id="waFloat" href="https://wa.me/213791402649?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%B9%D9%86%D8%AF%D9%8A%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20%D9%85%D9%86%D8%B5%D8%A9%20Promotion%20Dizad" target="_blank" rel="noopener" title="تواصل معنا عبر واتساب" style="position:fixed;bottom:18px;inset-inline-start:18px;z-index:60;background:#25d366;color:#fff;border-radius:999px;padding:12px 18px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);text-decoration:none">💬 واتساب</a>
 
 <div id="toast" class="toast" hidden></div>
 
