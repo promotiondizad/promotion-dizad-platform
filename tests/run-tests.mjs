@@ -439,6 +439,19 @@ try {
   r = await rvBuyer.post(`/api/products/${rvProdId}/reviews`, { stars: 9 });
   ok(r.status === 400, 'نجوم خارج النطاق تُرفض');
 
+
+  console.log('— متابعة المورّدين —');
+  const supList = await admin.get('/api/admin/users?role=supplier');
+  const supIdMain = supList.data.users[0].id;
+  const fol0 = await anon.get(`/api/suppliers/${supIdMain}/follow`);
+  ok(fol0.status === 200 && fol0.data.followers === 0 && fol0.data.following === false, 'عدّاد المتابعين يبدأ من الصفر');
+  r = await stranger.post(`/api/suppliers/${supIdMain}/follow`, {});
+  ok(r.status === 200 && r.data.following === true && r.data.followers === 1, 'المتابعة تُسجَّل والعدّاد يرتفع');
+  r = await stranger.post(`/api/suppliers/${supIdMain}/follow`, {});
+  ok(r.status === 200 && r.data.following === false && r.data.followers === 0, 'إعادة الضغط تلغي المتابعة');
+  r = await anon.post(`/api/suppliers/${supIdMain}/follow`, {});
+  ok(r.status === 401, 'الزائر لا يتابع دون دخول');
+
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;
 } catch (e) {

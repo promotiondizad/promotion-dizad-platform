@@ -145,10 +145,22 @@ async function openStore(supplierId) {
         <h2 style="margin:4px 0">${esc(s.business_name || s.name)}</h2>
         <p class="muted">${esc(s.activity || '')}${s.wilaya_name ? ' · 📍 ' + esc(s.wilaya_name) : ''} · عضو منذ ${new Date(s.member_since).toLocaleDateString('ar-DZ')} · ${s.products_count} منتج</p>
         <p><span class="badge">مورد موثّق من إدارة SOUQAR ✅</span></p>
+        <p><button class="btn small" id="followBtn" type="button">➕ متابعة المتجر</button> <span class="muted small" id="followCount"></span></p>
       </div>
       <h3>منتجات المتجر</h3>
       <div class="grid" id="storeGrid">${products.length ? products.map(productCard).join('') : '<p class="muted">لا منتجات معروضة حالياً في هذا المتجر.</p>'}</div>`;
     wireCards('storeGrid');
+    try {
+      const fs = await api('/api/suppliers/' + supplierId + '/follow');
+      const fb = $('#followBtn'), fc = $('#followCount');
+      const paint = () => { if (fb) fb.textContent = fs.following ? '✓ تتابع هذا المتجر' : '➕ متابعة المتجر'; if (fc) fc.textContent = fs.followers + ' متابِع'; };
+      paint();
+      if (fb) fb.addEventListener('click', async () => {
+        if (!ME) { toast('سجّل الدخول أولاً لمتابعة المتجر', true); openAuth('login'); return; }
+        try { const r = await api('/api/suppliers/' + supplierId + '/follow', { method: 'POST', body: {} }); fs.following = r.following; fs.followers = r.followers; paint(); toast(r.following ? 'أنت الآن تتابع هذا المتجر ✓' : 'ألغيت المتابعة'); }
+        catch (e) { toast(e.message, true); }
+      });
+    } catch (e) { /* عدّاد المتابعة اختياري */ }
   } catch (e) { $('#pageContent').innerHTML = '<p class="muted">تعذر تحميل هذا المتجر.</p>'; }
 }
 async function openPage(key) {

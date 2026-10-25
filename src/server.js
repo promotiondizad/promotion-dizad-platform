@@ -321,6 +321,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, rating_avg: rating.a, rating_count: rating.c });
     }
     // صفحة متجر المورد العامة (كيما نموذج التصميم: متجر بمنتجاته ومعلوماته)
+    const followM = p.match(/^\/api\/suppliers\/(\d+)\/follow$/);
+    if (followM && req.method === 'GET') {
+      const sid = Number(followM[1]);
+      const cnt = db.prepare('SELECT COUNT(*) c FROM supplier_follows WHERE supplier_id = ?').get(sid).c;
+      let following = false;
+      const s = sessionOf(req);
+      if (s) following = !!db.prepare('SELECT 1 FROM supplier_follows WHERE user_id = ? AND supplier_id = ?').get(s.userId, sid);
+      return send(res, 200, { followers: cnt, following });
+    }
+    if (followM && req.method === 'POST') {
+      const s = requireAuth(req, res); if (!s) return;
+      const sid = Number(followM[1]);
+      const sup = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'supplier' AND status = 'active'").get(sid);
+      if (!sup) return send(res, 404, { error: 'المورد غير موجود' });
+      if (sid === s.userId) return send(res, 400, { error: 'لا يمكنك متابعة متجرك' });
+      const exists = db.prepare('SELECT 1 FROM supplier_follows WHERE user_id = ? AND supplier_id = ?').get(s.userId, sid);
+      if (exists) db.prepare('DELETE FROM supplier_follows WHERE user_id = ? AND supplier_id = ?').run(s.userId, sid);
+      else db.prepare('INSERT INTO supplier_follows(user_id, supplier_id, created_at) VALUES(?,?,?)').run(s.userId, sid, Date.now());
+      const cnt = db.prepare('SELECT COUNT(*) c FROM supplier_follows WHERE supplier_id = ?').get(sid).c;
+      return send(res, 200, { following: !exists, followers: cnt });
+    }
     const storeM = p.match(/^\/api\/suppliers\/(\d+)\/public$/);
     if (storeM && req.method === 'GET') {
       const sup = getUser(Number(storeM[1]));

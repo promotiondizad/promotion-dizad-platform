@@ -223,3 +223,12 @@ CREATE TABLE IF NOT EXISTS product_reviews (
   UNIQUE(product_id, user_id)
 );
 `);
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS supplier_follows (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  supplier_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, supplier_id)
+);
+`);
