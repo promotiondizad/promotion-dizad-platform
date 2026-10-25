@@ -548,6 +548,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { notifications: rows });
     }
     // أسعار التوصيل العامة: أرخص رسم لكل ولاية عبر الموردين النشطين (لصفحة أسعار التوصيل)
+    if (p === '/api/communes' && req.method === 'GET') {
+      const w = Number(url.searchParams.get('wilaya'));
+      if (!w) return send(res, 400, { error: 'اختر الولاية أولاً' });
+      try {
+        if (!globalThis.__communes) globalThis.__communes = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'communes.json'), 'utf8'));
+        return send(res, 200, { communes: globalThis.__communes[String(w)] || [] });
+      } catch { return send(res, 200, { communes: [] }); }
+    }
     if (p === '/api/delivery-coverage' && req.method === 'GET') {
       // كيما سوقلي: سعر منزل وسعر مكتب ومدة التوصيل لكل ولاية (أرخص الأسعار بين الموردين النشطين)
       const rows = db.prepare(`SELECT sc.wilaya_code, MIN(sc.delivery_fee) AS min_fee, MIN(COALESCE(sc.fee_office, sc.delivery_fee)) AS min_office_fee, COUNT(DISTINCT sc.supplier_id) AS suppliers, w.name_ar,

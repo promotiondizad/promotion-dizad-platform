@@ -400,7 +400,7 @@ async function openOrderDetails(id) {
       ...(o.commission_total !== undefined && o.margin_total === undefined ? [['عمولتك من هذه الطلبية', fmt(o.commission_total)]] : [])
     ];
     $('#orderModalBox').innerHTML = `
-      <div class="drawer-head"><h3>📋 طلبية رقم ${esc(o.ref)}</h3><span><button class="btn small light" id="printReceipt" type="button">🖨 طباعة الوصل</button> <button class="icon-btn dark" id="closeOrderModal" type="button">✕</button></span></div>
+      <div class="drawer-head"><h3>📋 طلبية رقم ${esc(o.ref)}</h3><span><button class="btn small light" id="printReceipt" type="button">🧾 الوصل</button> <button class="icon-btn dark" id="closeOrderModal" type="button">✕</button></span></div>
       <p><span class="badge">${esc(o.status_label)}</span> <span class="muted">أُنشئت: ${new Date(o.created_at).toLocaleString('ar-DZ')} · آخر تحديث: ${new Date(o.updated_at).toLocaleString('ar-DZ')}</span></p>
       ${o.buyer_name ? `<div class="card"><h4>المشتري والتوصيل</h4>
         <p>الاسم: <strong>${esc(o.buyer_name || '')}</strong><br>الهاتف: <strong>${esc(o.buyer_phone || '')}</strong><br>
@@ -424,20 +424,43 @@ async function openOrderDetails(id) {
 }
 function printReceipt(d) {
   const o = d.order;
-  const w = window.open('', '_blank', 'width=720,height=900');
-  if (!w) return toast('اسمح بالنوافذ المنبثقة للطباعة', true);
-  w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>وصل طلبية ${esc(o.ref)}</title>
-  <style>body{font-family:Tahoma,Arial;padding:24px;color:#122}h1{font-size:20px}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{border:1px solid #bbb;padding:7px;text-align:right}.tot{text-align:left;font-weight:bold}</style></head><body>
-  <h1>SOUQAR — وصل طلبية</h1>
-  <p>رقم الطلبية: <strong>${esc(o.ref)}</strong><br>التاريخ: ${new Date(o.created_at).toLocaleString('ar-DZ')}<br>الحالة: ${esc(o.status_label)}</p>
-  ${o.buyer_name ? `<p>المشتري: ${esc(o.buyer_name)} — ${esc(o.buyer_phone || '')}<br>الولاية: ${esc(o.wilaya_name)} · البلدية: ${esc(o.commune)}<br>العنوان: ${esc(o.address || '')}</p>` : ''}
-  <table><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr>
-  ${d.items.map((i) => `<tr><td>${esc(i.name)}${i.size ? ' · ' + esc(i.size) : ''}${i.color ? ' · ' + esc(i.color) : ''}</td><td>${i.qty}</td><td>${fmt(i.customer_price)}</td><td>${fmt(i.line_total)}</td></tr>`).join('')}</table>
-  <p class="tot">مجموع المنتجات: ${fmt(o.subtotal)}<br>التوصيل: ${fmt(o.delivery_fee)}<br>الإجمالي عند الاستلام: ${fmt(o.total)}</p>
-  <p>المورد: ${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')}</p>
-  <p>شكراً لثقتكم — SOUQAR</p>
-  <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
-  w.document.close();
+  const lines = [
+    'SOUQAR — وصل طلبية ' + o.ref,
+    'التاريخ: ' + new Date(o.created_at).toLocaleString('ar-DZ') + ' · الحالة: ' + o.status_label,
+    o.buyer_name ? 'المشتري: ' + o.buyer_name + ' — ' + (o.buyer_phone || '') + '\nالولاية: ' + o.wilaya_name + ' · البلدية: ' + (o.commune || '') + '\nالعنوان: ' + (o.address || '') : '',
+    ...d.items.map((i) => '• ' + i.name + (i.size ? ' · ' + i.size : '') + (i.color ? ' · ' + i.color : '') + ' × ' + i.qty + ' = ' + fmt(i.line_total)),
+    'مجموع المنتجات: ' + fmt(o.subtotal),
+    'التوصيل: ' + fmt(o.delivery_fee),
+    'الإجمالي عند الاستلام: ' + fmt(o.total),
+    'المورد: ' + (o.supplier ? (o.supplier.business_name || o.supplier.name) : ''),
+    'شكراً لثقتكم — SOUQAR',
+  ].filter(Boolean).join('\n');
+  const rows = d.items.map((i) => `<tr><td>${esc(i.name)}${i.size ? ' · ' + esc(i.size) : ''}${i.color ? ' · ' + esc(i.color) : ''}</td><td>${i.qty}</td><td>${fmt(i.customer_price)}</td><td>${fmt(i.line_total)}</td></tr>`).join('');
+  const receiptHtml = `<h3 style="margin-top:0">SOUQAR — وصل طلبية</h3>
+    <p>رقم الطلبية: <strong>${esc(o.ref)}</strong><br>التاريخ: ${new Date(o.created_at).toLocaleString('ar-DZ')}<br>الحالة: ${esc(o.status_label)}</p>
+    ${o.buyer_name ? `<p>المشتري: ${esc(o.buyer_name)} — ${esc(o.buyer_phone || '')}<br>الولاية: ${esc(o.wilaya_name)} · البلدية: ${esc(o.commune)}<br>العنوان: ${esc(o.address || '')}</p>` : ''}
+    <div class="tbl-wrap"><table><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr>${rows}</table></div>
+    <p><strong>مجموع المنتجات: ${fmt(o.subtotal)}<br>التوصيل: ${fmt(o.delivery_fee)}<br>الإجمالي عند الاستلام: ${fmt(o.total)}</strong></p>
+    <p>المورد: ${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')}</p>
+    <p>شكراً لثقتكم — SOUQAR</p>`;
+  $('#modalBox').innerHTML = receiptHtml + `
+    <div class="actions-row">
+      <button class="btn" id="rcShare" type="button">📤 مشاركة الوصل</button>
+      <button class="btn light" id="rcCopy" type="button">📋 نسخ النص</button>
+      <button class="btn light" id="rcPrint" type="button">🖨 طباعة</button>
+    </div>`;
+  $('#modal').hidden = false;
+  $('#rcCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(lines); toast('نُسخ الوصل ✓'); } catch { toast('تعذّر النسخ', true); } });
+  $('#rcShare').addEventListener('click', async () => {
+    if (navigator.share) { try { await navigator.share({ title: 'وصل طلبية ' + o.ref, text: lines }); } catch {} }
+    else { try { await navigator.clipboard.writeText(lines); toast('نُسخ الوصل — الصقه أين تشاء ✓'); } catch { toast('المشاركة غير متاحة هنا', true); } }
+  });
+  $('#rcPrint').addEventListener('click', () => {
+    let pa = document.getElementById('printArea');
+    if (!pa) { pa = document.createElement('div'); pa.id = 'printArea'; document.body.appendChild(pa); }
+    pa.innerHTML = receiptHtml;
+    window.print();
+  });
 }
 async function reorder(orderId, btn) {
   try {
@@ -501,7 +524,7 @@ function renderSettings() {
       <input id="pfName" value="${esc(ME.name)}" placeholder="الاسم الكامل">
       <input id="pfEmail" type="email" value="${esc(ME.email || '')}" placeholder="البريد الإلكتروني">
       <select id="pfWilaya"><option value="">— الولاية —</option>${WILAYAS.map((w) => `<option value="${w.code}" ${ME.wilaya === w.code ? 'selected' : ''}>${w.code} — ${esc(w.name_ar)}</option>`).join('')}</select>
-      <input id="pfCommune" value="${esc(ME.commune || '')}" placeholder="البلدية">
+      <input id="pfCommune" list="communeList" value="${esc(ME.commune || '')}" placeholder="البلدية — اختر أو اكتب">
       <input id="pfAddress" value="${esc(ME.address || '')}" placeholder="العنوان">
       ${ME.role === 'supplier' ? `<input id="pfBusiness" value="${esc(ME.business_name || '')}" placeholder="اسم النشاط/المتجر">` : ''}
       <input id="pfTelegram" value="${esc(ME.telegram_chat_id || '')}" placeholder="معرّف تيليغرام الرقمي (لإشعارات فورية — اختياري)">
@@ -521,6 +544,8 @@ function renderSettings() {
       <button class="btn gold" type="submit">تغيير كلمة المرور</button>
     </form>
   </details>`;
+  const pfW = $('#pfWilaya');
+  if (pfW) { pfW.addEventListener('change', () => fillCommunes(pfW.value)); if (pfW.value) fillCommunes(pfW.value); }
   $('#profileForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
@@ -814,7 +839,16 @@ $('#moreSheet').addEventListener('click', (e) => { if (e.target.id === 'moreShee
 $$('#moreSheet a').forEach((a) => a.addEventListener('click', () => { $('#moreSheet').hidden = true; }));
 $('#moreTrack').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; openTrack(); });
 $('#closeCart').addEventListener('click', () => { $('#cartDrawer').hidden = true; });
-$('#coWilaya').addEventListener('change', updateTotals);
+async function fillCommunes(wilaya) {
+  const dl = $('#communeList'); if (!dl) return;
+  dl.innerHTML = '';
+  if (!wilaya) return;
+  try {
+    const r = await api('/api/communes?wilaya=' + wilaya);
+    dl.innerHTML = (r.communes || []).map((c) => `<option value="${esc(c.ar || c.fr)}">${esc(c.fr || '')}</option>`).join('');
+  } catch {}
+}
+$('#coWilaya').addEventListener('change', () => { updateTotals(); fillCommunes($('#coWilaya').value); });
 $('#coDelType').addEventListener('change', updateTotals);
 $('#searchInput').addEventListener('input', () => loadProducts().catch(() => {}));
 $('#catFilter').addEventListener('change', () => loadProducts().catch(() => {}));

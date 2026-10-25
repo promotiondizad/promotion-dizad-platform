@@ -244,7 +244,8 @@
       <input id="coName" placeholder="اسم المشتري" required>
       <input id="coPhone" placeholder="رقم الهاتف" required>
       <select id="coWilaya" required><option value="">اختر الولاية</option></select>
-      <input id="coCommune" placeholder="البلدية" required>
+      <input id="coCommune" placeholder="البلدية — اختر من القائمة أو اكتب" list="communeList" required>
+      <datalist id="communeList"></datalist>
       <input id="coAddress" placeholder="عنوان التوصيل بالتفصيل" required>
       <select id="coDelType"><option value="home">🏠 توصيل إلى المنزل</option><option value="office">🏢 توصيل إلى مكتب شركة التوصيل</option></select>
       <div id="coTotals" class="totals" hidden></div>

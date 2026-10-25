@@ -390,6 +390,14 @@ try {
   const homeHtml = await (await fetch(BASE + '/')).text();
   ok(homeHtml.includes('SOUQAR') && homeHtml.includes('manifest.json') && homeHtml.includes('سوق واحد'), 'الصفحة الرئيسية بهوية SOUQAR الخضراء وتربط بيان التطبيق');
 
+  console.log('— البلديات الحقيقية —');
+  r = await anon.get('/api/communes?wilaya=16');
+  ok(r.status === 200 && r.data.communes.length > 40 && r.data.communes.some((c) => c.ar.includes('الجزائر الوسطى')), 'بلديات العاصمة قائمة حقيقية فيها الجزائر الوسطى');
+  r = await anon.get('/api/communes?wilaya=31');
+  ok(r.status === 200 && r.data.communes.some((c) => c.ar.includes('وهران')), 'بلديات وهران فيها وهران');
+  r = await anon.get('/api/communes');
+  ok(r.status === 400, 'طلب البلديات بلا ولاية مرفوض');
+
   console.log('— واجهة الإدارة المنفصلة —');
   const admPage = await fetch(BASE + '/admin.html');
   const admHtml = await admPage.text();
