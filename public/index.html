@@ -148,7 +148,6 @@
       <button class="tab active" data-authtab="login" type="button">تسجيل الدخول</button>
       <button class="tab" data-authtab="register" type="button">حساب جديد</button>
       <button class="tab" data-authtab="forgot" type="button">استعادة كلمة المرور</button>
-      <button class="tab" data-authtab="verify" type="button">تأكيد الحساب</button>
     </div>
 
     <div class="card" id="pane-login">
@@ -186,18 +185,6 @@
         <label class="check"><input type="checkbox" id="rgTerms"> أوافق على <a href="#" data-nav="terms">شروط الاستخدام</a> وسياسة العمولات الموثقة فيها</label>
         <button class="btn gold" type="submit">إنشاء الحساب</button>
       </form>
-    </div>
-
-    <div class="card" id="pane-verify" hidden>
-      <h3>تأكيد الحساب بالبريد الإلكتروني</h3>
-      <p class="muted">سجّلت ببريد إلكتروني؟ وصلك رمز تأكيد من 6 أرقام على بريدك. أدخل رقم هاتفك والرمز هنا لتفعيل حسابك — الدخول يبقى مقفلاً حتى التأكيد.</p>
-      <form id="verifyForm" class="stack">
-        <input id="vfPhone" placeholder="رقم الهاتف المسجل" required>
-        <input id="vfCode" placeholder="رمز التأكيد (6 أرقام)" inputmode="numeric" autocomplete="one-time-code" required>
-        <button class="btn gold" type="submit">تأكيد الحساب</button>
-      </form>
-      <p><button class="btn light" id="vfResend" type="button">إعادة إرسال الرمز</button></p>
-      <p class="muted small">ما وصلكش الرمز؟ تأكد من مجلد الرسائل غير المرغوبة (Spam)، أو اطلب إعادة الإرسال. وإذا تعذر الوصول لبريدك، تواصل مع الإدارة — يمكنها تأكيد حسابك يدوياً.</p>
     </div>
 
     <div class="card" id="pane-forgot" hidden>

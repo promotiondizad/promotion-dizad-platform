@@ -137,14 +137,10 @@ async function renderProducts(box) {
 
 function userRow(u) {
   return `<tr><td>${esc(u.name)}</td><td>${esc(u.role)}</td><td>${esc(u.phone)}</td>
-  <td>${u.email ? esc(u.email) + (u.email_verified ? ' <span class="badge">مؤكد ✅</span>' : ' <span class="badge out">غير مؤكد</span>') : '<span class="muted">—</span>'}</td><td>${esc(u.status)}</td>
-  <td>${u.email && !u.email_verified ? `<button class="btn small gold" data-verify-user="${u.id}">تأكيد البريد يدوياً</button> ` : ''}${u.status === 'suspended' ? `<button class="btn small" data-uact="activate" data-uid="${u.id}">إعادة تفعيل</button>` : `<button class="btn small light" data-uact="suspend" data-uid="${u.id}">تعليق</button>`}</td></tr>`;
+  <td>${u.email ? esc(u.email) : '<span class="muted">—</span>'}</td><td>${esc(u.status)}</td>
+  <td>${u.status === 'suspended' ? `<button class="btn small" data-uact="activate" data-uid="${u.id}">إعادة تفعيل</button>` : `<button class="btn small light" data-uact="suspend" data-uid="${u.id}">تعليق</button>`}</td></tr>`;
 }
 function wireUserActions(box) {
-  $$('[data-verify-user]', box).forEach((b) => b.addEventListener('click', async () => {
-    try { await api(`/api/admin/users/${b.dataset.verifyUser}/verify-email`, { method: 'POST', body: {} }); toast('تم تأكيد بريد المستخدم'); render(); }
-    catch (e) { toast(e.message, true); }
-  }));
   $$('[data-uact]', box).forEach((b) => b.addEventListener('click', async () => {
     let reason = null;
     if (b.dataset.uact === 'reject') { reason = prompt('سبب الرفض:'); if (reason === null) return; }
@@ -169,7 +165,7 @@ async function renderUsers(box) {
   const { users } = await api('/api/admin/users');
   box.innerHTML = `<div class="card"><h3>المستخدمون</h3>
     <input id="aUserQ" type="search" placeholder="🔍 ابحث بالاسم أو الهاتف أو البريد…" style="margin-bottom:10px">
-    <div class="tablewrap"><table id="aUsersTable"><tr><th>الاسم</th><th>الدور</th><th>الهاتف</th><th>البريد وتأكيده</th><th>الحالة</th><th></th></tr>
+    <div class="tablewrap"><table id="aUsersTable"><tr><th>الاسم</th><th>الدور</th><th>الهاتف</th><th>البريد</th><th>الحالة</th><th></th></tr>
     ${users.filter((u) => u.role !== 'admin').map(userRow).join('')}</table></div></div>`;
   wireUserActions(box);
   $('#aUserQ').addEventListener('input', (e) => {

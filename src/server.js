@@ -131,18 +131,11 @@ const server = http.createServer(async (req, res) => {
       const status = role === 'supplier' ? 'pending' : 'active';
       const info = db.prepare(`INSERT INTO users(role,name,phone,email,email_verified,password_hash,wilaya,commune,address,business_name,activity,telegram_chat_id,status,created_at)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(role, String(b.name).trim(), phone, email, email ? 0 : 1, sec.hashPassword(b.password),
+        .run(role, String(b.name).trim(), phone, email, 1, sec.hashPassword(b.password),
           b.wilaya ? Number(b.wilaya) : null, b.commune || null, b.address || null,
           b.businessName || null, b.activity || null, b.telegramChatId || null, status, Date.now());
       const id = Number(info.lastInsertRowid);
       audit(id, 'register', 'user', id, role);
-      if (email) {
-        const code = sec.createAuthCode(id, 'verify_email');
-        const nid = await integ.notify({ userId: id, channel: 'email', type: 'email_verification', target: email, text: `رمز تأكيد حسابك في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله في خانة «تأكيد الحساب» مع رقم هاتفك.` });
-        const nrow = db.prepare('SELECT status FROM notifications WHERE id = ?').get(nid);
-        if (role === 'supplier') { await integ.notify({ channel: 'log', type: 'supplier_pending', text: `مورد جديد بانتظار المراجعة: ${b.name} (${phone})` }); await notifyAdmin(`🏭 مورد جديد بانتظار مراجعة الإدارة في منصة Promotion Dizad: ${b.name} (${phone})`); }
-        return send(res, 201, { ok: true, status, verificationRequired: true, emailDelivery: nrow ? nrow.status : null, message: 'تم إنشاء الحساب. أدخل رمز التأكيد المرسل إلى بريدك الإلكتروني في خانة «تأكيد الحساب» قبل تسجيل الدخول.' });
-      }
       if (role === 'supplier') { await integ.notify({ channel: 'log', type: 'supplier_pending', text: `مورد جديد بانتظار المراجعة: ${b.name} (${phone})` }); await notifyAdmin(`🏭 مورد جديد بانتظار مراجعة الإدارة في منصة Promotion Dizad: ${b.name} (${phone})`); }
       return send(res, 201, { ok: true, status, message: role === 'supplier' ? 'تم إنشاء الحساب. حسابات الموردين تُراجَع من الإدارة قبل تفعيل النشر واستقبال الطلبات.' : 'تم إنشاء الحساب بنجاح — يمكنك تسجيل الدخول.' });
     }
@@ -158,7 +151,6 @@ const server = http.createServer(async (req, res) => {
       }
       if (user.status === 'rejected') return send(res, 403, { error: 'تم رفض هذا الحساب من الإدارة' + (user.reject_reason ? ': ' + user.reject_reason : '') });
       if (user.status === 'suspended') return send(res, 403, { error: 'هذا الحساب موقوف — تواصل مع الدعم' });
-      if (user.email && !user.email_verified) return send(res, 403, { error: 'حسابك غير مؤكد بعد — أدخل رمز التأكيد المرسل إلى بريدك الإلكتروني في خانة «تأكيد الحساب»', code: 'email_unverified' });
       sec.registerLoginSuccess(user);
       const { token, csrf } = sec.createSession(user.id);
       audit(user.id, 'login', 'user', user.id, null);
@@ -169,28 +161,6 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/auth/logout' && req.method === 'POST') {
       const s = sessionOf(req); if (s) sec.destroySession(s.token);
       return send(res, 200, { ok: true }, { 'Set-Cookie': 'pd_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
-    }
-    if (p === '/api/auth/verify-email' && req.method === 'POST') {
-      const b = await readBody(req);
-      const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(sec.cleanPhone(b.phone || ''));
-      if (!user || !user.email) return send(res, 400, { error: 'لا يوجد حساب بهذا الرقم مع بريد مسجل' });
-      if (user.email_verified) return send(res, 200, { ok: true, already: true, message: 'حسابك مؤكد مسبقاً — يمكنك تسجيل الدخول' });
-      const v = sec.verifyAuthCode(user.id, 'verify_email', b.code);
-      if (!v.ok) return send(res, 400, { error: v.error });
-      db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(user.id);
-      audit(user.id, 'email_verified', 'user', user.id, null);
-      return send(res, 200, { ok: true, message: 'تم تأكيد حسابك بنجاح — سجّل الدخول الآن' });
-    }
-    if (p === '/api/auth/resend-verification' && req.method === 'POST') {
-      if (!sec.rateLimit('resend:' + req.socket.remoteAddress, 10, 3600e3)) return send(res, 429, { error: 'محاولات كثيرة — حاول لاحقاً' });
-      const b = await readBody(req);
-      const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(sec.cleanPhone(b.phone || ''));
-      if (user && user.email && !user.email_verified) {
-        if (Date.now() - sec.lastAuthCodeAt(user.id, 'verify_email') < 60e3) return send(res, 429, { error: 'انتظر دقيقة قبل طلب رمز جديد' });
-        const code = sec.createAuthCode(user.id, 'verify_email');
-        await integ.notify({ userId: user.id, channel: 'email', type: 'email_verification', target: user.email, text: `رمز تأكيد حسابك في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله في خانة «تأكيد الحساب» مع رقم هاتفك.` });
-      }
-      return send(res, 200, { ok: true, message: 'إذا كان الحساب موجوداً وغير مؤكد، أُرسل رمز جديد إلى البريد المسجل.' });
     }
     if (p === '/api/auth/forgot' && req.method === 'POST') {
       const b = await readBody(req);
@@ -261,7 +231,7 @@ const server = http.createServer(async (req, res) => {
         email = ne;
       }
       db.prepare('UPDATE users SET name = ?, email = ?, email_verified = ?, wilaya = ?, commune = ?, address = ?, business_name = ?, telegram_chat_id = ?, payment_method = ?, payment_details = ? WHERE id = ?')
-        .run(name, email, emailChanged ? (email ? 0 : 1) : me.email_verified,
+        .run(name, email, 1,
           b.wilaya !== undefined ? (b.wilaya ? Number(b.wilaya) : null) : me.wilaya,
           b.commune !== undefined ? (b.commune || null) : me.commune,
           b.address !== undefined ? (b.address || null) : me.address,
@@ -271,13 +241,7 @@ const server = http.createServer(async (req, res) => {
           b.paymentDetails !== undefined ? (b.paymentDetails || null) : me.payment_details,
           me.id);
       audit(me.id, 'profile_update', 'user', me.id, emailChanged ? 'email_changed' : null);
-      let verificationRequired = false;
-      if (emailChanged && email) {
-        verificationRequired = true;
-        const code = sec.createAuthCode(me.id, 'verify_email');
-        await integ.notify({ userId: me.id, channel: 'email', type: 'email_verification', target: email, text: `رمز تأكيد بريدك الجديد في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله في خانة «تأكيد الحساب» مع رقم هاتفك.` });
-      }
-      return send(res, 200, { ok: true, verificationRequired, user: publicUser(getUser(me.id)), message: verificationRequired ? 'تم الحفظ. غيّرت بريدك — أكّده بالرمز المرسل إليه قبل الدخول القادم.' : 'تم حفظ بياناتك.' });
+      return send(res, 200, { ok: true, user: publicUser(getUser(me.id)), message: 'تم حفظ بياناتك.' });
     }
     // تغيير كلمة المرور من داخل الحساب (بكلمة المرور الحالية)
     if (p === '/api/me/password' && req.method === 'POST') {
@@ -736,15 +700,6 @@ const server = http.createServer(async (req, res) => {
       const rows = (role ? db.prepare('SELECT * FROM users WHERE role = ? ORDER BY id DESC').all(role)
         : db.prepare('SELECT * FROM users ORDER BY id DESC').all()).map(publicUser);
       return send(res, 200, { users: rows });
-    }
-    const userVerifyM = p.match(/^\/api\/admin\/users\/(\d+)\/verify-email$/);
-    if (userVerifyM && req.method === 'POST') {
-      const s = requireAuth(req, res, ['admin']); if (!s) return;
-      const target = getUser(Number(userVerifyM[1]));
-      if (!target) return send(res, 404, { error: 'المستخدم غير موجود' });
-      db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(target.id);
-      audit(s.userId, 'user_email_verified_manual', 'user', target.id, null);
-      return send(res, 200, { ok: true });
     }
     const userActM = p.match(/^\/api\/admin\/users\/(\d+)\/action$/);
     if (userActM && req.method === 'POST') {

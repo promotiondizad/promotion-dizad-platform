@@ -370,8 +370,8 @@ function selectRole(r) {
   $('#supplierFields').hidden = r !== 'supplier';
   $('#marketerFields').hidden = r !== 'marketer';
   const em = $('#rgEmail');
-  em.required = r === 'marketer';
-  em.placeholder = r === 'marketer' ? 'البريد الإلكتروني (مطلوب للمسوق — يصلك عليه رمز التأكيد)' : 'البريد الإلكتروني (اختياري — إن أدخلته يلزم تأكيده برمز)';
+  em.required = false;
+  em.placeholder = 'البريد الإلكتروني (اختياري)';
 }
 async function refreshMe() {
   const data = await api('/api/me');
@@ -390,7 +390,7 @@ function renderSettings() {
   const box = $('#dashSettings');
   if (!ME) { box.innerHTML = ''; return; }
   box.innerHTML = `
-  <details class="card"><summary><strong>⚙️ إعدادات حسابي</strong> — الاسم: ${esc(ME.name)} · الهاتف: ${esc(ME.phone)}${ME.email ? ' · البريد: ' + esc(ME.email) + (ME.email_verified ? ' (مؤكد ✅)' : ' (غير مؤكد)') : ''}</summary>
+  <details class="card"><summary><strong>⚙️ إعدادات حسابي</strong> — الاسم: ${esc(ME.name)} · الهاتف: ${esc(ME.phone)}${ME.email ? ' · البريد: ' + esc(ME.email) : ''}</summary>
     <form id="profileForm" class="stack" style="margin-top:12px">
       <input id="pfName" value="${esc(ME.name)}" placeholder="الاسم الكامل">
       <input id="pfEmail" type="email" value="${esc(ME.email || '')}" placeholder="البريد الإلكتروني">
@@ -420,7 +420,6 @@ function renderSettings() {
     try {
       const r = await api('/api/me', { method: 'PATCH', body: { name: $('#pfName').value, email: $('#pfEmail').value, wilaya: $('#pfWilaya').value, commune: $('#pfCommune').value, address: $('#pfAddress').value, businessName: $('#pfBusiness') ? $('#pfBusiness').value : undefined, telegramChatId: $('#pfTelegram').value, paymentMethod: $('#pfPayMethod') ? $('#pfPayMethod').value : undefined, paymentDetails: $('#pfPayDetails') ? $('#pfPayDetails').value : undefined } });
       toast(r.message); await refreshMe(); renderDash();
-      if (r.verificationRequired) openAuth('verify', null, ME.phone);
     } catch (err) { toast(err.message, true); }
   });
   $('#pwForm').addEventListener('submit', async (e) => {
@@ -649,9 +648,7 @@ function openAuth(tab = 'login', role, phone) {
   $('#pane-login').hidden = tab !== 'login';
   $('#pane-register').hidden = tab !== 'register';
   $('#pane-forgot').hidden = tab !== 'forgot';
-  $('#pane-verify').hidden = tab !== 'verify';
   if (role) selectRole(role);
-  if (phone && tab === 'verify') $('#vfPhone').value = phone;
 }
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('[data-nav]');
@@ -738,10 +735,7 @@ $('#loginForm').addEventListener('submit', async (e) => {
     CSRF = r.csrf; await refreshMe();
     if (ME && ME.status === 'pending') { toast('حسابك قيد مراجعة الإدارة — ستُفعَّل صلاحيات النشر واستقبال الطلبات بعد الاعتماد.'); show('home'); }
     else { toast('مرحباً ' + ME.name); renderDash(); }
-  } catch (err) {
-    if (err.data && err.data.code === 'email_unverified') { openAuth('verify', null, $('#liPhone').value); toast('أكّد حسابك أولاً برمز البريد', true); }
-    else toast(err.message, true);
-  }
+  } catch (err) { toast(err.message, true); }
 });
 $('#registerForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -756,22 +750,8 @@ $('#registerForm').addEventListener('submit', async (e) => {
       terms: $('#rgTerms').checked
     } });
     toast(r.message);
-    if (r.verificationRequired) { const ph = $('#rgPhone').value; e.target.reset(); openAuth('verify', null, ph); }
-    else { e.target.reset(); openAuth('login'); }
+    e.target.reset(); openAuth('login');
   } catch (err) { toast(err.message, true); }
-});
-$('#verifyForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  try {
-    const r = await api('/api/auth/verify-email', { method: 'POST', body: { phone: $('#vfPhone').value, code: $('#vfCode').value.trim() } });
-    toast(r.message); e.target.reset(); openAuth('login');
-  } catch (err) { toast(err.message, true); }
-});
-$('#vfResend').addEventListener('click', async () => {
-  const phone = $('#vfPhone').value;
-  if (!phone) return toast('أدخل رقم هاتفك أولاً', true);
-  try { const r = await api('/api/auth/resend-verification', { method: 'POST', body: { phone } }); toast(r.message); }
-  catch (err) { toast(err.message, true); }
 });
 $('#fgChannel').addEventListener('change', () => {
   $('#fgId').placeholder = $('#fgChannel').value === 'email' ? 'البريد الإلكتروني المسجل' : 'رقم هاتف الحساب';

@@ -236,38 +236,20 @@ try {
   r = await new Client().get(`/api/orders/${myOrder.id}/timeline`);
   ok(r.status === 401, 'الزائر ممنوع من السجل الزمني');
 
-  console.log('— تأكيد البريد واستعادة كلمة المرور بالرمز —');
+  console.log('— الدخول المباشر واستعادة كلمة المرور بالرمز —');
   const mkMail = new Client();
   r = await mkMail.post('/api/auth/register', { role: 'marketer', name: 'مسوق بالبريد', phone: '0600000021', email: 'mk1@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
-  ok(r.status === 201 && r.data.verificationRequired === true, 'تسجيل مسوق ببريد يتطلب التأكيد');
+  ok(r.status === 201 && r.data.verificationRequired === undefined, 'التسجيل بالبريد لا يتطلب أي تأكيد (بقرار صاحب المنصة)');
   r = await mkMail.post('/api/auth/login', { phone: '0600000021', password: 'mkpass1234' });
-  ok(r.status === 403 && r.data.code === 'email_unverified', 'الدخول محظور قبل تأكيد البريد');
-  const vcode = lastOutboxCode('email_verification', 'mk1@test.dz');
-  ok(!!vcode, 'رمز التأكيد وصل إلى صندوق البريد الصادر');
-  const wrongCode = vcode === '000000' ? '000001' : '000000';
-  r = await mkMail.post('/api/auth/verify-email', { phone: '0600000021', code: wrongCode });
-  ok(r.status === 400, 'رمز تأكيد خاطئ مرفوض');
-  r = await mkMail.post('/api/auth/verify-email', { phone: '0600000021', code: vcode });
-  ok(r.status === 200, 'تأكيد البريد بالرمز الصحيح');
-  r = await mkMail.post('/api/auth/login', { phone: '0600000021', password: 'mkpass1234' });
-  ok(r.status === 200, 'الدخول يعمل بعد التأكيد');
+  ok(r.status === 200, 'الدخول مباشرة بعد التسجيل دون أي رمز تأكيد');
+  r = await mkMail.post('/api/auth/verify-email', { phone: '0600000021', code: '123456' });
+  ok(r.status === 404, 'نقطة تأكيد الحساب محذوفة نهائياً');
 
   const mk2 = new Client();
-  r = await mk2.post('/api/auth/register', { role: 'marketer', name: 'مسوق إعادة', phone: '0600000022', email: 'mk2@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
-  const firstCode = lastOutboxCode('email_verification', 'mk2@test.dz');
-  r = await mk2.post('/api/auth/resend-verification', { phone: '0600000022' });
-  ok(r.status === 429, 'إعادة الإرسال الفورية محظورة (تهدئة دقيقة ضد الإزعاج)');
-  const tdb = new DatabaseSync(dbPath);
-  tdb.prepare('UPDATE auth_codes SET created_at = created_at - 61000').run();
-  tdb.close();
-  r = await mk2.post('/api/auth/resend-verification', { phone: '0600000022' });
-  ok(r.status === 200, 'إعادة إرسال رمز التأكيد بعد التهدئة');
-  const secondCode = lastOutboxCode('email_verification', 'mk2@test.dz');
-  ok(!!secondCode && secondCode !== firstCode, 'رمز جديد مختلف بعد إعادة الإرسال');
-  r = await mk2.post('/api/auth/verify-email', { phone: '0600000022', code: firstCode });
-  ok(r.status === 400, 'الرمز القديم يبطل بعد إعادة الإرسال');
-  r = await mk2.post('/api/auth/verify-email', { phone: '0600000022', code: secondCode });
-  ok(r.status === 200, 'الرمز الجديد يؤكد الحساب');
+  r = await mk2.post('/api/auth/register', { role: 'marketer', name: 'مسوق ثان', phone: '0600000022', email: 'mk2@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
+  ok(r.status === 201, 'تسجيل المسوق الثاني');
+  r = await mk2.post('/api/auth/login', { phone: '0600000022', password: 'mkpass1234' });
+  ok(r.status === 200, 'دخول المسوق الثاني مباشرة');
 
   r = await mkMail.post('/api/auth/forgot', { email: 'mk1@test.dz' });
   ok(r.status === 200, 'طلب استعادة بالبريد');
@@ -290,16 +272,9 @@ try {
   ok(r.status === 200, 'الدخول بعد استعادة الهاتف');
 
   const mk3 = new Client();
-  r = await mk3.post('/api/auth/register', { role: 'marketer', name: 'مسوق يدوي', phone: '0600000023', email: 'mk3@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
+  r = await mk3.post('/api/auth/register', { role: 'marketer', name: 'مسوق ثالث', phone: '0600000023', email: 'mk3@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
   r = await mk3.post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
-  ok(r.status === 403, 'حساب ثالث محظور قبل التأكيد');
-  const allUsers = await admin.get('/api/admin/users');
-  const mk3row = allUsers.data.users.find((u) => u.phone === '0600000023');
-  ok(mk3row && mk3row.email_verified === 0, 'المدير يرى البريد غير المؤكد');
-  r = await admin.post(`/api/admin/users/${mk3row.id}/verify-email`, {});
-  ok(r.status === 200, 'المدير يؤكد البريد يدوياً');
-  r = await mk3.post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
-  ok(r.status === 200, 'الدخول بعد التأكيد اليدوي');
+  ok(r.status === 200, 'الحساب الثالث يدخل مباشرة دون تأكيد');
 
   console.log('— تفاصيل الطلبية الكاملة —');
   r = await admin.get(`/api/orders/${myOrder.id}/details`);
@@ -329,14 +304,9 @@ try {
   r = await new Client().post('/api/auth/login', { phone: '0600000021', password: 'mkfinalpass1' });
   ok(r.status === 200, 'الدخول بكلمة المرور المعدّلة من الإعدادات');
   r = await mk3.req('PATCH', '/api/me', { email: 'mk3new@test.dz' });
-  ok(r.status === 200 && r.data.verificationRequired === true, 'تغيير البريد يتطلب تأكيداً جديداً');
+  ok(r.status === 200 && r.data.user.email === 'mk3new@test.dz', 'تغيير البريد يتم مباشرة دون تأكيد');
   r = await new Client().post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
-  ok(r.status === 403 && r.data.code === 'email_unverified', 'الدخول محظور حتى تأكيد البريد الجديد');
-  const nvcode = lastOutboxCode('email_verification', 'mk3new@test.dz');
-  r = await mk3.post('/api/auth/verify-email', { phone: '0600000023', code: nvcode });
-  ok(r.status === 200, 'تأكيد البريد الجديد بالرمز');
-  r = await new Client().post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
-  ok(r.status === 200, 'الدخول بعد تأكيد البريد الجديد');
+  ok(r.status === 200, 'الدخول يعمل مباشرة بعد تغيير البريد');
   r = await anon.get('/api/products?sort=price_asc');
   ok(r.status === 200 && r.data.products.length >= 1, 'ترتيب المنتجات بالسعر يعمل');
   const ascPrices = (await anon.get('/api/products?sort=price_asc')).data.products.map((p) => p.customer_price);
