@@ -178,6 +178,18 @@ const WILAYAS = [
   for (const n of ['عام']) cat.run(n, Date.now());
 }
 
+// ترقية: تأكيد البريد الإلكتروني ورموز المصادقة (تأكيد الحساب + استعادة كلمة المرور)
+try { db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1'); } catch { /* العمود موجود */ }
+db.exec(`CREATE TABLE IF NOT EXISTS auth_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  purpose TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+)`);
+
 function audit(actorId, action, entity, entityId, details) {
   db.prepare('INSERT INTO audit_logs(actor_id,action,entity,entity_id,details,created_at) VALUES(?,?,?,?,?,?)')
     .run(actorId || null, action, entity || null, entityId ? String(entityId) : null, details || null, Date.now());

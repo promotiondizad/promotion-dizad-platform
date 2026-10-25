@@ -41,6 +41,34 @@ function destroySession(token) {
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token));
 }
 
+// رموز مصادقة من 6 أرقام (تأكيد البريد / استعادة كلمة المرور) — تُحفظ مجزّأة، صالحة 15 دقيقة، 5 محاولات كحد أقصى
+function createAuthCode(userId, purpose) {
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  db.prepare('DELETE FROM auth_codes WHERE user_id = ? AND purpose = ?').run(userId, purpose);
+  db.prepare('INSERT INTO auth_codes(user_id,purpose,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,0,?)')
+    .run(userId, purpose, hashToken(purpose + ':' + code), Date.now() + 15 * 60e3, Date.now());
+  return code;
+}
+function verifyAuthCode(userId, purpose, code) {
+  const row = db.prepare('SELECT * FROM auth_codes WHERE user_id = ? AND purpose = ? ORDER BY id DESC LIMIT 1').get(userId, purpose);
+  if (!row) return { ok: false, error: 'لا يوجد رمز صالح — اطلب رمزاً جديداً' };
+  if (row.expires_at < Date.now()) return { ok: false, error: 'انتهت صلاحية الرمز — اطلب رمزاً جديداً' };
+  if (row.attempts >= 5) return { ok: false, error: 'تجاوزت عدد المحاولات المسموح — اطلب رمزاً جديداً' };
+  const calc = Buffer.from(hashToken(purpose + ':' + String(code || '').trim()), 'hex');
+  const stored = Buffer.from(row.code_hash, 'hex');
+  const match = calc.length === stored.length && crypto.timingSafeEqual(calc, stored);
+  if (!match) {
+    db.prepare('UPDATE auth_codes SET attempts = attempts + 1 WHERE id = ?').run(row.id);
+    return { ok: false, error: 'الرمز غير صحيح' };
+  }
+  db.prepare('DELETE FROM auth_codes WHERE id = ?').run(row.id);
+  return { ok: true };
+}
+function lastAuthCodeAt(userId, purpose) {
+  const row = db.prepare('SELECT created_at FROM auth_codes WHERE user_id = ? AND purpose = ? ORDER BY id DESC LIMIT 1').get(userId, purpose);
+  return row ? row.created_at : 0;
+}
+
 // حدّ محاولات الدخول: 5 محاولات فاشلة = قفل 15 دقيقة (يُخزَّن في حساب المستخدم نفسه)
 const MAX_FAILS = 5, LOCK_MS = 15 * 60 * 1000;
 function loginLocked(user) { return user.locked_until && user.locked_until > Date.now(); }
@@ -77,5 +105,6 @@ module.exports = {
   hashPassword, verifyPassword, hashToken, newToken,
   createSession, getSession, destroySession,
   loginLocked, registerLoginFail, registerLoginSuccess,
-  rateLimit, strongPassword, validPhone, cleanPhone
+  rateLimit, strongPassword, validPhone, cleanPhone,
+  createAuthCode, verifyAuthCode, lastAuthCodeAt
 };

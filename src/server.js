@@ -123,16 +123,26 @@ const server = http.createServer(async (req, res) => {
       if (b.password !== b.passwordConfirm) return send(res, 400, { error: 'تأكيد كلمة المرور غير مطابق' });
       if (b.terms !== true) return send(res, 400, { error: 'يجب الموافقة على الشروط للمتابعة' });
       if (role === 'supplier' && !b.activity) return send(res, 400, { error: 'معلومات النشاط مطلوبة للمورد' });
+      const email = b.email ? String(b.email).trim().toLowerCase() : null;
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return send(res, 400, { error: 'بريد إلكتروني غير صحيح' });
+      if (email && db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return send(res, 409, { error: 'يوجد حساب مسجل بهذا البريد — سجّل الدخول' });
       const phone = sec.cleanPhone(b.phone);
       if (db.prepare('SELECT id FROM users WHERE phone = ?').get(phone)) return send(res, 409, { error: 'يوجد حساب مسجل بهذا الرقم — سجّل الدخول' });
       const status = role === 'supplier' ? 'pending' : 'active';
-      const info = db.prepare(`INSERT INTO users(role,name,phone,email,password_hash,wilaya,commune,address,business_name,activity,telegram_chat_id,status,created_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?, ?, ?)`)
-        .run(role, String(b.name).trim(), phone, b.email || null, sec.hashPassword(b.password),
+      const info = db.prepare(`INSERT INTO users(role,name,phone,email,email_verified,password_hash,wilaya,commune,address,business_name,activity,telegram_chat_id,status,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(role, String(b.name).trim(), phone, email, email ? 0 : 1, sec.hashPassword(b.password),
           b.wilaya ? Number(b.wilaya) : null, b.commune || null, b.address || null,
           b.businessName || null, b.activity || null, b.telegramChatId || null, status, Date.now());
       const id = Number(info.lastInsertRowid);
       audit(id, 'register', 'user', id, role);
+      if (email) {
+        const code = sec.createAuthCode(id, 'verify_email');
+        const nid = await integ.notify({ userId: id, channel: 'email', type: 'email_verification', target: email, text: `رمز تأكيد حسابك في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله في خانة «تأكيد الحساب» مع رقم هاتفك.` });
+        const nrow = db.prepare('SELECT status FROM notifications WHERE id = ?').get(nid);
+        if (role === 'supplier') { await integ.notify({ channel: 'log', type: 'supplier_pending', text: `مورد جديد بانتظار المراجعة: ${b.name} (${phone})` }); await notifyAdmin(`🏭 مورد جديد بانتظار مراجعة الإدارة في منصة Promotion Dizad: ${b.name} (${phone})`); }
+        return send(res, 201, { ok: true, status, verificationRequired: true, emailDelivery: nrow ? nrow.status : null, message: 'تم إنشاء الحساب. أدخل رمز التأكيد المرسل إلى بريدك الإلكتروني في خانة «تأكيد الحساب» قبل تسجيل الدخول.' });
+      }
       if (role === 'supplier') { await integ.notify({ channel: 'log', type: 'supplier_pending', text: `مورد جديد بانتظار المراجعة: ${b.name} (${phone})` }); await notifyAdmin(`🏭 مورد جديد بانتظار مراجعة الإدارة في منصة Promotion Dizad: ${b.name} (${phone})`); }
       return send(res, 201, { ok: true, status, message: role === 'supplier' ? 'تم إنشاء الحساب. حسابات الموردين تُراجَع من الإدارة قبل تفعيل النشر واستقبال الطلبات.' : 'تم إنشاء الحساب بنجاح — يمكنك تسجيل الدخول.' });
     }
@@ -148,6 +158,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (user.status === 'rejected') return send(res, 403, { error: 'تم رفض هذا الحساب من الإدارة' + (user.reject_reason ? ': ' + user.reject_reason : '') });
       if (user.status === 'suspended') return send(res, 403, { error: 'هذا الحساب موقوف — تواصل مع الدعم' });
+      if (user.email && !user.email_verified) return send(res, 403, { error: 'حسابك غير مؤكد بعد — أدخل رمز التأكيد المرسل إلى بريدك الإلكتروني في خانة «تأكيد الحساب»', code: 'email_unverified' });
       sec.registerLoginSuccess(user);
       const { token, csrf } = sec.createSession(user.id);
       audit(user.id, 'login', 'user', user.id, null);
@@ -159,22 +170,67 @@ const server = http.createServer(async (req, res) => {
       const s = sessionOf(req); if (s) sec.destroySession(s.token);
       return send(res, 200, { ok: true }, { 'Set-Cookie': 'pd_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
     }
-    if (p === '/api/auth/forgot' && req.method === 'POST') {
+    if (p === '/api/auth/verify-email' && req.method === 'POST') {
       const b = await readBody(req);
       const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(sec.cleanPhone(b.phone || ''));
+      if (!user || !user.email) return send(res, 400, { error: 'لا يوجد حساب بهذا الرقم مع بريد مسجل' });
+      if (user.email_verified) return send(res, 200, { ok: true, already: true, message: 'حسابك مؤكد مسبقاً — يمكنك تسجيل الدخول' });
+      const v = sec.verifyAuthCode(user.id, 'verify_email', b.code);
+      if (!v.ok) return send(res, 400, { error: v.error });
+      db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(user.id);
+      audit(user.id, 'email_verified', 'user', user.id, null);
+      return send(res, 200, { ok: true, message: 'تم تأكيد حسابك بنجاح — سجّل الدخول الآن' });
+    }
+    if (p === '/api/auth/resend-verification' && req.method === 'POST') {
+      if (!sec.rateLimit('resend:' + req.socket.remoteAddress, 10, 3600e3)) return send(res, 429, { error: 'محاولات كثيرة — حاول لاحقاً' });
+      const b = await readBody(req);
+      const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(sec.cleanPhone(b.phone || ''));
+      if (user && user.email && !user.email_verified) {
+        if (Date.now() - sec.lastAuthCodeAt(user.id, 'verify_email') < 60e3) return send(res, 429, { error: 'انتظر دقيقة قبل طلب رمز جديد' });
+        const code = sec.createAuthCode(user.id, 'verify_email');
+        await integ.notify({ userId: user.id, channel: 'email', type: 'email_verification', target: user.email, text: `رمز تأكيد حسابك في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله في خانة «تأكيد الحساب» مع رقم هاتفك.` });
+      }
+      return send(res, 200, { ok: true, message: 'إذا كان الحساب موجوداً وغير مؤكد، أُرسل رمز جديد إلى البريد المسجل.' });
+    }
+    if (p === '/api/auth/forgot' && req.method === 'POST') {
+      const b = await readBody(req);
+      let user = null;
+      if (b.email) user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(b.email).trim().toLowerCase());
+      else if (b.phone) user = db.prepare('SELECT * FROM users WHERE phone = ?').get(sec.cleanPhone(b.phone));
       if (user) {
         const token = sec.newToken(20);
         db.prepare('INSERT INTO password_resets(user_id,token,token_hash,expires_at,created_at) VALUES(?,?,?,?,?)')
           .run(user.id, token, sec.hashToken(token), Date.now() + 30 * 60e3, Date.now());
         await integ.notify({ userId: user.id, channel: 'log', type: 'password_reset', text: `رمز استعادة كلمة المرور (صالح 30 دقيقة): ${token}` });
         if (user.telegram_chat_id) await integ.notify({ userId: user.id, channel: 'telegram', type: 'password_reset', text: `Promotion Dizad — رمز استعادة كلمة المرور (30 دقيقة): ${token}` });
+        // رمز قصير من 6 أرقام عبر القناة المطلوبة: البريد الإلكتروني أو الهاتف (تيليغرام/واتساب حسب المضبوط)
+        const code = sec.createAuthCode(user.id, 'reset_password');
+        const codeText = `رمز استعادة كلمة المرور في منصة Promotion Dizad هو: ${code}\nصالح لمدة 15 دقيقة. أدخله مع رقم هاتفك أو بريدك في نموذج الاستعادة.`;
+        if (b.email && user.email) await integ.notify({ userId: user.id, channel: 'email', type: 'password_reset', target: user.email, text: codeText });
+        else {
+          if (user.telegram_chat_id) await integ.notify({ userId: user.id, channel: 'telegram', type: 'password_reset', text: codeText });
+          await integ.notify({ userId: user.id, channel: 'whatsapp', type: 'password_reset', target: user.phone, text: codeText });
+        }
       }
-      return send(res, 200, { ok: true, message: 'إذا كان الرقم مسجلاً، تم إرسال رمز الاستعادة عبر قنوات الإشعار المضبوطة.' });
+      return send(res, 200, { ok: true, message: 'إذا كان الحساب مسجلاً، وصلك رمز الاستعادة (6 أرقام) عبر القناة المختارة.' });
     }
     if (p === '/api/auth/reset' && req.method === 'POST') {
       const b = await readBody(req);
       if (!sec.strongPassword(b.password || '')) return send(res, 400, { error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' });
       if (b.password !== b.passwordConfirm) return send(res, 400, { error: 'تأكيد كلمة المرور غير مطابق' });
+      // المسار الأول: رمز قصير من 6 أرقام + رقم الهاتف أو البريد
+      if (b.code) {
+        let user = null;
+        if (b.email) user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(b.email).trim().toLowerCase());
+        else if (b.phone) user = db.prepare('SELECT * FROM users WHERE phone = ?').get(sec.cleanPhone(b.phone));
+        if (!user) return send(res, 400, { error: 'الحساب غير موجود' });
+        const v = sec.verifyAuthCode(user.id, 'reset_password', b.code);
+        if (!v.ok) return send(res, 400, { error: v.error });
+        db.prepare('UPDATE users SET password_hash = ?, failed_logins = 0, locked_until = 0 WHERE id = ?').run(sec.hashPassword(b.password), user.id);
+        db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+        audit(user.id, 'password_reset_code', 'user', user.id, null);
+        return send(res, 200, { ok: true, message: 'تم تغيير كلمة المرور — سجّل الدخول من جديد.' });
+      }
       const row = db.prepare('SELECT * FROM password_resets WHERE token_hash = ? AND used = 0 AND expires_at > ?')
         .get(sec.hashToken(String(b.token || '')), Date.now());
       if (!row) return send(res, 400, { error: 'الرمز غير صالح أو منتهي الصلاحية' });
@@ -371,6 +427,57 @@ const server = http.createServer(async (req, res) => {
         items, history: hist
       });
     }
+    // تفاصيل كاملة لطلبية برقمها — لكل طرف معني، مع إخفاء ما لا يخصه
+    const detM = p.match(/^\/api\/orders\/(\d+)\/details$/);
+    if (detM && req.method === 'GET') {
+      const s = sessionOf(req);
+      if (!s) return send(res, 401, { error: 'يجب تسجيل الدخول أولاً' });
+      const o = db.prepare('SELECT * FROM orders WHERE id = ?').get(Number(detM[1]));
+      if (!o) return send(res, 404, { error: 'الطلب غير موجود' });
+      const allowed = s.role === 'admin'
+        || (s.role === 'buyer' && o.buyer_id === s.userId)
+        || (s.role === 'marketer' && o.marketer_id === s.userId)
+        || (s.role === 'supplier' && o.supplier_id === s.userId);
+      if (!allowed) return send(res, 404, { error: 'الطلب غير موجود' });
+      const wilaya = db.prepare('SELECT name_ar FROM wilayas WHERE code = ?').get(o.wilaya);
+      const supplier = getUser(o.supplier_id);
+      const marketer = o.marketer_id ? getUser(o.marketer_id) : null;
+      const buyerAcc = o.buyer_id ? getUser(o.buyer_id) : null;
+      const itemsRaw = db.prepare('SELECT oi.*, pr.name FROM order_items oi JOIN products pr ON pr.id = oi.product_id WHERE oi.order_id = ?').all(o.id);
+      const seeContact = s.role === 'admin' || s.role === 'supplier' || (s.role === 'buyer' && o.buyer_id === s.userId);
+      const items = itemsRaw.map((i) => ({
+        name: i.name, qty: i.qty, size: i.size, color: i.color, customer_price: i.customer_price,
+        line_total: i.customer_price * i.qty,
+        ...(s.role === 'admin' || s.role === 'supplier' ? { wholesale_price: i.wholesale_price } : {}),
+        ...(s.role === 'admin' ? { platform_margin: i.platform_margin, marketer_commission: i.marketer_commission } : {}),
+        ...(s.role === 'marketer' ? { marketer_commission: i.marketer_commission, commission_total: i.marketer_commission * i.qty } : {})
+      }));
+      const hist = db.prepare('SELECT status, note, created_at FROM order_history WHERE order_id = ? ORDER BY id').all(o.id)
+        .map((h) => ({ ...h, label: ORDER_STATUSES[h.status] || h.status }));
+      const wholesaleTotal = itemsRaw.reduce((a, i) => a + i.wholesale_price * i.qty, 0);
+      const marginTotal = itemsRaw.reduce((a, i) => a + i.platform_margin * i.qty, 0);
+      const commissionTotal = o.marketer_id ? itemsRaw.reduce((a, i) => a + i.marketer_commission * i.qty, 0) : 0;
+      return send(res, 200, {
+        order: {
+          id: o.id, ref: o.ref, group_ref: o.group_ref, status: o.status, status_label: ORDER_STATUSES[o.status],
+          created_at: o.created_at, updated_at: o.updated_at,
+          wilaya: o.wilaya, wilaya_name: wilaya ? wilaya.name_ar : '', commune: o.commune,
+          subtotal: o.subtotal, delivery_fee: o.delivery_fee, total: o.total,
+          reject_reason: o.reject_reason || null,
+          ...(seeContact ? {
+            buyer_name: o.guest_name || (buyerAcc ? buyerAcc.name : null),
+            buyer_phone: o.guest_phone || (buyerAcc ? buyerAcc.phone : null),
+            address: o.address
+          } : {}),
+          supplier: supplier ? { id: supplier.id, name: supplier.name, business_name: supplier.business_name } : null,
+          ...(s.role === 'admin' || s.role === 'marketer' ? { marketer: marketer ? { id: marketer.id, name: marketer.name, ref_code: o.ref_code } : null } : {}),
+          ...(s.role === 'admin' ? { wholesale_total: wholesaleTotal, margin_total: marginTotal, commission_total: commissionTotal, platform_net: marginTotal - commissionTotal } : {}),
+          ...(s.role === 'supplier' ? { wholesale_total: wholesaleTotal } : {}),
+          ...(s.role === 'marketer' ? { commission_total: commissionTotal } : {})
+        },
+        items, history: hist
+      });
+    }
     if (p === '/api/my/orders' && req.method === 'GET') {
       const s = requireAuth(req, res, ['buyer']); if (!s) return;
       const rows = db.prepare('SELECT * FROM orders WHERE buyer_id = ? ORDER BY id DESC').all(s.userId)
@@ -563,6 +670,15 @@ const server = http.createServer(async (req, res) => {
       const rows = (role ? db.prepare('SELECT * FROM users WHERE role = ? ORDER BY id DESC').all(role)
         : db.prepare('SELECT * FROM users ORDER BY id DESC').all()).map(publicUser);
       return send(res, 200, { users: rows });
+    }
+    const userVerifyM = p.match(/^\/api\/admin\/users\/(\d+)\/verify-email$/);
+    if (userVerifyM && req.method === 'POST') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const target = getUser(Number(userVerifyM[1]));
+      if (!target) return send(res, 404, { error: 'المستخدم غير موجود' });
+      db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(target.id);
+      audit(s.userId, 'user_email_verified_manual', 'user', target.id, null);
+      return send(res, 200, { ok: true });
     }
     const userActM = p.match(/^\/api\/admin\/users\/(\d+)\/action$/);
     if (userActM && req.method === 'POST') {

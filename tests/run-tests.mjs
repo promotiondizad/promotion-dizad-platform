@@ -13,7 +13,7 @@ function ok(cond, name) { if (cond) { passed++; console.log('  ✓ ' + name); } 
 
 const srv = spawn('node', ['src/server.js'], {
   cwd: path.join(import.meta.dirname, '..'),
-  env: { ...process.env, PORT: String(PORT), DB_PATH: dbPath, DATA_DIR: tmp, TELEGRAM_BOT_TOKEN: '', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_NUMBER_ID: '', FACEBOOK_PAGE_ACCESS_TOKEN: '', ADMIN_TELEGRAM_CHAT_ID: '' },
+  env: { ...process.env, PORT: String(PORT), DB_PATH: dbPath, DATA_DIR: tmp, TELEGRAM_BOT_TOKEN: '', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_NUMBER_ID: '', FACEBOOK_PAGE_ACCESS_TOKEN: '', ADMIN_TELEGRAM_CHAT_ID: '', AUTH_CODE_OUTBOX_FILE: path.join(tmp, 'outbox.jsonl') },
   stdio: 'pipe'
 });
 srv.stderr.on('data', (d) => process.stderr.write('[srv] ' + d));
@@ -37,6 +37,15 @@ class Client {
   get(p) { return this.req('GET', p); }
   post(p, b) { return this.req('POST', p, b || {}); }
   put(p, b) { return this.req('PUT', p, b || {}); }
+}
+const outboxPath = path.join(tmp, 'outbox.jsonl');
+function lastOutboxCode(type, target) {
+  let lines = [];
+  try { lines = fs.readFileSync(outboxPath, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return null; }
+  const es = lines.filter((e) => e.type === type && (target === undefined || e.target === target));
+  if (!es.length) return null;
+  const m = String(es[es.length - 1].text || '').match(/(\d{6})/);
+  return m ? m[1] : null;
 }
 
 try {
@@ -226,6 +235,85 @@ try {
   ok(r.status === 404, 'مسوق غير معني بالطلب لا يرى سجله الزمني');
   r = await new Client().get(`/api/orders/${myOrder.id}/timeline`);
   ok(r.status === 401, 'الزائر ممنوع من السجل الزمني');
+
+  console.log('— تأكيد البريد واستعادة كلمة المرور بالرمز —');
+  const mkMail = new Client();
+  r = await mkMail.post('/api/auth/register', { role: 'marketer', name: 'مسوق بالبريد', phone: '0600000021', email: 'mk1@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
+  ok(r.status === 201 && r.data.verificationRequired === true, 'تسجيل مسوق ببريد يتطلب التأكيد');
+  r = await mkMail.post('/api/auth/login', { phone: '0600000021', password: 'mkpass1234' });
+  ok(r.status === 403 && r.data.code === 'email_unverified', 'الدخول محظور قبل تأكيد البريد');
+  const vcode = lastOutboxCode('email_verification', 'mk1@test.dz');
+  ok(!!vcode, 'رمز التأكيد وصل إلى صندوق البريد الصادر');
+  const wrongCode = vcode === '000000' ? '000001' : '000000';
+  r = await mkMail.post('/api/auth/verify-email', { phone: '0600000021', code: wrongCode });
+  ok(r.status === 400, 'رمز تأكيد خاطئ مرفوض');
+  r = await mkMail.post('/api/auth/verify-email', { phone: '0600000021', code: vcode });
+  ok(r.status === 200, 'تأكيد البريد بالرمز الصحيح');
+  r = await mkMail.post('/api/auth/login', { phone: '0600000021', password: 'mkpass1234' });
+  ok(r.status === 200, 'الدخول يعمل بعد التأكيد');
+
+  const mk2 = new Client();
+  r = await mk2.post('/api/auth/register', { role: 'marketer', name: 'مسوق إعادة', phone: '0600000022', email: 'mk2@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
+  const firstCode = lastOutboxCode('email_verification', 'mk2@test.dz');
+  r = await mk2.post('/api/auth/resend-verification', { phone: '0600000022' });
+  ok(r.status === 429, 'إعادة الإرسال الفورية محظورة (تهدئة دقيقة ضد الإزعاج)');
+  const tdb = new DatabaseSync(dbPath);
+  tdb.prepare('UPDATE auth_codes SET created_at = created_at - 61000').run();
+  tdb.close();
+  r = await mk2.post('/api/auth/resend-verification', { phone: '0600000022' });
+  ok(r.status === 200, 'إعادة إرسال رمز التأكيد بعد التهدئة');
+  const secondCode = lastOutboxCode('email_verification', 'mk2@test.dz');
+  ok(!!secondCode && secondCode !== firstCode, 'رمز جديد مختلف بعد إعادة الإرسال');
+  r = await mk2.post('/api/auth/verify-email', { phone: '0600000022', code: firstCode });
+  ok(r.status === 400, 'الرمز القديم يبطل بعد إعادة الإرسال');
+  r = await mk2.post('/api/auth/verify-email', { phone: '0600000022', code: secondCode });
+  ok(r.status === 200, 'الرمز الجديد يؤكد الحساب');
+
+  r = await mkMail.post('/api/auth/forgot', { email: 'mk1@test.dz' });
+  ok(r.status === 200, 'طلب استعادة بالبريد');
+  const rcode = lastOutboxCode('password_reset', 'mk1@test.dz');
+  ok(!!rcode, 'رمز الاستعادة وصل بالبريد');
+  r = await mkMail.post('/api/auth/reset', { email: 'mk1@test.dz', code: rcode, password: 'mknewpass99', passwordConfirm: 'mknewpass99' });
+  ok(r.status === 200, 'تغيير كلمة المرور برمز البريد');
+  r = await mkMail.post('/api/auth/login', { phone: '0600000021', password: 'mkpass1234' });
+  ok(r.status === 401, 'كلمة المرور القديمة لم تعد تعمل');
+  r = await mkMail.post('/api/auth/login', { phone: '0600000021', password: 'mknewpass99' });
+  ok(r.status === 200, 'الدخول بكلمة المرور الجديدة');
+
+  r = await mk2.post('/api/auth/forgot', { phone: '0600000022' });
+  ok(r.status === 200, 'طلب استعادة برقم الهاتف');
+  const pcode = lastOutboxCode('password_reset', '0600000022');
+  ok(!!pcode, 'رمز الاستعادة وصل عبر قناة الهاتف');
+  r = await mk2.post('/api/auth/reset', { phone: '0600000022', code: pcode, password: 'mk2newpass9', passwordConfirm: 'mk2newpass9' });
+  ok(r.status === 200, 'تغيير كلمة المرور برمز الهاتف');
+  r = await mk2.post('/api/auth/login', { phone: '0600000022', password: 'mk2newpass9' });
+  ok(r.status === 200, 'الدخول بعد استعادة الهاتف');
+
+  const mk3 = new Client();
+  r = await mk3.post('/api/auth/register', { role: 'marketer', name: 'مسوق يدوي', phone: '0600000023', email: 'mk3@test.dz', password: 'mkpass1234', passwordConfirm: 'mkpass1234', terms: true });
+  r = await mk3.post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
+  ok(r.status === 403, 'حساب ثالث محظور قبل التأكيد');
+  const allUsers = await admin.get('/api/admin/users');
+  const mk3row = allUsers.data.users.find((u) => u.phone === '0600000023');
+  ok(mk3row && mk3row.email_verified === 0, 'المدير يرى البريد غير المؤكد');
+  r = await admin.post(`/api/admin/users/${mk3row.id}/verify-email`, {});
+  ok(r.status === 200, 'المدير يؤكد البريد يدوياً');
+  r = await mk3.post('/api/auth/login', { phone: '0600000023', password: 'mkpass1234' });
+  ok(r.status === 200, 'الدخول بعد التأكيد اليدوي');
+
+  console.log('— تفاصيل الطلبية الكاملة —');
+  r = await admin.get(`/api/orders/${myOrder.id}/details`);
+  ok(r.status === 200 && r.data.order.wholesale_total !== undefined && r.data.items[0].platform_margin !== undefined && r.data.order.buyer_name !== undefined, 'المدير يرى تفاصيل الطلبية كاملة بالأرقام الداخلية');
+  r = await buyer.get(`/api/orders/${myOrder.id}/details`);
+  ok(r.status === 200 && r.data.items[0].wholesale_price === undefined && r.data.order.buyer_phone === '0600000004', 'المشتري يرى تفاصيل طلبية دون أسعار الجملة');
+  r = await marketer.get(`/api/orders/${myOrder.id}/details`);
+  ok(r.status === 404, 'مسوق غير معني لا يرى تفاصيل الطلبية');
+  const admOrders = await admin.get('/api/admin/orders');
+  const guestOrder = admOrders.data.orders.find((o) => o.ref === orderRef);
+  r = await marketer.get(`/api/orders/${guestOrder.id}/details`);
+  ok(r.status === 200 && r.data.order.commission_total === 200 && r.data.order.buyer_phone === undefined, 'المسوق المعني يرى عمولته دون هاتف المشتري');
+  r = await anon.get(`/api/orders/${myOrder.id}/details`);
+  ok(r.status === 401, 'الزائر ممنوع من تفاصيل الطلبية');
 
   console.log(`\nالنتيجة: ${passed} ناجحة، ${failed} فاشلة`);
   process.exitCode = failed ? 1 : 0;

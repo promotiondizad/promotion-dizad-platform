@@ -16,7 +16,7 @@ async function api(path, opts = {}) {
   if (CSRF && (opts.method || 'GET') !== 'GET') headers['x-csrf'] = CSRF;
   const res = await fetch(path, { ...opts, headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || ('خطأ ' + res.status));
+  if (!res.ok) { const e = new Error(data.error || ('خطأ ' + res.status)); e.data = data; e.status = res.status; throw e; }
   return data;
 }
 function show(view) {
@@ -251,6 +251,47 @@ async function updateTotals() {
   $('#coTotals').innerHTML = html;
 }
 
+// ---------- تفاصيل الطلبية الكاملة ----------
+async function openOrderDetails(id) {
+  try {
+    const d = await api('/api/orders/' + id + '/details');
+    const o = d.order;
+    const moneyRows = [
+      ['مجموع المنتجات', fmt(o.subtotal)],
+      ['التوصيل', fmt(o.delivery_fee)],
+      ['الإجمالي عند الاستلام', fmt(o.total)],
+      ...(o.wholesale_total !== undefined ? [['مجموع الجملة (للمورد)', fmt(o.wholesale_total)]] : []),
+      ...(o.margin_total !== undefined ? [['هامش المنصة الكلي', fmt(o.margin_total)], ['عمولات المسوق الكلية', fmt(o.commission_total)], ['صافي المنصة', fmt(o.platform_net)]] : []),
+      ...(o.commission_total !== undefined && o.margin_total === undefined ? [['عمولتك من هذه الطلبية', fmt(o.commission_total)]] : [])
+    ];
+    $('#orderModalBox').innerHTML = `
+      <div class="drawer-head"><h3>📋 طلبية رقم ${esc(o.ref)}</h3><button class="icon-btn dark" id="closeOrderModal" type="button">✕</button></div>
+      <p><span class="badge">${esc(o.status_label)}</span> <span class="muted">أُنشئت: ${new Date(o.created_at).toLocaleString('ar-DZ')} · آخر تحديث: ${new Date(o.updated_at).toLocaleString('ar-DZ')}</span></p>
+      ${o.buyer_name ? `<div class="card"><h4>المشتري والتوصيل</h4>
+        <p>الاسم: <strong>${esc(o.buyer_name || '')}</strong><br>الهاتف: <strong>${esc(o.buyer_phone || '')}</strong><br>
+        الولاية: ${esc(o.wilaya_name)} (${o.wilaya}) · البلدية: ${esc(o.commune)}<br>العنوان: ${esc(o.address || '')}</p></div>` : ''}
+      <div class="card"><h4>المنتجات</h4><div class="tablewrap"><table>
+        <tr><th>المنتج</th><th>الكمية</th><th>سعر الزبون</th><th>المجموع</th>${d.items.some((i) => i.wholesale_price !== undefined) ? '<th>الجملة</th>' : ''}${d.items.some((i) => i.platform_margin !== undefined) ? '<th>الهامش</th><th>العمولة</th>' : ''}${d.items.some((i) => i.commission_total !== undefined) ? '<th>عمولتك</th>' : ''}</tr>
+        ${d.items.map((i) => `<tr><td>${esc(i.name)}${i.size ? ' · مقاس ' + esc(i.size) : ''}${i.color ? ' · ' + esc(i.color) : ''}</td><td>${i.qty}</td><td>${fmt(i.customer_price)}</td><td>${fmt(i.line_total)}</td>
+          ${i.wholesale_price !== undefined ? `<td>${fmt(i.wholesale_price)}</td>` : ''}${i.platform_margin !== undefined ? `<td>${fmt(i.platform_margin)}</td><td>${fmt(i.marketer_commission)}</td>` : ''}${i.commission_total !== undefined ? `<td>${fmt(i.commission_total)}</td>` : ''}</tr>`).join('')}
+      </table></div></div>
+      <div class="totals">${moneyRows.map(([k, v]) => `<div>${k}: <strong>${v}</strong></div>`).join('')}</div>
+      <div class="card"><h4>الأطراف</h4>
+        <p>المورد: <strong>${esc(o.supplier ? (o.supplier.business_name || o.supplier.name) : '')}</strong>
+        ${o.marketer !== undefined ? `<br>المسوق: ${o.marketer ? '<strong>' + esc(o.marketer.name) + '</strong> (رمز الإحالة: ' + esc(o.marketer.ref_code || '') + ')' : 'بيع مباشر بلا مسوق'}` : ''}</p></div>
+      ${o.reject_reason ? `<p class="muted">سبب الرفض/الإلغاء: ${esc(o.reject_reason)}</p>` : ''}
+      <div class="card"><h4>سجل حالات الطلبية</h4>
+        ${d.history.length ? d.history.map((h) => `<p class="small">${new Date(h.created_at).toLocaleString('ar-DZ')} — ${esc(h.label)}${h.note ? ' · ' + esc(h.note) : ''}</p>`).join('') : '<p class="muted">لا سجل بعد.</p>'}</div>`;
+    $('#orderModal').hidden = false;
+    $('#closeOrderModal').addEventListener('click', () => { $('#orderModal').hidden = true; });
+  } catch (e) { toast(e.message, true); }
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-details]');
+  if (b) { e.preventDefault(); openOrderDetails(b.dataset.details); }
+  if (e.target.id === 'orderModal') $('#orderModal').hidden = true;
+});
+
 // ---------- المصادقة ----------
 let regRole = 'buyer';
 const ROLE_HINTS = {
@@ -264,6 +305,9 @@ function selectRole(r) {
   $('#roleHint').textContent = ROLE_HINTS[r];
   $('#supplierFields').hidden = r !== 'supplier';
   $('#marketerFields').hidden = r !== 'marketer';
+  const em = $('#rgEmail');
+  em.required = r === 'marketer';
+  em.placeholder = r === 'marketer' ? 'البريد الإلكتروني (مطلوب للمسوق — يصلك عليه رمز التأكيد)' : 'البريد الإلكتروني (اختياري — إن أدخلته يلزم تأكيده برمز)';
 }
 async function refreshMe() {
   const data = await api('/api/me');
@@ -292,7 +336,7 @@ async function renderBuyer(box) {
   box.innerHTML = `<div class="card"><h3>طلباتي</h3>${orders.length ? `<div class="tablewrap"><table>
     <tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th><th>التاريخ</th><th></th></tr>
     ${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td>${new Date(o.created_at).toLocaleDateString('ar-DZ')}</td>
-    <td>${o.status === 'pending_supplier' ? `<button class="btn small danger" data-cancel="${o.id}">إلغاء</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد طلبات بعد.</p>'}</div>`;
+    <td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button> ${o.status === 'pending_supplier' ? `<button class="btn small danger" data-cancel="${o.id}">إلغاء</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا توجد طلبات بعد.</p>'}</div>`;
   $$('#dashContent [data-cancel]').forEach((b) => b.addEventListener('click', async () => {
     try { await api(`/api/my/orders/${b.dataset.cancel}/cancel`, { method: 'POST', body: {} }); toast('أُلغي الطلب'); renderDash(); }
     catch (e) { toast(e.message, true); }
@@ -317,7 +361,7 @@ async function renderMarketer(box) {
       <td><button class="btn small light" data-share="${p.id}">مشاركة</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">لا منتجات معتمدة بعد</td></tr>'}</table></div>
     <p class="muted small">قاعدة الإحالة: آخر رابط صالح نقره المشتري خلال 30 يوماً هو المعتمد.</p></div>
   <div class="card"><h3>روابطي ونقراتها</h3>${links.length ? links.map((l) => `<p><code>${location.origin}/r/${l.code}</code> — ${l.product_id ? 'منتج #' + l.product_id : 'رابط عام'} — نقرات: ${l.clicks}</p>`).join('') : '<p class="muted">لا روابط بعد.</p>'}</div>
-  <div class="card"><h3>طلباتي وحالاتها</h3>${orders.length ? `<div class="tablewrap"><table><tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th></tr>${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
+  <div class="card"><h3>طلباتي وحالاتها</h3>${orders.length ? `<div class="tablewrap"><table><tr><th>الرقم</th><th>الحالة</th><th>الإجمالي</th><th></th></tr>${orders.map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div>` : '<p class="muted">لا طلبات بعد.</p>'}</div>
   <div class="card"><h3>عمولاتي وتسوياتي</h3>
     ${commissions.length ? `<div class="tablewrap"><table><tr><th>الطلب</th><th>العمولة</th><th>الحالة</th></tr>${commissions.map((c) => `<tr><td>${esc(c.ref)}</td><td>${fmt(c.amount)}</td><td>${({ expected: 'متوقعة', confirmed: 'مثبتة', payable: 'مستحقة', paid: 'مدفوعة', cancelled: 'ملغاة' })[c.state]}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا عمولات بعد.</p>'}
     <button class="btn gold" id="reqSettle" ${sums.payable <= 0 ? 'disabled' : ''}>طلب تسوية المستحقات (${fmt(sums.payable)})</button>
@@ -384,6 +428,7 @@ async function renderSupplier(box) {
     <details><summary>${esc(o.ref)} — ${esc(o.status_label)} — ${fmt(o.total)} — ${esc(o.guest_name || '')} (${esc(o.guest_phone || '')}) — ${wilayaName(o.wilaya)} / ${esc(o.commune)}</summary>
       <p>${o.items.map((i) => `${esc(i.name)} × ${i.qty} — ${fmt(i.customer_price * i.qty)}`).join('<br>')}</p>
       <p class="muted">العنوان: ${esc(o.address)} · التوصيل: ${fmt(o.delivery_fee)}${o.reject_reason ? ' · سبب الرفض: ' + esc(o.reject_reason) : ''}</p>
+      <p><button class="btn small light" data-details="${o.id}">📋 التفاصيل الكاملة للطلبية</button></p>
       <div class="row-form">
         <select id="st-${o.id}">${STATUS_FLOW.map((s) => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${STATUS_AR[s]}</option>`).join('')}</select>
         <input id="rs-${o.id}" placeholder="سبب (إلزامي عند الرفض/الإلغاء)">
@@ -466,11 +511,12 @@ async function renderAdmin(box) {
     <button class="btn small danger" data-preject="${p.id}">رفض</button></p>`).join('') : '<p class="muted">لا منتجات بانتظار الاعتماد.</p>'}
     <details><summary>كل المنتجات (${products.products.length})</summary><div class="tablewrap"><table><tr><th>المنتج</th><th>الحالة</th><th>الجملة</th><th>الهامش</th><th>العمولة</th><th>سعر الزبون</th><th>صافي المنصة</th></tr>
     ${products.products.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.status)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>${fmt(p.marketer_commission)}</td><td>${fmt(p.customer_price)}</td><td>${fmt(p.platform_net)}</td></tr>`).join('')}</table></div></details></div>
-  <div class="card"><h3>المستخدمون</h3><div class="tablewrap"><table><tr><th>الاسم</th><th>الدور</th><th>الهاتف</th><th>الحالة</th><th></th></tr>
-    ${users.users.filter((u) => u.role !== 'admin').map((u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.role)}</td><td>${esc(u.phone)}</td><td>${esc(u.status)}</td>
-    <td>${u.status === 'suspended' ? `<button class="btn small" data-uact="activate" data-uid="${u.id}">إعادة تفعيل</button>` : `<button class="btn small light" data-uact="suspend" data-uid="${u.id}">تعليق</button>`}</td></tr>`).join('')}</table></div></div>
+  <div class="card"><h3>المستخدمون</h3><div class="tablewrap"><table><tr><th>الاسم</th><th>الدور</th><th>الهاتف</th><th>البريد وتأكيده</th><th>الحالة</th><th></th></tr>
+    ${users.users.filter((u) => u.role !== 'admin').map((u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.role)}</td><td>${esc(u.phone)}</td>
+    <td>${u.email ? esc(u.email) + (u.email_verified ? ' <span class="badge">مؤكد ✅</span>' : ' <span class="badge out">غير مؤكد</span>') : '<span class="muted">—</span>'}</td><td>${esc(u.status)}</td>
+    <td>${u.email && !u.email_verified ? `<button class="btn small gold" data-verify-user="${u.id}">تأكيد البريد يدوياً</button> ` : ''}${u.status === 'suspended' ? `<button class="btn small" data-uact="activate" data-uid="${u.id}">إعادة تفعيل</button>` : `<button class="btn small light" data-uact="suspend" data-uid="${u.id}">تعليق</button>`}</td></tr>`).join('')}</table></div></div>
   <div class="card"><h3>كل الطلبات ومصادرها</h3><div class="tablewrap"><table><tr><th>الرقم</th><th>الحالة</th><th>المورد</th><th>المسوق</th><th>الإجمالي</th></tr>
-    ${orders.orders.slice(0, 60).map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>#${o.supplier_id}</td><td>${o.marketer_id ? '#' + o.marketer_id + ' (' + esc(o.ref_code || '') + ')' : 'مباشر'}</td><td>${fmt(o.total)}</td></tr>`).join('')}</table></div></div>
+    ${orders.orders.slice(0, 60).map((o) => `<tr><td>${esc(o.ref)}</td><td>${esc(o.status_label)}</td><td>#${o.supplier_id}</td><td>${o.marketer_id ? '#' + o.marketer_id + ' (' + esc(o.ref_code || '') + ')' : 'مباشر'}</td><td>${fmt(o.total)}</td><td><button class="btn small light" data-details="${o.id}">📋 التفاصيل</button></td></tr>`).join('')}</table></div></div>
   <div class="card"><h3>تسويات المسوقين</h3>${settlements.settlements.length ? settlements.settlements.map((s) => `
     <p>#${s.id} — ${esc(s.marketer_name)} — ${fmt(s.amount)} — ${esc(s.state)} ${s.state === 'requested' || s.state === 'approved' ? `
     <input placeholder="طريقة الدفع" id="sm-${s.id}" style="width:110px"> <input placeholder="المرجع" id="sr-${s.id}" style="width:110px">
@@ -485,6 +531,10 @@ async function renderAdmin(box) {
     <p><button class="btn light" id="backupBtn" type="button">إنشاء نسخة احتياطية من قاعدة البيانات</button></p>
     <details><summary>سجل العمليات الإدارية (تدقيق)</summary>${auditL.logs.slice(0, 40).map((l) => `<p class="small">#${l.id} ${esc(l.action)} · ${esc(l.entity || '')} ${esc(l.entity_id || '')} · ${new Date(l.created_at).toLocaleString('ar-DZ')}</p>`).join('')}</details>
   </div>`;
+  $$('#dashContent [data-verify-user]').forEach((b) => b.addEventListener('click', async () => {
+    try { await api(`/api/admin/users/${b.dataset.verifyUser}/verify-email`, { method: 'POST', body: {} }); toast('تم تأكيد بريد المستخدم'); renderDash(); }
+    catch (e) { toast(e.message, true); }
+  }));
   $$('#dashContent [data-uact]').forEach((b) => b.addEventListener('click', async () => {
     let reason = null;
     if (b.dataset.uact === 'reject') { reason = prompt('سبب الرفض:'); if (reason === null) return; }
@@ -526,13 +576,15 @@ async function renderAdmin(box) {
 }
 
 // ---------- أحداث عامة ----------
-function openAuth(tab = 'login', role) {
+function openAuth(tab = 'login', role, phone) {
   show('auth');
   $$('[data-authtab]').forEach((t) => t.classList.toggle('active', t.dataset.authtab === tab));
   $('#pane-login').hidden = tab !== 'login';
   $('#pane-register').hidden = tab !== 'register';
   $('#pane-forgot').hidden = tab !== 'forgot';
+  $('#pane-verify').hidden = tab !== 'verify';
   if (role) selectRole(role);
+  if (phone && tab === 'verify') $('#vfPhone').value = phone;
 }
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('[data-nav]');
@@ -592,7 +644,10 @@ $('#loginForm').addEventListener('submit', async (e) => {
     CSRF = r.csrf; await refreshMe();
     if (ME && ME.status === 'pending') { toast('حسابك قيد مراجعة الإدارة — ستُفعَّل صلاحيات النشر واستقبال الطلبات بعد الاعتماد.'); show('home'); }
     else { toast('مرحباً ' + ME.name); renderDash(); }
-  } catch (err) { toast(err.message, true); }
+  } catch (err) {
+    if (err.data && err.data.code === 'email_unverified') { openAuth('verify', null, $('#liPhone').value); toast('أكّد حسابك أولاً برمز البريد', true); }
+    else toast(err.message, true);
+  }
 });
 $('#registerForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -606,17 +661,40 @@ $('#registerForm').addEventListener('submit', async (e) => {
       telegramChatId: (regRole === 'supplier' ? $('#rgTelegram').value : $('#rgTelegramM').value) || undefined,
       terms: $('#rgTerms').checked
     } });
+    toast(r.message);
+    if (r.verificationRequired) { const ph = $('#rgPhone').value; e.target.reset(); openAuth('verify', null, ph); }
+    else { e.target.reset(); openAuth('login'); }
+  } catch (err) { toast(err.message, true); }
+});
+$('#verifyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api('/api/auth/verify-email', { method: 'POST', body: { phone: $('#vfPhone').value, code: $('#vfCode').value.trim() } });
     toast(r.message); e.target.reset(); openAuth('login');
   } catch (err) { toast(err.message, true); }
 });
+$('#vfResend').addEventListener('click', async () => {
+  const phone = $('#vfPhone').value;
+  if (!phone) return toast('أدخل رقم هاتفك أولاً', true);
+  try { const r = await api('/api/auth/resend-verification', { method: 'POST', body: { phone } }); toast(r.message); }
+  catch (err) { toast(err.message, true); }
+});
+$('#fgChannel').addEventListener('change', () => {
+  $('#fgId').placeholder = $('#fgChannel').value === 'email' ? 'البريد الإلكتروني المسجل' : 'رقم هاتف الحساب';
+});
 $('#forgotForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  try { const r = await api('/api/auth/forgot', { method: 'POST', body: { phone: $('#fgPhone').value } }); toast(r.message); }
+  const ch = $('#fgChannel').value, id = $('#fgId').value;
+  try { const r = await api('/api/auth/forgot', { method: 'POST', body: ch === 'email' ? { email: id } : { phone: id } }); toast(r.message); $('#rsId').value = id; }
   catch (err) { toast(err.message, true); }
 });
 $('#resetForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  try { const r = await api('/api/auth/reset', { method: 'POST', body: { token: $('#rsToken').value.trim(), password: $('#rsPass').value, passwordConfirm: $('#rsPass2').value } }); toast(r.message); openAuth('login'); }
+  const id = $('#rsId').value.trim(), tok = $('#rsToken').value.trim();
+  const isCode = /^\d{6}$/.test(tok);
+  const idBody = id.includes('@') ? { email: id } : { phone: id };
+  const body = { ...idBody, password: $('#rsPass').value, passwordConfirm: $('#rsPass2').value, ...(isCode ? { code: tok } : { token: tok }) };
+  try { const r = await api('/api/auth/reset', { method: 'POST', body }); toast(r.message); openAuth('login'); }
   catch (err) { toast(err.message, true); }
 });
 $('#setupForm').addEventListener('submit', async (e) => {

@@ -2,6 +2,9 @@
 // التكاملات الرسمية فقط. لا يُرسل أي شيء فعلياً ما لم تُضبط المفاتيح في أسرار الخادم (env).
 // حالة كل تكامل تظهر في لوحة الإدارة بصدق: configured / not_configured + آخر نجاح وفشل.
 const { db } = require('./db');
+const fs = require('node:fs');
+const net = require('node:net');
+const tls = require('node:tls');
 
 const CFG = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
@@ -12,6 +15,86 @@ const CFG = {
   storeWhatsapp: process.env.STORE_WHATSAPP || '213791402649'
 };
 
+// البريد الإلكتروني عبر SMTP (Gmail بخطوة App Password، أو Brevo المجاني…) — بلا أي اعتماديات خارجية
+const SMTP = {
+  host: process.env.SMTP_HOST || '',
+  port: Number(process.env.SMTP_PORT || 465),
+  user: process.env.SMTP_USER || '',
+  pass: process.env.SMTP_PASS || '',
+  from: process.env.SMTP_FROM || process.env.SMTP_USER || ''
+};
+function emailConfigured() { return !!(SMTP.host && SMTP.user && SMTP.pass && SMTP.from); }
+
+function smtpSend(to, subject, text) {
+  return new Promise((resolve, reject) => {
+    const secure = SMTP.port === 465;
+    const socket = secure
+      ? tls.connect({ host: SMTP.host, port: SMTP.port, servername: SMTP.host })
+      : net.connect({ host: SMTP.host, port: SMTP.port });
+    socket.setTimeout(12000);
+    let buf = '', waiters = [];
+    const onData = (d) => {
+      buf += d.toString('utf8');
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        if (/^\d{3} /.test(line) && waiters.length) waiters.shift()(line);
+      }
+    };
+    socket.on('data', onData);
+    socket.on('timeout', () => { socket.destroy(); reject(new Error('SMTP timeout')); });
+    socket.on('error', reject);
+    const read = () => new Promise((r) => waiters.push(r));
+    const send = (s) => socket.write(s + '\r\n');
+    (async () => {
+      try {
+        let line = await read();
+        if (!line.startsWith('220')) throw new Error('SMTP greeting: ' + line);
+        send('EHLO promotion-dizad'); line = await read();
+        if (!secure) {
+          if (!/STARTTLS/i.test(line)) { /* قد تصل قدرات الخادم في أسطر متعددة — نتابع */ }
+          send('STARTTLS'); line = await read();
+          if (!line.startsWith('220')) throw new Error('STARTTLS: ' + line);
+          const up = tls.connect({ socket, servername: SMTP.host });
+          await new Promise((res2, rej2) => { up.once('secureConnect', res2); up.once('error', rej2); });
+          // إعادة ربط القارئ بالمقبس المشفّر
+          socket.removeAllListeners('data'); buf = ''; waiters = [];
+          up.on('data', onData);
+          const sendUp = (s) => up.write(s + '\r\n');
+          sendUp('EHLO promotion-dizad'); line = await read();
+          return await authAndSend(sendUp, read, up, resolve, reject, line);
+        }
+        await authAndSend(send, read, socket, resolve, reject, line);
+      } catch (e) { try { socket.destroy(); } catch {} reject(e); }
+    })();
+    async function authAndSend(sendFn, readFn, sock, res, rej, ehloLine) {
+      try {
+        let line = ehloLine;
+        sendFn('AUTH LOGIN'); line = await readFn();
+        if (!line.startsWith('334')) throw new Error('AUTH: ' + line);
+        sendFn(Buffer.from(SMTP.user).toString('base64')); line = await readFn();
+        if (!line.startsWith('334')) throw new Error('AUTH user: ' + line);
+        sendFn(Buffer.from(SMTP.pass).toString('base64')); line = await readFn();
+        if (!line.startsWith('235')) throw new Error('AUTH pass: ' + line);
+        sendFn(`MAIL FROM:<${SMTP.from}>`); line = await readFn();
+        if (!line.startsWith('250')) throw new Error('MAIL FROM: ' + line);
+        sendFn(`RCPT TO:<${to}>`); line = await readFn();
+        if (!line.startsWith('250')) throw new Error('RCPT TO: ' + line);
+        sendFn('DATA'); line = await readFn();
+        if (!line.startsWith('354')) throw new Error('DATA: ' + line);
+        const subj64 = Buffer.from(subject, 'utf8').toString('base64');
+        const body64 = Buffer.from(text, 'utf8').toString('base64').replace(/(.{76})/g, '$1\r\n');
+        sock.write(`From: Promotion Dizad <${SMTP.from}>\r\nTo: ${to}\r\nSubject: =?UTF-8?B?${subj64}?=\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${body64}\r\n.\r\n`);
+        line = await readFn();
+        if (!line.startsWith('250')) throw new Error('BODY: ' + line);
+        sendFn('QUIT');
+        sock.end();
+        res(true);
+      } catch (e) { try { sock.destroy(); } catch {} rej(e); }
+    }
+  });
+}
+
 function integrationStatus() {
   const last = (ch) => db.prepare(
     'SELECT status, created_at, sent_at, last_error FROM notifications WHERE channel = ? ORDER BY id DESC LIMIT 1'
@@ -20,6 +103,11 @@ function integrationStatus() {
     "SELECT COUNT(*) c FROM notifications WHERE channel = ? AND status IN ('failed','queued_not_configured')"
   ).get(ch).c;
   return {
+    email: {
+      configured: emailConfigured(),
+      note: emailConfigured() ? `مضبوط — SMTP (${SMTP.host}) لإرسال رموز التأكيد والاستعادة` : 'غير مضبوط: أضف SMTP_HOST وSMTP_USER وSMTP_PASS في أسرار الخادم (Gmail عبر App Password أو Brevo المجاني) — حتى يُضبط، تبقى رموز البريد في الطابور ويمكن للمدير التأكيد يدوياً',
+      last: last('email'), failedCount: failed('email')
+    },
     telegram: {
       configured: !!CFG.telegramBotToken,
       note: CFG.telegramBotToken ? 'بوت مضبوط — الإرسال عبر Telegram Bot API الرسمي' : 'غير مضبوط: أضف TELEGRAM_BOT_TOKEN في أسرار الخادم (من BotFather، مجاني)',
@@ -65,6 +153,10 @@ async function sendWhatsapp(to, text) {
 
 // إنشاء إشعار ومحاولة إرساله فوراً إن كان التكامل مضبوطاً، وإلا يبقى في الطابور بحالة صادقة.
 async function notify({ userId = null, channel, type, text, target = null }) {
+  // صندوق بريد تطويري اختياري (اختبارات/تشخيص فقط): يُضبط عبر AUTH_CODE_OUTBOX_FILE فتُسجَّل فيه كل الإشعارات
+  if (process.env.AUTH_CODE_OUTBOX_FILE) {
+    try { fs.appendFileSync(process.env.AUTH_CODE_OUTBOX_FILE, JSON.stringify({ channel, userId, type, target, text, at: Date.now() }) + '\n'); } catch {}
+  }
   const payload = JSON.stringify({ text, target });
   const info = db.prepare('INSERT INTO notifications(user_id,channel,type,payload,status,created_at) VALUES(?,?,?,?,?,?)')
     .run(userId, channel, type, payload, 'queued', Date.now());
@@ -88,6 +180,16 @@ async function attemptNotification(id) {
       if (!CFG.whatsappToken || !CFG.whatsappPhoneId) throw Object.assign(new Error('whatsapp_not_configured'), { notConfigured: true });
       if (!target) throw Object.assign(new Error('no_whatsapp_target'), { notConfigured: true });
       await sendWhatsapp(target, text);
+    } else if (n.channel === 'email') {
+      if (!target) throw Object.assign(new Error('no_email_target'), { notConfigured: true });
+      if (emailConfigured()) {
+        const subjects = { email_verification: 'رمز تأكيد حسابك — Promotion Dizad', password_reset: 'رمز استعادة كلمة المرور — Promotion Dizad' };
+        await smtpSend(target, subjects[n.type] || 'Promotion Dizad', text);
+      } else if (process.env.AUTH_CODE_OUTBOX_FILE) {
+        // وضع التطوير/الاختبار: سُجّل في الصندوق الصادر أعلاه فيُعدّ مُرسلاً إليه
+      } else {
+        throw Object.assign(new Error('smtp_not_configured'), { notConfigured: true });
+      }
     } else if (n.channel === 'log') {
       // قناة داخلية: تُسجَّل فقط (إشعارات الإدارة داخل اللوحة)
     } else {
@@ -104,4 +206,4 @@ async function attemptNotification(id) {
   }
 }
 
-module.exports = { CFG, integrationStatus, notify, attemptNotification };
+module.exports = { CFG, integrationStatus, notify, attemptNotification, emailConfigured };
