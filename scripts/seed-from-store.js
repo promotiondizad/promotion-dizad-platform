@@ -8,7 +8,10 @@ const sec = require('../src/security');
 
 const urlArg = process.argv.indexOf('--url');
 const STORE_URL = urlArg > -1 ? process.argv[urlArg + 1] : 'https://sandjerdev-ui.github.io/store-data.json';
-const SUPPLIER_PHONE = '0791402649';
+// رقم اصطناعي مقصود (ليس رقماً حقيقياً): رقم المتجر 0791402649 هو هاتف حساب المدير نفسه،
+// ولا يجوز إعادة استعماله لحساب آخر. حساب المورد هنا حاوية عرض للمنتجات المستوردة،
+// وعند الحاجة تُنقل منتجاته لحساب مورد حقيقي بطلب من المؤسس.
+const SUPPLIER_PHONE = '0000000000';
 const HOME_FEE = 500, OFFICE_FEE = 300, DURATION = '24-72 ساعة', DEFAULT_STOCK = 20;
 
 (async () => {
