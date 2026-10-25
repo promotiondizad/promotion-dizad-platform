@@ -251,7 +251,7 @@ function productCard(p) {
           ${priceHtml(p)}
           <button class="add-btn" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''} aria-label="أضف إلى السلة">🛒</button>
         </div>
-        ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="badge">متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
+        ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="stock-ok">● متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
         <button class="btn light small" data-view="${p.id}" type="button" style="width:100%;margin-top:8px">عرض التفاصيل</button>
       </div>
     </article>`;
@@ -423,10 +423,9 @@ async function renderCart() {
   box.innerHTML = (isMk ? '<p class="muted small">💼 أنت مسوق: حدّد <strong>سعر البيع للزبون</strong> لكل منتج — ربحك هو الفرق عن السعر الأساسي (5% على الأقل).</p>' : '') + CART.map((i, idx) => `
     <div class="cart-item">
       ${i.image ? `<img src="${esc(i.image)}" alt="">` : ''}
-      <div style="flex:1"><strong>${esc(i.name)}</strong><br><span class="muted small">${i.size ? 'مقاس ' + esc(i.size) + ' · ' : ''}${i.color ? esc(i.color) + ' · ' : ''}السعر الأساسي ${fmt(i.price)}</span>
-      ${isMk ? `<br><label class="small">سعر بيعك للزبون <input type="number" data-sell="${idx}" value="${sellOf(i)}" min="${Math.ceil(i.price * 1.05)}" style="width:110px"> <span class="badge">ربحك ${fmt((sellOf(i) - i.price) * i.qty)}</span></label>` : ''}</div>
-      <div class="qty"><button data-dec="${idx}" type="button">−</button><span>${i.qty}</span><button data-inc="${idx}" type="button">+</button></div>
-      <button class="icon-btn dark" data-del="${idx}" type="button">حذف</button>
+      <div class="ci-main"><strong class="ci-name" dir="auto">${esc(i.name)}</strong><span class="muted small">${i.size ? 'مقاس ' + esc(i.size) + ' · ' : ''}${i.color ? esc(i.color) + ' · ' : ''}السعر الأساسي ${fmt(i.price)}</span>
+      ${isMk ? `<br><label class="small">سعر بيعك للزبون <input type="number" data-sell="${idx}" value="${sellOf(i)}" min="${Math.ceil(i.price * 1.05)}" style="width:110px"> <span class="badge">ربحك ${fmt((sellOf(i) - i.price) * i.qty)}</span></label>` : ''}
+      <div class="ci-row"><div class="qty"><button data-dec="${idx}" type="button">−</button><span>${i.qty}</span><button data-inc="${idx}" type="button">+</button></div><strong>${fmt(sellOf(i) * i.qty)}</strong><button class="icon-btn dark" data-del="${idx}" type="button">🗑 حذف</button></div></div>
     </div>`).join('');
   $$('#cartItems [data-inc]').forEach((b) => b.addEventListener('click', () => { CART[+b.dataset.inc].qty++; saveCart(); renderCart(); }));
   $$('#cartItems [data-dec]').forEach((b) => b.addEventListener('click', () => { const it = CART[+b.dataset.dec]; it.qty = Math.max(1, it.qty - 1); saveCart(); renderCart(); }));
@@ -817,13 +816,20 @@ async function renderSupplier(box) {
   ]);
   const covMap = Object.fromEntries(coverage.map((c) => [c.wilaya_code, c]));
   box.innerHTML = `
-  <div class="stat-grid">
-    <div class="stat">طلبات جديدة<b>${orders.filter((o) => o.status === 'pending_supplier').length}</b></div>
-    <div class="stat">مبيعات مسلّمة ومحصّلة<b>${fmt(reports.delivered.sum)}</b></div>
-    <div class="stat">منتجاتي<b>${products.length}</b></div>
-    <div class="stat">تنبيه مخزون منخفض<b>${reports.lowStock.length}</b></div>
+  <div class="card account-hub">
+    <div class="hub-head"><span class="avatar-circle">${esc((ME.business_name || ME.name || 'م').trim().charAt(0))}</span><div><strong>${esc(ME.business_name || ME.name)}</strong><br><span class="muted small">🏭 متجر مورّد${ME.wilaya ? ' · ' + esc(ME.wilaya) : ''} · <span id="supFollowers">…</span> متابِع</span></div></div>
+    <div class="join-row"><button class="btn gold" id="supStoreBtn" type="button">🏪 عرض متجري العام</button><a class="btn light" href="#supOrdersSec">🧾 الطلبات الواردة</a><a class="btn light" href="#supCovSec">🚚 أسعار التوصيل</a></div>
+  </div>
+  <div class="grid" style="margin-bottom:14px">
+    <div class="card stat-card"><span class="stat-ic">💰</span><strong>${fmt(reports.delivered.sum)}</strong><span>مبيعاتي المسلّمة</span><small>${reports.delivered.c || 0} طلباً محصّلاً</small></div>
+    <div class="card stat-card"><span class="stat-ic">🆕</span><strong>${orders.filter((o) => o.status === 'pending_supplier').length}</strong><span>طلبات جديدة</span><small>بانتظار تأكيدك</small></div>
+    <div class="card stat-card"><span class="stat-ic">⚙️</span><strong>${orders.filter((o) => ['confirmed', 'preparing', 'handed', 'out_for_delivery'].includes(o.status)).length}</strong><span>قيد المعالجة</span><small>مؤكدة أو في التوصيل</small></div>
+    <div class="card stat-card"><span class="stat-ic">✅</span><strong>${orders.filter((o) => o.status === 'delivered_collected').length}</strong><span>تم التسليم</span><small>طلبات مكتملة</small></div>
+    <div class="card stat-card"><span class="stat-ic">📦</span><strong>${products.length}</strong><span>منتجاتي</span><small>${products.filter((p) => p.status === 'approved').length} معتمداً معروضاً</small></div>
+    <div class="card stat-card"><span class="stat-ic">⚠️</span><strong>${reports.lowStock.length}</strong><span>تنبيه مخزون</span><small>منتجات قاربت النفاد</small></div>
   </div>
   ${ME.status !== 'active' ? '<div class="card"><p>⏳ حسابك قيد مراجعة الإدارة — ستتمكن من النشر واستقبال الطلبات بعد التفعيل.</p></div>' : ''}
+  <div class="card"><h3>🕐 آخر النشاطات</h3>${orders.length ? orders.slice(0, 5).map((o) => `<div class="prod-row"><div class="pr-main"><strong>${esc(o.ref)}</strong> <span class="badge">${esc(o.status_label)}</span><br><span class="muted small">${esc(o.guest_name || '')} · ${wilayaName(o.wilaya)} · ${new Date(o.created_at).toLocaleDateString('ar-DZ')}</span></div><strong>${fmt(o.total)}</strong><button class="btn small light" data-details="${o.id}">التفاصيل</button></div>`).join('') : '<p class="muted">لا نشاط بعد — أول طلب يصلك يظهر هنا.</p>'}</div>
   <div class="card"><h3>إضافة منتج</h3>
     <form id="prodForm" class="stack">
       <input id="pfName" placeholder="اسم المنتج" required>
@@ -842,23 +848,29 @@ async function renderSupplier(box) {
       <button class="btn gold" type="submit">إرسال المنتج لمراجعة الإدارة</button>
       <p class="muted small">سعر الزبون = سعر الجملة + هامش المنصة الذي تحدده الإدارة عند الاعتماد. المنتج لا يظهر قبل الاعتماد.</p>
     </form></div>
-  <div class="card"><h3>منتجاتي</h3>${products.length ? `<div class="tablewrap"><table>
-    <tr><th>المنتج</th><th>الجملة</th><th>هامش المنصة</th><th>عمولة المسوق</th><th>سعر الزبون</th><th>المخزون</th><th>الحالة</th><th></th></tr>
-    ${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${fmt(p.wholesale_price)}</td><td>${fmt(p.platform_margin)}</td><td>حسب اختيار المسوق</td><td>${fmt(p.customer_price)}</td><td>${p.stock}</td>
-      <td>${({ pending_review: 'بانتظار المراجعة', approved: 'معتمد', rejected: 'مرفوض' + (p.reject_reason ? ': ' + esc(p.reject_reason) : ''), paused: 'موقوف' })[p.status]}</td>
-      <td>${p.status === 'approved' ? `<button class="btn small light" data-pause="${p.id}">إيقاف مؤقت</button>` : ''}${p.status === 'paused' ? `<button class="btn small" data-resume="${p.id}">إعادة تفعيل</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">لا منتجات بعد.</p>'}</div>
-  <div class="card"><h3>طلباتي الواردة</h3>${orders.length ? orders.map((o) => `
-    <details><summary>${esc(o.ref)} — ${esc(o.status_label)} — ${fmt(o.total)} — ${esc(o.guest_name || '')} (${esc(o.guest_phone || '')}) — ${wilayaName(o.wilaya)} / ${esc(o.commune)}</summary>
-      <p>${o.items.map((i) => `${esc(i.name)} × ${i.qty} — ${fmt(i.customer_price * i.qty)}`).join('<br>')}</p>
-      <p class="muted">العنوان: ${esc(o.address)} · التوصيل: ${fmt(o.delivery_fee)}${o.reject_reason ? ' · سبب الرفض: ' + esc(o.reject_reason) : ''}</p>
-      <p><button class="btn small light" data-details="${o.id}">📋 التفاصيل الكاملة للطلبية</button></p>
+  <div class="card" id="supProductsSec"><h3>منتجاتي</h3>${products.length ? products.map((p) => `
+    <div class="prod-row">
+      ${p.images && p.images.length ? `<img src="${esc(p.images[0])}" alt="">` : '<span class="cc-img cc-emoji" style="width:56px;height:56px;border-radius:12px">📦</span>'}
+      <div class="pr-main"><strong dir="auto">${esc(p.name)}</strong><br>
+      <span class="muted small">الجملة ${fmt(p.wholesale_price)} · هامش المنصة ${fmt(p.platform_margin)} · سعر الزبون <strong style="color:#0d9d63">${fmt(p.customer_price)}</strong> · المخزون ${p.stock}</span><br>
+      <span class="badge">${({ pending_review: 'بانتظار المراجعة', approved: 'معتمد', rejected: 'مرفوض', paused: 'موقوف' })[p.status] || p.status}</span>${p.status === 'rejected' && p.reject_reason ? ' <span class="small">' + esc(p.reject_reason) + '</span>' : ''} <span class="muted small">عمولة المسوق: حسب اختياره</span></div>
+      ${p.status === 'approved' ? `<button class="btn small light" data-pause="${p.id}">إيقاف مؤقت</button>` : ''}${p.status === 'paused' ? `<button class="btn small" data-resume="${p.id}">إعادة تفعيل</button>` : ''}
+    </div>`).join('') : '<p class="muted">لا منتجات بعد.</p>'}</div>
+  <div class="card" id="supOrdersSec"><h3>طلباتي الواردة</h3>
+    ${orders.length ? `<div class="chip-row" id="supOrderChips"><button class="chip on" data-ofilter="all" type="button">الكل</button><button class="chip" data-ofilter="new" type="button">جديدة</button><button class="chip" data-ofilter="progress" type="button">قيد المعالجة</button><button class="chip" data-ofilter="delivered" type="button">تم التسليم</button><button class="chip" data-ofilter="bad" type="button">ملغاة / مرتجعة</button></div>` + orders.map((o) => `
+    <div class="ord-card" data-ostatus="${o.status}">
+      <div class="ord-head"><strong>${esc(o.ref)}</strong><span class="badge">${esc(o.status_label)}</span><strong style="color:#0d9d63">${fmt(o.total)}</strong></div>
+      <p class="small" style="margin:7px 0">👤 ${esc(o.guest_name || '')} (${esc(o.guest_phone || '')}) · 📍 ${wilayaName(o.wilaya)} / ${esc(o.commune)} — ${esc(o.address)}</p>
+      <p class="small muted" style="margin:4px 0">${o.items.map((i) => `${esc(i.name)} × ${i.qty} — ${fmt(i.customer_price * i.qty)}`).join('<br>')}</p>
+      <p class="muted small">التوصيل: ${fmt(o.delivery_fee)}${o.reject_reason ? ' · سبب الرفض: ' + esc(o.reject_reason) : ''}</p>
+      <p><button class="btn small light" data-details="${o.id}">📋 التفاصيل الكاملة والخط الزمني</button></p>
       <div class="row-form">
         <select id="st-${o.id}">${STATUS_FLOW.map((s) => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${STATUS_AR[s]}</option>`).join('')}</select>
         <input id="rs-${o.id}" placeholder="سبب (إلزامي عند الرفض/الإلغاء)">
         <button class="btn small" data-status="${o.id}">تحديث الحالة</button>
       </div>
-    </details>`).join('') : '<p class="muted">لا طلبات بعد.</p>'}</div>
-  <div class="card"><h3>تغطية الولايات وتكلفة التوصيل</h3>
+    </div>`).join('') : '<p class="muted">لا طلبات بعد.</p>'}</div>
+  <div class="card" id="supCovSec"><h3>تغطية الولايات وتكلفة التوصيل</h3>
     <p class="muted small">فعّل الولايات التي تغطيها وحدد لكل واحدة: سعر التوصيل <strong>للمنزل</strong>، سعر التوصيل <strong>للمكتب</strong> (اختياري)، ومدة التوصيل (مثال: 24–48 ساعة). الطلبات إلى ولايات غير مغطاة تُرفض آلياً.</p>
     <form id="covForm"><div class="kv">${WILAYAS.map((w) => { const c = covMap[w.code]; return `<label class="check"><input type="checkbox" data-cov="${w.code}" ${c ? 'checked' : ''}> ${w.code} — ${esc(w.name_ar)} <input type="number" min="0" data-fee="${w.code}" value="${c ? c.delivery_fee : ''}" placeholder="منزل دج" style="width:95px"> <input type="number" min="0" data-feeoffice="${w.code}" value="${c && c.fee_office != null ? c.fee_office : ''}" placeholder="مكتب دج" style="width:95px"> <input data-dur="${w.code}" value="${c && c.duration ? esc(c.duration) : ''}" placeholder="المدة" style="width:110px"></label>`; }).join('')}</div>
     <button class="btn gold" type="submit" style="margin-top:10px">حفظ التغطية</button></form></div>`;
@@ -900,6 +912,18 @@ async function renderSupplier(box) {
     try { await api('/api/supplier/products/' + id, { method: 'PUT', body: { name: p.name, wholesalePrice: p.wholesale_price, stock: p.stock, description: p.description, categoryId: p.category_id, sizes: p.sizes, colors: p.colors, images: p.images, paused } }); renderDash(); }
     catch (e) { toast(e.message, true); }
   }
+  const ssb = $('#supStoreBtn');
+  if (ssb) ssb.addEventListener('click', () => openStore(ME.id));
+  api('/api/suppliers/' + ME.id + '/follow').then((f) => { const el = $('#supFollowers'); if (el) el.textContent = f.followers; }).catch(() => { const el = $('#supFollowers'); if (el) el.textContent = '0'; });
+  $$('#supOrderChips .chip').forEach((ch) => ch.addEventListener('click', () => {
+    $$('#supOrderChips .chip').forEach((x) => x.classList.toggle('on', x === ch));
+    const f = ch.dataset.ofilter;
+    $$('#supOrdersSec .ord-card').forEach((card) => {
+      const st = card.dataset.ostatus;
+      const show = f === 'all' || (f === 'new' && st === 'pending_supplier') || (f === 'progress' && ['confirmed', 'preparing', 'handed', 'out_for_delivery'].includes(st)) || (f === 'delivered' && st === 'delivered_collected') || (f === 'bad' && ['cancelled', 'rejected', 'returned', 'failed_delivery'].includes(st));
+      card.style.display = show ? '' : 'none';
+    });
+  }));
   $('#covForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const coverage = $$('#covForm [data-cov]:checked').map((cb) => ({ wilaya_code: Number(cb.dataset.cov), delivery_fee: Number($(`#covForm [data-fee="${cb.dataset.cov}"]`).value) || 0, fee_office: $(`#covForm [data-feeoffice="${cb.dataset.cov}"]`).value === '' ? null : Number($(`#covForm [data-feeoffice="${cb.dataset.cov}"]`).value), duration: $(`#covForm [data-dur="${cb.dataset.cov}"]`).value || null }));

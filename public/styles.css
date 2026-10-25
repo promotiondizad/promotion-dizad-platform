@@ -267,3 +267,51 @@ input,select,textarea{border-radius:12px}
 .feat-strip{gap:10px}
 .feat{border-radius:16px}
 .mnav{box-shadow:0 -4px 18px rgba(6,57,43,.10)}
+
+/* ===== إصلاحات الهاتف من الفحص البصري + بطاقات المورد ===== */
+.pcard-body h3{dir:auto;unicode-bidi:plaintext;text-align:start}
+.stock-ok{color:#0d9d63;font-size:12.5px;font-weight:800}
+.steps .step{font-size:12.5px}
+.cart-item{display:flex;gap:11px;padding:13px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.cart-item img{width:62px;height:62px;border-radius:12px;object-fit:cover;flex:none}
+.ci-main{flex:1;min-width:0}
+.ci-name{display:block;font-size:14.5px;line-height:1.45}
+.ci-row{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.prod-row{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.prod-row:last-child{border-bottom:none}
+.prod-row img{width:56px;height:56px;border-radius:12px;object-fit:cover;flex:none}
+.prod-row .pr-main{flex:1;min-width:0}
+.ord-card{border:1px solid var(--line);border-radius:16px;padding:13px;margin-bottom:11px;background:var(--surface)}
+.ord-head{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:900px){.main-nav{display:none}}
+@media(max-width:560px){
+  .brand-sub{display:none}
+  .logo-mark{width:38px;height:38px}
+  .topbar-in{gap:8px;padding:8px 12px}
+  .topbar-actions .icon-btn{padding:7px 10px;font-size:13.5px}
+}
+@media(max-width:720px){
+  .grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .rail .pcard{flex-basis:158px}
+  .pcard-media img{height:128px}
+  .pcard-body{padding:9px 10px 11px}
+  .pcard-body h3{font-size:13px;min-height:35px}
+  .add-btn{width:38px;height:38px;font-size:16px}
+  .feat-strip{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .feat{padding:11px;font-size:13px}
+  .feat>span{font-size:22px}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .filters input{grid-column:1/-1}
+  .filters .btn{grid-column:1/-1}
+}
+
+/* ===== ضبط الفيض الأفقي والخطوات ===== */
+html,body{overflow-x:clip}
+.badge{white-space:normal;text-align:center;line-height:1.35}
+.dash-nav{flex-wrap:wrap}
+.kv label{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.steps{display:flex;gap:6px}
+.steps .step{flex:1;min-width:0;padding:8px 4px;text-align:center}
+.prod-row{flex-wrap:wrap}
+.prod-row .pr-main{min-width:170px}
+.tablewrap{overflow-x:auto}
