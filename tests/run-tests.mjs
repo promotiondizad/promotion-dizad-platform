@@ -216,6 +216,14 @@ try {
   ok(typeof ig.data.integrations.whatsapp.note === 'string' && ig.data.integrations.whatsapp.note.length > 10, 'حالة واتساب موثقة مع تنبيه الرسوم');
   const notifs = await admin.get('/api/admin/notifications');
   ok(notifs.data.notifications.some((n) => n.status === 'queued_not_configured'), 'إشعارات الطلبات في الطابور بحالة غير مضبوط — لا ادعاء إرسال كاذب');
+  r = await admin.post('/api/admin/integrations/telegram', { token: 'not-a-token' });
+  ok(r.status === 400, 'توكن بوت بصيغة خاطئة مرفوض');
+  r = await admin.post('/api/admin/integrations/telegram', { token: '123456789:AAEhBOweik6ad9r_QXMENQJUYoJpOfoTest', chatId: '8575879347' });
+  ok(r.status === 200, 'المدير يحفظ توكن البوت ومعرّف المحادثة من واجهة الإدارة');
+  const ig2 = await admin.get('/api/admin/integrations');
+  ok(ig2.data.integrations.telegram.configured === true && ig2.data.integrations.telegram.chatId === '8575879347' && !JSON.stringify(ig2.data.integrations.telegram).includes('AAEhBO'), 'التيليغرام مضبوط من القاعدة والتوكن لا يُعرض أبداً');
+  r = await admin.post('/api/admin/integrations/telegram/test', {});
+  ok(r.status === 200 && typeof r.data.ok === 'boolean', 'اختبار البوت يرد بنتيجة صريحة');
   r = await admin.post('/api/admin/backup', {});
   ok(r.status === 201 && fs.existsSync(path.join(tmp, 'backups', r.data.file)), 'نسخة احتياطية من قاعدة البيانات تُنشأ فعلاً');
 

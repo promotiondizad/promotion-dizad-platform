@@ -83,9 +83,9 @@ function publicUser(u) {
 function getUser(id) { return db.prepare('SELECT * FROM users WHERE id = ?').get(id); }
 function customerPrice(p) { return p.wholesale_price + p.platform_margin; }
 
-const ADMIN_CHAT = process.env.ADMIN_TELEGRAM_CHAT_ID || '';
 async function notifyAdmin(text) {
-  if (ADMIN_CHAT) await integ.notify({ channel: 'telegram', type: 'admin_alert', text, target: ADMIN_CHAT });
+  const chat = integ.adminChatId();
+  if (chat) await integ.notify({ channel: 'telegram', type: 'admin_alert', text, target: chat });
 }
 function orderDigest(o, forSupplier) {
   const items = db.prepare('SELECT oi.qty, p.name FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?').all(o.id);
@@ -907,6 +907,28 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/admin/integrations' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
       return send(res, 200, { integrations: integ.integrationStatus(), statuses: ORDER_STATUSES });
+    }
+    if (p === '/api/admin/integrations/telegram' && req.method === 'POST') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const b = await readBody(req);
+      const setK = (k, val) => db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(k, val);
+      if (b.token !== undefined) {
+        const tok = String(b.token || '').trim();
+        if (tok && !/^\d{6,}:[A-Za-z0-9_-]{30,}$/.test(tok)) return send(res, 400, { error: 'صيغة التوكن غير صحيحة — الصقه كاملاً كما أعطاه BotFather' });
+        if (tok) setK('telegram_bot_token', tok); else db.prepare("DELETE FROM settings WHERE key = 'telegram_bot_token'").run();
+      }
+      if (b.chatId !== undefined) {
+        const cid = String(b.chatId || '').trim();
+        if (cid && !/^-?\d{5,}$/.test(cid)) return send(res, 400, { error: 'معرّف المحادثة يجب أن يكون رقماً' });
+        if (cid) setK('admin_telegram_chat_id', cid); else db.prepare("DELETE FROM settings WHERE key = 'admin_telegram_chat_id'").run();
+      }
+      audit(s.userId, 'telegram_config', 'settings', null, 'bot token/chat updated from admin');
+      return send(res, 200, { ok: true, integrations: integ.integrationStatus() });
+    }
+    if (p === '/api/admin/integrations/telegram/test' && req.method === 'POST') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      try { return send(res, 200, await integ.telegramTest()); }
+      catch (e) { return send(res, 200, { ok: false, error: 'تعذر الوصول إلى تيليغرام من الخادم حالياً — أعد المحاولة بعد قليل' }); }
     }
     if (p === '/api/admin/notifications' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;

@@ -234,9 +234,32 @@ async function renderSettlements(box) {
 
 async function renderIntegrations(box) {
   const [integ, notifs] = await Promise.all([api('/api/admin/integrations'), api('/api/admin/notifications')]);
-  box.innerHTML = `<div class="card"><h3>حالة التكاملات</h3>
+  box.innerHTML = `<div class="card"><h3>🤖 بوت إشعارات تيليغرام — @PromotionDizadPlatformBot</h3>
+    <p class="muted small">التوكن يُحفظ في قاعدة بيانات المنصة نفسها (لا في الكود ولا في أسرار الاستضافة) فيبقى فعّالاً حتى لو نام الخادم أو تبدّلت الاستضافة. التوكن عندك في محادثتك مع BotFather في تيليغرام.</p>
+    <form id="tgForm" class="stack">
+      <label class="small">توكن البوت — ${integ.integrations.telegram.tokenSet ? '<strong>محفوظ ✅</strong> (اترك الحقل فارغاً للإبقاء عليه، أو الصق توكناً جديداً للتبديل)' : '<strong>غير محفوظ بعد ⚠️</strong>'}</label>
+      <input id="tgToken" type="password" placeholder="123456789:AAE…" autocomplete="off">
+      <label class="small">معرّف محادثة المدير (Chat ID) — تصلك عليه تنبيهات الطلبات</label>
+      <input id="tgChat" value="${esc(integ.integrations.telegram.chatId || '')}" placeholder="مثال: 123456789" inputmode="numeric">
+      <p><button class="btn" type="submit">حفظ إعدادات البوت</button> <button class="btn light" id="tgTest" type="button">📨 إرسال رسالة تجريبية</button></p>
+      <p class="small" id="tgMsg"></p>
+    </form></div>
+  <div class="card"><h3>حالة التكاملات</h3>
     ${Object.entries(integ.integrations).map(([k, v]) => `<p><strong>${esc(k)}</strong>: ${v.configured ? '✅ مضبوط' : '⚠️ غير مضبوط'} — ${esc(v.note)}<br><span class="muted small">فاشلة/في الطابور: ${v.failedCount}${v.last ? ' · آخر محاولة: ' + esc(v.last.status) : ''}</span></p>`).join('')}
     <h4>الإشعارات الأخيرة</h4>${notifs.notifications.slice(0, 15).map((n) => `<p class="small">#${n.id} ${esc(n.channel)} · ${esc(n.type)} · ${esc(n.status)} · محاولات ${n.attempts}${n.last_error ? ' · ' + esc(n.last_error) : ''} <button class="btn small light" data-retry="${n.id}">إعادة المحاولة</button></p>`).join('')}</div>`;
+  $('#tgForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = { chatId: $('#tgChat').value.trim() };
+    const tok = $('#tgToken').value.trim(); if (tok) body.token = tok;
+    try { await api('/api/admin/integrations/telegram', { method: 'POST', body }); toast('حُفظت إعدادات البوت'); render(); }
+    catch (err) { toast(err.message, true); }
+  });
+  $('#tgTest').addEventListener('click', async () => {
+    const msg = $('#tgMsg'); msg.textContent = 'جارٍ الاختبار…';
+    try { const r = await api('/api/admin/integrations/telegram/test', { method: 'POST', body: {} });
+      msg.textContent = r.ok ? ('✅ البوت @' + (r.bot || '') + (r.sent ? ' — وصلتك رسالة تجريبية في تيليغرام' : ' — ' + (r.error || ''))) : ('⚠️ ' + (r.error || 'فشل الاختبار'));
+    } catch (err) { msg.textContent = '⚠️ ' + err.message; }
+  });
   $$('[data-retry]', box).forEach((b) => b.addEventListener('click', async () => {
     try { const r = await api(`/api/admin/notifications/${b.dataset.retry}/retry`, { method: 'POST', body: {} }); toast(r.ok ? 'أُعيدت المحاولة بنجاح' : 'ما زالت غير مُرسلة — راجع الإعداد', !r.ok); render(); }
     catch (e) { toast(e.message, true); }

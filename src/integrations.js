@@ -25,6 +25,11 @@ const SMTP = {
 };
 function emailConfigured() { return !!(SMTP.host && SMTP.user && SMTP.pass && SMTP.from); }
 
+// إعدادات تحفظها الإدارة في قاعدة البيانات (تنجو من نوم الخادم وتبديل الاستضافة) — تتقدّم على متغيرات البيئة
+function getSetting(k) { const r = db.prepare('SELECT value FROM settings WHERE key = ?').get(k); return r ? r.value : null; }
+function botToken() { return getSetting('telegram_bot_token') || CFG.telegramBotToken || ''; }
+function adminChatId() { return getSetting('admin_telegram_chat_id') || process.env.ADMIN_TELEGRAM_CHAT_ID || ''; }
+
 function smtpSend(to, subject, text) {
   return new Promise((resolve, reject) => {
     const secure = SMTP.port === 465;
@@ -109,8 +114,10 @@ function integrationStatus() {
       last: last('email'), failedCount: failed('email')
     },
     telegram: {
-      configured: !!CFG.telegramBotToken,
-      note: CFG.telegramBotToken ? 'بوت مضبوط — الإرسال عبر Telegram Bot API الرسمي' : 'غير مضبوط: أضف TELEGRAM_BOT_TOKEN في أسرار الخادم (من BotFather، مجاني)',
+      configured: !!botToken(),
+      tokenSet: !!botToken(),
+      chatId: adminChatId(),
+      note: botToken() ? 'بوت مضبوط — الإرسال عبر Telegram Bot API الرسمي' : 'غير مضبوط: احفظ توكن البوت من BotFather في بطاقة الإعداد أسفله',
       last: last('telegram'), failedCount: failed('telegram')
     },
     whatsapp: {
@@ -132,7 +139,7 @@ function integrationStatus() {
 }
 
 async function sendTelegram(chatId, text) {
-  const res = await fetch(`https://api.telegram.org/bot${CFG.telegramBotToken}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${botToken()}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: chatId, text }),
     signal: AbortSignal.timeout(5000)
@@ -172,7 +179,7 @@ async function attemptNotification(id) {
   const attempts = n.attempts + 1;
   try {
     if (n.channel === 'telegram') {
-      if (!CFG.telegramBotToken) throw Object.assign(new Error('telegram_not_configured'), { notConfigured: true });
+      if (!botToken()) throw Object.assign(new Error('telegram_not_configured'), { notConfigured: true });
       const chatId = target || (n.user_id ? (db.prepare('SELECT telegram_chat_id FROM users WHERE id = ?').get(n.user_id) || {}).telegram_chat_id : null);
       if (!chatId) throw Object.assign(new Error('no_telegram_chat_id_for_user'), { notConfigured: true });
       await sendTelegram(chatId, text);
@@ -206,4 +213,16 @@ async function attemptNotification(id) {
   }
 }
 
-module.exports = { CFG, integrationStatus, notify, attemptNotification, emailConfigured };
+async function telegramTest() {
+  const tok = botToken();
+  if (!tok) return { ok: false, error: 'لا يوجد توكن محفوظ بعد' };
+  const meRes = await fetch(`https://api.telegram.org/bot${tok}/getMe`, { signal: AbortSignal.timeout(6000) });
+  const me = await meRes.json().catch(() => ({}));
+  if (!me.ok) return { ok: false, error: 'التوكن مرفوض من تيليغرام — تأكد من نسخه كاملاً من BotFather' };
+  const chat = adminChatId();
+  if (!chat) return { ok: true, bot: me.result.username, sent: false, error: 'البوت صحيح، لكن معرّف محادثة المدير غير محفوظ بعد' };
+  await sendTelegram(chat, '✅ SOUQAR — بوت إشعارات المنصة مربوط ويعمل.');
+  return { ok: true, bot: me.result.username, sent: true };
+}
+
+module.exports = { CFG, integrationStatus, notify, attemptNotification, emailConfigured, botToken, adminChatId, telegramTest };
