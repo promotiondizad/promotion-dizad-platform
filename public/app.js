@@ -1112,8 +1112,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
       if (sp) {
         sp.hidden = false;
         const closeSplash = (login) => { localStorage.setItem('pd_seen', '1'); sp.hidden = true; if (login) openAuth('login'); };
-        $('#spStart').addEventListener('click', () => closeSplash(false));
-        $('#spLogin').addEventListener('click', () => closeSplash(true));
+        $('#spStart').addEventListener('click', () => closeSplash(!ME));
       }
     }
   } catch (e) { /* بيئة بلا تخزين محلي */ }

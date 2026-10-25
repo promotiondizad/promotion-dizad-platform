@@ -17,6 +17,8 @@ const { db, DATA_DIR, audit } = require('./db');
 const sec = require('./security');
 const integ = require('./integrations');
 const { iconPNG } = require('./icon');
+const splashBg = require('./splash-bg-data');
+const SPLASH_BUF = Buffer.from(splashBg.base64, 'base64');
 
 const PORT = Number(process.env.PORT || 4173);
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -1006,6 +1008,12 @@ const server = http.createServer(async (req, res) => {
       const buf = iconPNG(p.includes('512') ? 512 : 192);
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
       return res.end(buf);
+    }
+
+    // صورة شاشة البداية (من لوحة تصميم المستخدم) — تُفكّ من Base64 داخل الكود
+    if (p === '/splash-bg.jpg' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': splashBg.contentType, 'Cache-Control': 'public, max-age=604800' });
+      return res.end(SPLASH_BUF);
     }
 
     // ---------- ملفات ثابتة ----------

@@ -7,7 +7,7 @@
   --radius:16px;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.65}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Cairo","Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.65}
 h1,h2,h3,h4{line-height:1.35;margin:0 0 10px}
 a{color:var(--navysoft)}
 button{font-family:inherit;cursor:pointer}
@@ -198,14 +198,12 @@ summary{cursor:pointer;font-weight:700}
 .role-tabs .tab.active{border-color:var(--gold);background:var(--navy);color:#fff}
 .role-tabs .tab.active small{color:#bfe9d2}
 /* شاشة الترحيب الأولى */
-#splash{position:fixed;inset:0;z-index:200;background:linear-gradient(180deg,rgba(13,90,65,.88),rgba(4,42,31,.96)),url('https://upload.wikimedia.org/wikipedia/commons/0/0c/Maqam_Echahid.jpg') center/cover no-repeat;color:#fff;display:flex;align-items:center;justify-content:center;padding:22px}
-#splash .sp-box{text-align:center;max-width:420px;width:100%}
-#splash .sp-logo{font-size:64px;font-weight:900;letter-spacing:1px}
-#splash .sp-logo span{color:var(--gold2)}
-#splash .sp-tag{font-size:19px;margin:8px 0 4px}
-#splash .sp-sub{color:#bfe9d2;margin-bottom:26px}
-#splash .btn{width:100%;margin-top:10px;padding:14px;font-size:16.5px}
-#splash .sp-login{color:#fff;text-decoration:underline;background:none;border:none;font-size:15px;margin-top:14px;cursor:pointer}
+#splash{position:fixed;inset:0;z-index:200;background:#03231b;display:flex;align-items:center;justify-content:center}
+#splash[hidden]{display:none}
+.sp-frame{position:relative;width:min(100vw,49.47dvh);max-height:100dvh;aspect-ratio:601/1215}
+.sp-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.sp-frame #spStart{position:absolute;left:4%;bottom:3.2%;width:89%;height:7%;background:transparent;border:none;border-radius:14px;cursor:pointer}
+.sp-frame #spStart:active{background:rgba(255,255,255,.18)}
 /* نجوم التقييم */
 .stars{color:#f5a623;font-size:13.5px;letter-spacing:1px}
 .stars .off{color:var(--line)}
