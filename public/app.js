@@ -8,7 +8,7 @@ let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
 let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
 // تحديث تلقائي: مقارنة نسخة البناء مع الخادم دورياً — صفحة مفتوحة قديماً لا تبقى عالقة أبداً
-const CLIENT_VERSION = 'v2026.10.26-16';
+const CLIENT_VERSION = 'v2026.10.26-17';
 async function checkForUpdate() {
   try {
     const r = await fetch('/api/config', { cache: 'no-store' });
@@ -311,8 +311,8 @@ function productCard(p) {
       </div>
       <div class="pcard-body">
         <h3 data-view="${p.id}" title="عرض التفاصيل">${esc(p.name)}</h3>
-        ${p.rating_count ? starsHtml(p.rating_avg, p.rating_count) : `<span class="muted small">${esc(p.category_name || '')}</span>`}
-        ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="stock-ok">● متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
+        <span class="muted small pcard-cat">${esc(p.category_name || '')}</span>
+        ${p.rating_count ? starsHtml(p.rating_avg, p.rating_count) : ''}
         <div class="pcard-buyrow">${priceHtml(p)}</div>
         <button class="add-wide" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
         <button class="details-link" data-view="${p.id}" type="button">عرض التفاصيل ←</button>
