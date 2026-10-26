@@ -284,26 +284,25 @@ function productCard(p) {
   const disc = p.compare_price && p.compare_price > p.customer_price ? Math.round((1 - p.customer_price / p.compare_price) * 100) : 0;
   return `
     <article class="pcard">
-      <div class="pcard-media">
+      <div class="pcard-media" data-view="${p.id}" title="عرض التفاصيل">
         ${p.images && p.images.length ? `<img src="${esc(p.images[0])}" alt="${esc(p.name)}" loading="lazy">` : '<div class="noimg">📦</div>'}
         ${disc ? `<span class="disc-badge">-${disc}%</span>` : ''}
         <button class="fav-btn" data-fav="${p.id}" type="button" aria-label="المفضلة">${FAVS.has(p.id) ? '❤️' : '🤍'}</button>
         ${p.sold >= 3 ? `<span class="sold-badge">🔥 الأكثر مبيعاً</span>` : ''}
       </div>
       <div class="pcard-body">
-        <h3>${esc(p.name)}</h3>
+        <h3 data-view="${p.id}" title="عرض التفاصيل">${esc(p.name)}</h3>
         ${p.rating_count ? starsHtml(p.rating_avg, p.rating_count) : `<span class="muted small">${esc(p.category_name || '')}</span>`}
         <div class="pcard-foot">
           ${priceHtml(p)}
-          <button class="add-btn" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''} aria-label="أضف إلى السلة">🛒</button>
         </div>
         ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="stock-ok">● متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
-        <button class="btn gold small" data-view="${p.id}" type="button" style="width:100%;margin-top:8px">عرض التفاصيل ←</button>
+        <button class="btn add-cart-btn" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
       </div>
     </article>`;
 }
 function wireCards(root) {
-  $$('#' + root + ' [data-view]').forEach((b) => b.addEventListener('click', () => openProduct(Number(b.dataset.view))));
+  $$('#' + root + ' [data-view]').forEach((b) => b.addEventListener('click', (e) => { if (e.target.closest('[data-fav],[data-add]')) return; openProduct(Number(b.dataset.view)); }));
   $$('#' + root + ' [data-add]').forEach((b) => b.addEventListener('click', () => { addToCart(Number(b.dataset.add), 1); }));
   $$('#' + root + ' [data-fav]').forEach((b) => b.addEventListener('click', () => {
     const id = Number(b.dataset.fav);
@@ -362,10 +361,16 @@ async function openProduct(id) {
   const pageUrl = location.origin + '/?product=' + p.id;
   box.innerHTML = `
     <div class="drawer-head"><button class="icon-btn dark" id="ppBack" type="button">→ رجوع</button><h3 dir="auto" style="flex:1">${esc(p.name)}</h3></div>
-    ${p.images.length ? `<img class="main-img pp-main" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}" title="اضغط للتكبير">
+    ${p.images.length ? `<div class="pp-media"><img class="main-img pp-main" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}" title="اضغط للتكبير"><span class="img-count" id="pmCount">1 / ${p.images.length}</span></div>
     <p class="muted small" style="text-align:center">🔍 اضغط على الصورة لتكبيرها</p>
     <div class="gallery">${p.images.map((im, i) => `<img src="${esc(im)}" data-g="${i}" class="${i === 0 ? 'sel' : ''}" alt="">`).join('')}</div>` : '<div class="noimg" style="height:200px;display:flex;align-items:center;justify-content:center;font-size:60px;background:#eef2f5;border-radius:13px">📦</div>'}
-    <p>${priceHtml(p)} ${p.stock > 0 ? '<span class="badge">متوفر — مخزون ' + p.stock + '</span>' : '<span class="badge out">نفد المخزون</span>'}</p>
+    <p>${priceHtml(p)}</p>
+    <p>${p.stock > 0 ? '<span class="badge pp-stock">✔ متوفر في المخزون — بقي ' + p.stock + '</span>' : '<span class="badge out">نفد المخزون</span>'}</p>
+    <div class="pp-feats">
+      <div>↩️<b>إرجاع سهل</b><span>خلال 7 أيام</span></div>
+      <div>🛡️<b>دفع آمن</b><span>عند الاستلام</span></div>
+      <div>🚚<b>توصيل سريع</b><span>${esc((p.coverage[0] && p.coverage[0].duration) || '24-72 ساعة')}</span></div>
+    </div>
     <p class="muted small">🏪 المتجر: <a href="#" id="pmStore"><strong>${esc(p.business_name || p.supplier_name || 'متجر المورد')}</strong></a> — اضغط لعرض كل منتجات هذا المتجر</p>
     <div class="pp-desc card"><h4>📝 وصف المنتج</h4><p>${esc(descFor(p)).replace(/\n/g, '<br>')}</p></div>
     ${p.sizes.length ? `<div>المقاس<div class="swatches" id="pmSizes">${p.sizes.map((s, i) => `<button type="button" data-size="${esc(s)}" class="${i === 0 ? 'sel' : ''}">${esc(s)}</button>`).join('')}</div></div>` : ''}
@@ -398,6 +403,7 @@ async function openProduct(id) {
   if (mainImg) mainImg.addEventListener('click', () => openLightbox(mainImg.src));
   $$('#productPage [data-g]').forEach((im) => im.addEventListener('click', () => {
     $('#pmMain').src = im.src; $$('#productPage [data-g]').forEach((x) => x.classList.remove('sel')); im.classList.add('sel');
+    const cnt = $('#pmCount'); if (cnt) cnt.textContent = (Number(im.dataset.g) + 1) + ' / ' + p.images.length;
   }));
   let selSize = p.sizes[0] || null, selColor = p.colors[0] || null;
   $$('#pmSizes [data-size]').forEach((b) => b.addEventListener('click', () => { selSize = b.dataset.size; $$('#pmSizes [data-size]').forEach((x) => x.classList.toggle('sel', x === b)); }));

@@ -465,3 +465,31 @@ input::placeholder, textarea::placeholder { color: var(--ink2); opacity: .85; }
   #view-home .grid, #view-product .grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .pcard-body { padding: 10px; }
 }
+
+/* ===== مطابقة لوحة الهوية: بطاقات بيضاء + صفحة منتج فاتحة + هيرو اللوحة ===== */
+.promo-banner { background: linear-gradient(140deg, #0b5138 0%, #04231a 75%); border: 1px solid rgba(201,162,39,.4); }
+.promo-banner h1 .gold { color: var(--gold2); }
+.promo-feats { display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 14px; font-size: 13.5px; font-weight: 700; color: #ffe9a8; }
+html:not([data-theme="light"]) .pcard { background: #fdfcf8; border-color: #e7e2d2; color: #16222e; }
+html:not([data-theme="light"]) .pcard h3 { color: #16222e; }
+html:not([data-theme="light"]) .pcard .muted { color: #5c6b5e; }
+.pcard .price { color: #0e9f5a; }
+.pcard-media, .pcard h3 { cursor: pointer; }
+.add-cart-btn { background: linear-gradient(180deg, #1cb56b, #0d8a4c); color: #fff; border-color: #0d8a4c; width: 100%; margin-top: 8px; }
+.add-cart-btn:disabled { opacity: .5; }
+[data-theme="light"] .add-cart-btn { background: linear-gradient(180deg, #1cb56b, #0d8a4c); color: #fff; border-color: #0d8a4c; }
+html:not([data-theme="light"]) #view-product { color: #16222e; background: #f8f7f2; --surface: #ffffff; --surface2: #f0eee3; --ink: #16222e; --ink2: #5c6b5e; --line: #e3dfcd; }
+html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
+#view-product .price { color: #0e9f5a; font-size: 26px; }
+#view-product .badge { background: #e5f6ec; color: #0d8a4c; }
+#view-product .badge.out { background: #fdecea; color: #c0392b; }
+#view-product #pmAdd { background: linear-gradient(180deg, #1cb56b, #0d8a4c); border-color: #0d8a4c; color: #fff; }
+#view-product #pmBuyNow { background: #06392b; border-color: #06392b; color: #fff; }
+.pp-media { position: relative; }
+.img-count { position: absolute; bottom: 10px; inset-inline-start: 10px; background: rgba(3,26,18,.72); color: #fff; font-size: 12.5px; font-weight: 700; border-radius: 99px; padding: 2px 11px; }
+.pp-feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.pp-feats > div { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px; text-align: center; font-size: 19px; }
+.pp-feats b { display: block; font-size: 13.5px; margin-top: 2px; }
+.pp-feats span { font-size: 12px; color: var(--ink2); }
+.cat-circle { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 10px 4px 8px; width: 96px; }
+.cat-circle .cc-img { border-radius: 16px; width: 72px; height: 72px; }
