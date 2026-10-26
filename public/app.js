@@ -8,7 +8,7 @@ let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
 let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
 // تحديث تلقائي: مقارنة نسخة البناء مع الخادم دورياً — صفحة مفتوحة قديماً لا تبقى عالقة أبداً
-const CLIENT_VERSION = 'v2026.10.26-13';
+const CLIENT_VERSION = 'v2026.10.26-14';
 async function checkForUpdate() {
   try {
     const r = await fetch('/api/config', { cache: 'no-store' });
@@ -305,7 +305,7 @@ function productCard(p) {
     <article class="pcard">
       <div class="pcard-media" data-view="${p.id}" title="عرض التفاصيل">
         ${p.images && p.images.length ? `<img src="${esc(p.images[0])}" alt="${esc(p.name)}" loading="lazy">` : '<div class="noimg">📦</div>'}
-        ${disc ? `<span class="disc-badge">-${disc}%</span>` : ''}
+        ${disc ? `<span class="disc-badge">خصم ${disc}%</span>` : ''}
         <button class="fav-btn" data-fav="${p.id}" type="button" aria-label="المفضلة">${FAVS.has(p.id) ? '❤️' : '🤍'}</button>
         ${p.sold >= 3 ? `<span class="sold-badge">🔥 الأكثر مبيعاً</span>` : ''}
       </div>
