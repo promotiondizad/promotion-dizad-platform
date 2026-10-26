@@ -733,14 +733,17 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 .pgrid-sec { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
 .pgrid-sec .pcard, #productGrid .pcard { height: 100%; }
 #productGrid { align-items: stretch; }
-.pcard { border-radius: 18px; }
+.pcard { border-radius: 16px; }
 #view-home .pcard, #view-product .pcard { padding: 0; }
 #view-home .pcard-media, #view-product .pcard-media { background: #fff; border-radius: 0; }
-#view-home .pcard-media img, #view-product .pcard-media img { aspect-ratio: 1.5 / 1; height: auto; object-fit: cover; background: #fff; border-radius: 0; }
-#view-home .pcard-media .noimg, #view-product .pcard-media .noimg { aspect-ratio: 1.5 / 1; height: auto; border-radius: 0; }
+#view-home .pcard-media img, #view-product .pcard-media img { aspect-ratio: 2 / 1; height: auto; object-fit: cover; background: #fff; border-radius: 0; }
+#view-home .pcard-media .noimg, #view-product .pcard-media .noimg { aspect-ratio: 2 / 1; height: auto; border-radius: 0; }
 .pcard-body { padding: 10px 12px; gap: 6px; }
 .pcard-body > .pcard-buyrow { margin-top: auto; }
 #view-home .pcard .add-wide, #view-product .pcard .add-wide { border-radius: 14px; min-height: 44px; }
 .disc-badge { inset-inline-end: auto; inset-inline-start: 8px; }
 .fav-btn { inset-inline-start: auto; inset-inline-end: 8px; background: rgba(255, 255, 255, .94); border: none; }
 @media (max-width: 360px) { .pgrid-sec { gap: 8px; } #productGrid { gap: 8px; } .pcard-body { padding: 8px; } }
+
+/* ورقة مقاسات المؤسس (v16): عنوان البطاقة 17px */
+.pcard-body h3 { font-size: 16.5px; }

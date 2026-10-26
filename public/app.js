@@ -8,7 +8,7 @@ let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
 let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
 // تحديث تلقائي: مقارنة نسخة البناء مع الخادم دورياً — صفحة مفتوحة قديماً لا تبقى عالقة أبداً
-const CLIENT_VERSION = 'v2026.10.26-15';
+const CLIENT_VERSION = 'v2026.10.26-16';
 async function checkForUpdate() {
   try {
     const r = await fetch('/api/config', { cache: 'no-store' });
