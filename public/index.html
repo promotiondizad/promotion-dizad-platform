@@ -260,11 +260,15 @@
   </section>
 </main>
 
-<div class="drawer" id="cartDrawer" hidden>
-  <div class="drawer-box">
-    <div class="drawer-head"><h3>سلة الطلبات</h3><button class="icon-btn dark" id="closeCart" type="button">✕</button></div>
-    <div id="cartItems"></div>
-    <form id="checkoutForm" class="stack">
+<main id="view-product" hidden>
+  <div id="productPage" class="wrap"></div>
+</main>
+
+<main id="view-checkout" hidden>
+  <div class="wrap">
+    <div class="page-head"><button class="icon-btn dark" id="coBack" type="button">→ رجوع</button><h2>🧾 إتمام الطلب</h2></div>
+    <div id="coItems"></div>
+    <form id="checkoutForm" class="stack card">
       <div class="steps"><div class="step now">1 · العنوان</div><div class="step">2 · الدفع 💵</div><div class="step">3 · التأكيد</div></div>
       <h4>بيانات التوصيل</h4>
       <input id="coName" placeholder="اسم المشتري" required>
@@ -279,9 +283,17 @@
       <p class="muted small">بالضغط على تأكيد تُنشأ طلبية رسمية برقم مرجعي. لا توجد أي تكاليف مخفية: سعر المنتجات + التوصيل فقط.</p>
     </form>
   </div>
+</main>
+
+<div class="drawer" id="cartDrawer" hidden>
+  <div class="drawer-box">
+    <div class="drawer-head"><h3>سلة الطلبات</h3><button class="icon-btn dark" id="closeCart" type="button">✕</button></div>
+    <div id="cartItems"></div>
+    <button class="btn gold big" id="goCheckout" type="button" style="width:100%;margin-top:14px">إتمام الطلب ←</button>
+  </div>
 </div>
 
-<div class="modal" id="productModal" hidden><div class="modal-box" id="productModalBox"></div></div>
+<div id="lightbox" hidden><button class="icon-btn" id="lightboxClose" type="button">✕</button><img id="lightboxImg" alt="صورة المنتج مكبرة"></div>
 
 <div class="modal" id="orderModal" hidden><div class="modal-box" id="orderModalBox"></div></div>
 

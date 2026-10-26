@@ -67,7 +67,8 @@ function fillWilayaSelects() {
   }
 }
 function show(view) {
-  for (const v of ['home', 'page', 'auth', 'dash', 'track']) $('#view-' + v).hidden = v !== view;
+  for (const v of ['home', 'page', 'auth', 'dash', 'track', 'product', 'checkout']) $('#view-' + v).hidden = v !== view;
+  if (view === 'product' || view === 'checkout') window.scrollTo(0, 0);
   window.scrollTo({ top: 0 });
 }
 
@@ -343,17 +344,30 @@ async function loadProducts() {
     $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
   } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
+// وصف عربي جاهز لأي منتج وصفه الأصلي فارغ (بيانات المتجر بلا أوصاف) — عام وصادق بلا اختراع مواصفات
+function descFor(p) {
+  if (p.description && p.description.trim()) return p.description.trim();
+  const cat = p.category_name || 'منتجات مختارة';
+  return p.name + ' — من تشكيلة «' + cat + '» في متجرنا.\n\n'
+    + '✔️ منتج عملي مختار بعناية، بجودة مضمونة وأفضل قيمة مقابل السعر.\n'
+    + '✔️ سهل الاستعمال ومناسب للاستعمال اليومي.\n'
+    + '✔️ الدفع نقداً عند الاستلام — ما تخلّص حتى يوصلك المنتج وتشوفو بعينيك.\n'
+    + '✔️ التوصيل متوفر لـ58 ولاية، إلى المنزل أو إلى مكتب شركة التوصيل، والإجمالي يظهر لك كاملاً قبل تأكيد الطلب.\n\n'
+    + 'للطلب اضغط «اشترِ الآن» وعمّر معلوماتك، أو أضف المنتج إلى السلة وأكمل تسوّقك.';
+}
+function openLightbox(src) { if (!src) return; $('#lightboxImg').src = src; $('#lightbox').hidden = false; }
 async function openProduct(id) {
   const { product: p } = await api('/api/products/' + id);
-  const box = $('#productModalBox');
+  const box = $('#productPage');
   const pageUrl = location.origin + '/?product=' + p.id;
   box.innerHTML = `
-    <div class="drawer-head"><h3>${esc(p.name)}</h3><button class="icon-btn dark" id="pmClose" type="button">✕</button></div>
-    ${p.images.length ? `<img class="main-img" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}">
+    <div class="drawer-head"><button class="icon-btn dark" id="ppBack" type="button">→ رجوع</button><h3 dir="auto" style="flex:1">${esc(p.name)}</h3></div>
+    ${p.images.length ? `<img class="main-img pp-main" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}" title="اضغط للتكبير">
+    <p class="muted small" style="text-align:center">🔍 اضغط على الصورة لتكبيرها</p>
     <div class="gallery">${p.images.map((im, i) => `<img src="${esc(im)}" data-g="${i}" class="${i === 0 ? 'sel' : ''}" alt="">`).join('')}</div>` : '<div class="noimg" style="height:200px;display:flex;align-items:center;justify-content:center;font-size:60px;background:#eef2f5;border-radius:13px">📦</div>'}
-    <p>${esc(p.description || '')}</p>
     <p>${priceHtml(p)} ${p.stock > 0 ? '<span class="badge">متوفر — مخزون ' + p.stock + '</span>' : '<span class="badge out">نفد المخزون</span>'}</p>
     <p class="muted small">🏪 المتجر: <a href="#" id="pmStore"><strong>${esc(p.business_name || p.supplier_name || 'متجر المورد')}</strong></a> — اضغط لعرض كل منتجات هذا المتجر</p>
+    <div class="pp-desc card"><h4>📝 وصف المنتج</h4><p>${esc(descFor(p)).replace(/\n/g, '<br>')}</p></div>
     ${p.sizes.length ? `<div>المقاس<div class="swatches" id="pmSizes">${p.sizes.map((s, i) => `<button type="button" data-size="${esc(s)}" class="${i === 0 ? 'sel' : ''}">${esc(s)}</button>`).join('')}</div></div>` : ''}
     ${p.colors.length ? `<div>اللون<div class="swatches" id="pmColors">${p.colors.map((s, i) => `<button type="button" data-color="${esc(s)}" class="${i === 0 ? 'sel' : ''}">${esc(s)}</button>`).join('')}</div></div>` : ''}
     <label>الكمية <input type="number" id="pmQty" value="1" min="1" max="99"></label>
@@ -374,19 +388,21 @@ async function openProduct(id) {
       <a class="btn light small" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}">مشاركة فيسبوك</a>
       <a class="btn light small" target="_blank" rel="noopener" href="https://m.me/promotion.dizad">مراسلة الصفحة</a>
     </div>
-    <div class="buy-row">
+    <div class="buy-row buy-bar">
       <button class="btn gold big" id="pmAdd" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
       <button class="btn big" id="pmBuyNow" ${p.stock <= 0 ? 'disabled' : ''}>⚡ اشترِ الآن</button>
     </div>`;
-  $('#productModal').hidden = false;
-  $('#pmClose').addEventListener('click', () => { $('#productModal').hidden = true; });
-  $$('#productModalBox [data-g]').forEach((im) => im.addEventListener('click', () => {
-    $('#pmMain').src = im.src; $$('#productModalBox [data-g]').forEach((x) => x.classList.remove('sel')); im.classList.add('sel');
+  show('product');
+  $('#ppBack').addEventListener('click', () => show('home'));
+  const mainImg = $('#pmMain');
+  if (mainImg) mainImg.addEventListener('click', () => openLightbox(mainImg.src));
+  $$('#productPage [data-g]').forEach((im) => im.addEventListener('click', () => {
+    $('#pmMain').src = im.src; $$('#productPage [data-g]').forEach((x) => x.classList.remove('sel')); im.classList.add('sel');
   }));
   let selSize = p.sizes[0] || null, selColor = p.colors[0] || null;
   $$('#pmSizes [data-size]').forEach((b) => b.addEventListener('click', () => { selSize = b.dataset.size; $$('#pmSizes [data-size]').forEach((x) => x.classList.toggle('sel', x === b)); }));
   $$('#pmColors [data-color]').forEach((b) => b.addEventListener('click', () => { selColor = b.dataset.color; $$('#pmColors [data-color]').forEach((x) => x.classList.toggle('sel', x === b)); }));
-  $('#pmStore').addEventListener('click', (e) => { e.preventDefault(); $('#productModal').hidden = true; openStore(p.supplier_id); });
+  $('#pmStore').addEventListener('click', (e) => { e.preventDefault(); openStore(p.supplier_id); });
   const rvBox = $('#pmReviews');
   if (rvBox) {
     const revs = p.reviews || [];
@@ -407,19 +423,17 @@ async function openProduct(id) {
   }
   $('#pmAdd').addEventListener('click', () => {
     addToCart(p.id, Number($('#pmQty').value) || 1, selSize, selColor);
-    $('#productModal').hidden = true;
   });
   $('#pmBuyNow').addEventListener('click', async () => {
     addToCart(p.id, Number($('#pmQty').value) || 1, selSize, selColor);
-    $('#productModal').hidden = true;
-    $('#cartDrawer').hidden = false; await renderCart();
+    openCheckout();
   });
   $('#pmCopyDesc').addEventListener('click', async () => {
     const isMk = ME && ME.role === 'marketer';
     // للمسوق: بلا سعر — السعر الأساسي لا يُلصق في إعلانه فيلغي هامشه (تدقيق 2026-10-25)
     const txt = isMk
-      ? `${p.name}\n${p.description || ''}\n✅ الدفع عند الاستلام — للطلب والاستفسار راسلني`
-      : `${p.name}\n${p.description || ''}\n💰 السعر: ${fmt(p.customer_price)} — الدفع عند الاستلام\n${pageUrl}`;
+      ? `${p.name}\n${descFor(p)}\n✅ الدفع عند الاستلام — للطلب والاستفسار راسلني`
+      : `${p.name}\n${descFor(p)}\n💰 السعر: ${fmt(p.customer_price)} — الدفع عند الاستلام\n${pageUrl}`;
     const ok = await copyText(txt);
     if (ok) toast(isMk ? 'نُسخ الوصف بلا سعر — أضف سعرك أنت في إعلانك' : 'نُسخ وصف المنتج — الصقه في إعلانك');
     else toast('تعذّر النسخ التلقائي — حدّد النص يدوياً وانسخه', true);
@@ -497,6 +511,26 @@ async function updateTotals() {
     } catch { html += '<div class="muted">تعذر حساب التوصيل الآن — سيُحسب نهائياً في الخادم عند التأكيد.</div>'; }
   } else html += '<div class="muted">اختر الولاية لحساب التوصيل والإجمالي.</div>';
   $('#coTotals').innerHTML = html;
+}
+
+// ---------- صفحة إتمام الطلب (مستقلة، كيما متاجر AliExpress) ----------
+function renderCheckoutItems() {
+  const box = $('#coItems');
+  if (!CART.length) { box.innerHTML = '<p class="muted">السلة فارغة.</p>'; return; }
+  box.innerHTML = '<div class="card"><h4>🛍️ ملخص الطلب</h4>' + CART.map((i) => `
+    <div class="cart-item">
+      ${i.image ? `<img src="${esc(i.image)}" alt="">` : ''}
+      <div class="ci-main"><strong class="ci-name" dir="auto">${esc(i.name)}</strong>
+      <span class="muted small">${i.size ? 'مقاس ' + esc(i.size) + ' · ' : ''}${i.color ? esc(i.color) + ' · ' : ''}الكمية: ${i.qty} × ${fmt(sellOf(i))}</span></div>
+      <strong>${fmt(sellOf(i) * i.qty)}</strong>
+    </div>`).join('') + '</div>';
+}
+function openCheckout() {
+  if (!CART.length) return toast('السلة فارغة — أضف منتجاً أولاً', true);
+  $('#cartDrawer').hidden = true;
+  renderCheckoutItems();
+  show('checkout');
+  updateTotals();
 }
 
 // ---------- تفاصيل الطلبية الكاملة ----------
@@ -1097,6 +1131,9 @@ $('#moreSheet').addEventListener('click', (e) => { if (e.target.id === 'moreShee
 $$('#moreSheet a').forEach((a) => a.addEventListener('click', () => { $('#moreSheet').hidden = true; }));
 $('#moreTrack').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; openTrack(); });
 $('#closeCart').addEventListener('click', () => { $('#cartDrawer').hidden = true; });
+$('#goCheckout').addEventListener('click', () => openCheckout());
+$('#coBack').addEventListener('click', () => show('home'));
+$('#lightbox').addEventListener('click', () => { $('#lightbox').hidden = true; });
 async function fillCommunes(wilaya) {
   const dl = $('#communeList'); if (!dl) return;
   dl.innerHTML = '';
