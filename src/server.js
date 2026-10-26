@@ -18,7 +18,9 @@ const sec = require('./security');
 const integ = require('./integrations');
 const { iconPNG } = require('./icon');
 const splashBg = require('./splash-bg-data');
+const heroBg = require('./hero-bg-data');
 const SPLASH_BUF = Buffer.from(splashBg.base64, 'base64');
+const HERO_BUF = Buffer.from(heroBg.base64, 'base64');
 
 const PORT = Number(process.env.PORT || 4173);
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -1243,6 +1245,12 @@ const server = http.createServer(async (req, res) => {
     if (p === '/splash-bg.jpg' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': splashBg.contentType, 'Cache-Control': 'public, max-age=604800' });
       return res.end(SPLASH_BUF);
+    }
+
+    // صورة بانر الواجهة الرئيسية — تُفكّ من Base64 داخل الكود
+    if (p === '/hero-bg.jpg' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': heroBg.contentType, 'Cache-Control': 'public, max-age=604800' });
+      return res.end(HERO_BUF);
     }
 
     // ---------- ملفات ثابتة ----------
