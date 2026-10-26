@@ -338,9 +338,10 @@ async function loadProducts() {
     const iconFor = (name) => { for (const [k, ic] of CAT_ICONS) if (name.includes(k)) return ic; return '🛍️'; };
     const tiles = CATEGORIES.map((c) => ({ c, n: PRODUCTS.filter((p) => p.category_id === c.id).length })).filter((x) => x.n);
     $('#secCats').hidden = !tiles.length;
-    $('#catTiles').innerHTML = tiles.map(({ c, n }) => { const fp = PRODUCTS.find((x) => x.category_id === c.id && x.images && x.images.length); return `<button class="cat-circle" data-tile="${c.id}" type="button">${fp ? `<img class="cc-img" src="${esc(fp.images[0])}" alt="" loading="lazy">` : `<span class="cc-img cc-emoji">${iconFor(c.name)}</span>`}<b>${esc(c.name)}</b><span>${n} منتج</span></button>`; }).join('');
+    $('#catTiles').innerHTML = tiles.map(({ c }) => `<button class="cat-circle" data-tile="${c.id}" type="button"><span class="cc-emoji">${iconFor(c.name)}</span><b>${esc(c.name)}</b></button>`).join('') + `<button class="cat-circle" data-all="1" type="button"><span class="cc-emoji">⊞</span><b>المزيد</b></button>`;
     const pi = $('#promoImg'); const fpp = PRODUCTS.find((x) => x.images && x.images.length); if (pi && fpp) { pi.src = fpp.images[0]; pi.hidden = false; }
     $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
+    $$('#catTiles [data-all]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = ''; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
   } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
 // وصف عربي جاهز لأي منتج وصفه الأصلي فارغ (بيانات المتجر بلا أوصاف) — عام وصادق بلا اختراع مواصفات
@@ -360,10 +361,9 @@ async function openProduct(id) {
   const box = $('#productPage');
   const pageUrl = location.origin + '/?product=' + p.id;
   box.innerHTML = `
-    <div class="drawer-head"><button class="icon-btn dark" id="ppBack" type="button">→ رجوع</button><h3 dir="auto" style="flex:1">${esc(p.name)}</h3></div>
-    ${p.images.length ? `<div class="pp-media"><img class="main-img pp-main" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}" title="اضغط للتكبير"><span class="img-count" id="pmCount">1 / ${p.images.length}</span></div>
-    <p class="muted small" style="text-align:center">🔍 اضغط على الصورة لتكبيرها</p>
-    <div class="gallery">${p.images.map((im, i) => `<img src="${esc(im)}" data-g="${i}" class="${i === 0 ? 'sel' : ''}" alt="">`).join('')}</div>` : '<div class="noimg" style="height:200px;display:flex;align-items:center;justify-content:center;font-size:60px;background:#eef2f5;border-radius:13px">📦</div>'}
+    ${p.images.length ? `<div class="pp-media"><img class="main-img pp-main" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}" title="اضغط للتكبير"><span class="img-count" id="pmCount">1 / ${p.images.length}</span><div class="pm-topbar"><button class="pm-tb" id="ppBack" type="button" aria-label="رجوع">→</button><span class="pm-tb-group"><button class="pm-tb" id="pmShare" type="button" aria-label="مشاركة">↗</button><button class="pm-tb" id="pmCartGo" type="button" aria-label="السلة">🛒</button></span></div></div>
+    <div class="gallery">${p.images.map((im, i) => `<img src="${esc(im)}" data-g="${i}" class="${i === 0 ? 'sel' : ''}" alt="">`).join('')}</div>` : '<div class="drawer-head"><button class="icon-btn dark" id="ppBack" type="button">→ رجوع</button></div><div class="noimg" style="height:200px;display:flex;align-items:center;justify-content:center;font-size:60px;background:#eef2f5;border-radius:13px">📦</div>'}
+    <h3 class="pp-title" dir="auto">${esc(p.name)}</h3>
     <p>${priceHtml(p)}</p>
     <p>${p.stock > 0 ? '<span class="badge pp-stock">✔ متوفر في المخزون — بقي ' + p.stock + '</span>' : '<span class="badge out">نفد المخزون</span>'}</p>
     <div class="pp-feats">
@@ -375,7 +375,7 @@ async function openProduct(id) {
     <div class="pp-desc card"><h4>📝 وصف المنتج</h4><p>${esc(descFor(p)).replace(/\n/g, '<br>')}</p></div>
     ${p.sizes.length ? `<div>المقاس<div class="swatches" id="pmSizes">${p.sizes.map((s, i) => `<button type="button" data-size="${esc(s)}" class="${i === 0 ? 'sel' : ''}">${esc(s)}</button>`).join('')}</div></div>` : ''}
     ${p.colors.length ? `<div>اللون<div class="swatches" id="pmColors">${p.colors.map((s, i) => `<button type="button" data-color="${esc(s)}" class="${i === 0 ? 'sel' : ''}">${esc(s)}</button>`).join('')}</div></div>` : ''}
-    <label>الكمية <input type="number" id="pmQty" value="1" min="1" max="99"></label>
+    <div class="qty-row"><span>الكمية</span><span class="qty-stepper"><button type="button" id="pmQtyMinus" aria-label="إنقاص">−</button><input type="number" id="pmQty" value="1" min="1" max="99"><button type="button" id="pmQtyPlus" aria-label="زيادة">+</button></span></div>
     ${ME && ME.role === 'marketer' ? `<p class="badge" style="display:block;padding:10px">💼 للمسوق: هذا هو <strong>السعر الأساسي</strong> — عمولتك حسب اختيارك: حدّد سعر بيعك في السلة وربحك هو الفرق (5% على الأقل من السعر الأساسي).</p>` : ''}
     <details><summary>الولايات المتوفرة وتكلفة التوصيل لكل ولاية (منزل / مكتب)</summary>
       <div class="kv">${p.coverage.length ? p.coverage.map((c) => `<span>${wilayaName(c.wilaya_code)}: منزل ${fmt(c.delivery_fee)}${c.fee_office != null ? ' · مكتب ' + fmt(c.fee_office) : ''}${c.duration ? ' · ' + esc(c.duration) : ''}</span>`).join('') : '<span class="muted">لم يضبط المورد تغطية التوصيل بعد</span>'}</div>
@@ -394,11 +394,22 @@ async function openProduct(id) {
       <a class="btn light small" target="_blank" rel="noopener" href="https://m.me/promotion.dizad">مراسلة الصفحة</a>
     </div>
     <div class="buy-row buy-bar">
+      <button class="fav-circle" id="pmFavBar" type="button" aria-label="المفضلة">${FAVS.has(p.id) ? '❤️' : '🤍'}</button>
       <button class="btn gold big" id="pmAdd" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
       <button class="btn big" id="pmBuyNow" ${p.stock <= 0 ? 'disabled' : ''}>⚡ اشترِ الآن</button>
     </div>`;
   show('product');
   $('#ppBack').addEventListener('click', () => show('home'));
+  const shBtn = $('#pmShare');
+  if (shBtn) shBtn.addEventListener('click', async () => {
+    if (navigator.share) { try { await navigator.share({ title: p.name, text: p.name + ' — ' + fmt(p.customer_price), url: pageUrl }); } catch {} }
+    else { const ok = await copyText(pageUrl); toast(ok ? 'نُسخ رابط المنتج ✓' : 'تعذّر النسخ — انسخ الرابط يدوياً', !ok); }
+  });
+  const cgBtn = $('#pmCartGo');
+  if (cgBtn) cgBtn.addEventListener('click', async () => { $('#cartDrawer').hidden = false; await renderCart(); });
+  const qIn = $('#pmQty');
+  $('#pmQtyMinus').addEventListener('click', () => { qIn.value = Math.max(1, (Number(qIn.value) || 1) - 1); });
+  $('#pmQtyPlus').addEventListener('click', () => { qIn.value = Math.min(99, (Number(qIn.value) || 1) + 1); });
   const mainImg = $('#pmMain');
   if (mainImg) mainImg.addEventListener('click', () => openLightbox(mainImg.src));
   $$('#productPage [data-g]').forEach((im) => im.addEventListener('click', () => {
@@ -448,8 +459,10 @@ async function openProduct(id) {
   if (dlb) dlb.addEventListener('click', () => downloadImages(p));
   $('#pmFav').addEventListener('click', () => {
     if (FAVS.has(p.id)) FAVS.delete(p.id); else FAVS.add(p.id);
-    saveFavs(); $('#pmFav').textContent = FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'; loadProducts().catch(() => {});
+    saveFavs(); $('#pmFav').textContent = FAVS.has(p.id) ? '❤️ في المفضلة' : '🤍 أضف للمفضلة'; const fb = $('#pmFavBar'); if (fb) fb.textContent = FAVS.has(p.id) ? '❤️' : '🤍'; loadProducts().catch(() => {});
   });
+  const fbBtn = $('#pmFavBar');
+  if (fbBtn) fbBtn.addEventListener('click', () => $('#pmFav').click());
   const similar = PRODUCTS.filter((x) => x.id !== p.id && x.category_id && x.category_id === p.category_id).slice(0, 4);
   if (similar.length) {
     $('#pmSimilar').innerHTML = '<h4>منتجات مماثلة</h4><div class="grid">' + similar.map(productCard).join('') + '</div>';
@@ -1137,6 +1150,7 @@ $('#closeMore').addEventListener('click', () => { $('#moreSheet').hidden = true;
 $('#moreSheet').addEventListener('click', (e) => { if (e.target.id === 'moreSheet') $('#moreSheet').hidden = true; });
 $$('#moreSheet a').forEach((a) => a.addEventListener('click', () => { $('#moreSheet').hidden = true; }));
 $('#moreTrack').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; openTrack(); });
+$('#moreFav').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; if (!FAV_ONLY) $('#favToggle').click(); show('home'); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); });
 $('#closeCart').addEventListener('click', () => { $('#cartDrawer').hidden = true; });
 $('#goCheckout').addEventListener('click', () => openCheckout());
 $('#coBack').addEventListener('click', () => show('home'));

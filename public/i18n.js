@@ -106,7 +106,7 @@ const I18N_FR = {
   'وضع التعديل — عدّل ثم اضغط «حفظ التعديلات» (تغيير الاسم أو السعر يعيد المنتج لمراجعة الإدارة، والمخزون وحده لا يعيده)': 'Mode édition — modifiez puis touchez « Enregistrer » (changer le nom ou le prix renvoie le produit en validation ; le stock seul ne le fait pas)',
   '✏️ تعديل منتج:': '✏️ Modifier le produit :',
   // عملة
-  'دج': 'DA',
+  'دج': 'DA', 'الكمية': 'Quantité', 'نُسخ رابط المنتج ✓': 'Lien du produit copié ✓',
   // الولايات
   'أدرار': 'Adrar', 'الأغواط': 'Laghouat', 'أم البواقي': 'Oum El Bouaghi', 'باتنة': 'Batna', 'بجاية': 'Béjaïa', 'بسكرة': 'Biskra', 'بشار': 'Béchar', 'البليدة': 'Blida', 'البويرة': 'Bouira', 'تمنراست': 'Tamanrasset', 'تبسة': 'Tébessa', 'تلمسان': 'Tlemcen', 'تيارت': 'Tiaret', 'تيزي وزو': 'Tizi Ouzou', 'الجزائر': 'Alger', 'الجلفة': 'Djelfa', 'جيجل': 'Jijel', 'سطيف': 'Sétif', 'سعيدة': 'Saïda', 'سكيكدة': 'Skikda', 'سيدي بلعباس': 'Sidi Bel Abbès', 'عنابة': 'Annaba', 'قالمة': 'Guelma', 'قسنطينة': 'Constantine', 'المدية': 'Médéa', 'مستغانم': 'Mostaganem', 'المسيلة': 'M’Sila', 'معسكر': 'Mascara', 'ورقلة': 'Ouargla', 'وهران': 'Oran', 'البيض': 'El Bayadh', 'إليزي': 'Illizi', 'برج بوعريريج': 'Bordj Bou Arréridj', 'بومرداس': 'Boumerdès', 'الطارف': 'El Tarf', 'تندوف': 'Tindouf', 'تيسمسيلت': 'Tissemsilt', 'الوادي': 'El Oued', 'خنشلة': 'Khenchela', 'سوق أهراس': 'Souk Ahras', 'تيبازة': 'Tipaza', 'ميلة': 'Mila', 'عين الدفلى': 'Aïn Defla', 'النعامة': 'Naâma', 'عين تموشنت': 'Aïn Témouchent', 'غرداية': 'Ghardaïa', 'غليزان': 'Relizane', 'الشلف': 'Chlef', 'تيميمون': 'Timimoun', 'برج باجي مختار': 'Bordj Badji Mokhtar', 'أولاد جلال': 'Ouled Djellal', 'بني عباس': 'Béni Abbès', 'عين صالح': 'In Salah', 'عين قزام': 'In Guezzam', 'تقرت': 'Touggourt', 'جانت': 'Djanet', 'المغير': 'El M’Ghair', 'المنيعة': 'El Meniaa'
 };
