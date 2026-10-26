@@ -29,7 +29,7 @@ const I18N_FR = {
   '🛒 أضف إلى السلة': '🛒 Ajouter au panier', 'أضف إلى السلة': 'Ajouter au panier', 'أُضيف إلى السلة': 'Ajouté au panier', 'اشترِ الآن': 'Acheter maintenant', '⚡ اشترِ الآن': '⚡ Acheter',
   '→ رجوع': 'Retour →', 'اضغط للتكبير': 'Touchez pour zoomer', 'لا صور لهذا المنتج': 'Aucune photo pour ce produit',
   '✔ متوفر في المخزون': '✔ En stock', 'متوفر في المخزون': 'En stock', 'نفد المخزون': 'Rupture de stock', 'المخزون': 'Stock', 'منتج': 'produit',
-  'وصف المنتج': 'Description du produit', '📝 وصف المنتج': '📝 Description du produit', '⭐ تقييمات المشترين': '⭐ Avis des clients', '⭐ تقييمات منتجات هذا المتجر': '⭐ Avis sur les produits de cette boutique', 'الوصف الكامل': 'Description complète', 'منتجات مماثلة': 'Produits similaires', 'إرجاع سهل': 'Retour facile', 'خلال 7 أيام': 'Sous 7 jours',
+  'وصف المنتج': 'Description du produit', 'عرض التفاصيل ←': 'Voir les détails →', '📝 وصف المنتج': '📝 Description du produit', '⭐ تقييمات المشترين': '⭐ Avis des clients', '⭐ تقييمات منتجات هذا المتجر': '⭐ Avis sur les produits de cette boutique', 'الوصف الكامل': 'Description complète', 'منتجات مماثلة': 'Produits similaires', 'إرجاع سهل': 'Retour facile', 'خلال 7 أيام': 'Sous 7 jours',
   'دفع آمن': 'Paiement sécurisé', 'عند الاستلام': 'À la livraison', 'توصيل سريع': 'Livraison rapide',
   '🤍 أضف للمفضلة': '🤍 Ajouter aux favoris', '❤️ في المفضلة': '❤️ Dans vos favoris', 'أُضيف إلى المفضلة ❤️': 'Ajouté aux favoris ❤️', 'أُزيل من المفضلة': 'Retiré des favoris',
   'المتجر:': 'Boutique :', 'المورد:': 'Fournisseur :', 'المشتري:': 'Client :', 'قسم': 'Catégorie',

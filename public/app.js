@@ -68,6 +68,8 @@ function fillWilayaSelects() {
 }
 function show(view) {
   for (const v of ['home', 'page', 'auth', 'dash', 'track', 'product', 'checkout']) $('#view-' + v).hidden = v !== view;
+  const cd = $('#cartDrawer'); if (cd) cd.hidden = true;
+  const ms = $('#moreSheet'); if (ms) ms.hidden = true;
   if (view === 'product' || view === 'checkout') window.scrollTo(0, 0);
   window.scrollTo({ top: 0 });
 }
@@ -298,6 +300,7 @@ function productCard(p) {
         </div>
         ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="stock-ok">● متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
         <button class="btn add-cart-btn" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
+        <button class="btn details-btn" data-view="${p.id}" type="button">عرض التفاصيل ←</button>
       </div>
     </article>`;
 }
