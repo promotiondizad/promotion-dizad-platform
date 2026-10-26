@@ -736,9 +736,9 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 .pcard { border-radius: 18px; }
 #view-home .pcard, #view-product .pcard { padding: 0; }
 #view-home .pcard-media, #view-product .pcard-media { background: #fff; border-radius: 0; }
-#view-home .pcard-media img, #view-product .pcard-media img { aspect-ratio: 1 / 1; height: auto; object-fit: contain; background: #fff; border-radius: 0; }
-#view-home .pcard-media .noimg, #view-product .pcard-media .noimg { aspect-ratio: 1 / 1; height: auto; border-radius: 0; }
-.pcard-body { padding: 12px; gap: 8px; }
+#view-home .pcard-media img, #view-product .pcard-media img { aspect-ratio: 1.5 / 1; height: auto; object-fit: cover; background: #fff; border-radius: 0; }
+#view-home .pcard-media .noimg, #view-product .pcard-media .noimg { aspect-ratio: 1.5 / 1; height: auto; border-radius: 0; }
+.pcard-body { padding: 10px 12px; gap: 6px; }
 .pcard-body > .pcard-buyrow { margin-top: auto; }
 #view-home .pcard .add-wide, #view-product .pcard .add-wide { border-radius: 14px; min-height: 44px; }
 .disc-badge { inset-inline-end: auto; inset-inline-start: 8px; }

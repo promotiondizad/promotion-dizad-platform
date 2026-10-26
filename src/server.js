@@ -15,7 +15,7 @@ try {
 } catch {}
 const { db, DATA_DIR, audit } = require('./db');
 // نسخة البناء: الواجهة تقارنها دورياً وتعيد التحميل تلقائياً عند أي تحديث — حتى لا يبقى أي هاتف عالقاً على بناء قديم
-const BUILD_VERSION = 'v2026.10.26-14';
+const BUILD_VERSION = 'v2026.10.26-15';
 const sec = require('./security');
 const integ = require('./integrations');
 const { iconPNG } = require('./icon');
