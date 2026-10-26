@@ -7,6 +7,12 @@ let CSRF = null, ME = null, WILAYAS = [], CATEGORIES = [], PRODUCTS = [];
 let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
 let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
+let SUPPLIERS_OPEN = true; // يُحدَّث من /api/config — إغلاق الموردين من الإدارة يخفي أزرارهم فقط
+function applySuppliersGate() {
+  const jb = $('#joinSupplier'); if (jb) jb.hidden = !SUPPLIERS_OPEN;
+  const st = document.querySelector('.role-tabs .tab[data-role="supplier"]'); if (st) st.hidden = !SUPPLIERS_OPEN;
+  if (!SUPPLIERS_OPEN && regRole === 'supplier') selectRole('buyer');
+}
 
 function toast(msg, err = false) {
   const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false;
@@ -683,6 +689,7 @@ const ROLE_HINTS = {
   supplier: 'حساب مورد: تُراجع الإدارة حسابك أولاً، ثم تنشر منتجاتك وتستقبل الطلبات الموجهة إليك آلياً.'
 };
 function selectRole(r) {
+  if (r === 'supplier' && !SUPPLIERS_OPEN) { toast('تسجيل الموردين مغلق مؤقتاً', true); r = 'buyer'; }
   regRole = r;
   $$('.role-tabs .tab').forEach((t) => t.classList.toggle('active', t.dataset.role === r));
   $('#roleHint').textContent = ROLE_HINTS[r];
@@ -1354,6 +1361,7 @@ async function initLoads(params) {
   } catch { failed = true; }
   try { await refreshMe(); } catch { failed = true; }
   try { const st = await api('/api/setup/status'); if (st.needsSetup) { $('#setupCard').hidden = false; openAuth('login'); } } catch { failed = true; }
+  try { const cfg = await api('/api/config'); SUPPLIERS_OPEN = cfg.suppliersOpen !== false; applySuppliersGate(); } catch {}
   try { await loadProducts(); } catch {
     failed = true;
     $('#productGrid').innerHTML = '<div class="card" style="text-align:center"><p>⚠️ تعذّر تحميل المنتجات — الخادم لا يرد حالياً.</p><button class="btn" type="button" onclick="location.reload()">إعادة المحاولة</button></div>';

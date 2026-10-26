@@ -158,6 +158,11 @@ const server = http.createServer(async (req, res) => {
       const c = db.prepare("SELECT COUNT(*) c FROM users WHERE role='admin'").get().c;
       return send(res, 200, { needsSetup: c === 0 });
     }
+    // إعدادات عامة للواجهة — تسجيل الموردين يُغلق/يُفتح من الإدارة (مغلق الآن بأمر المؤسس حتى الحاجة)
+    const suppliersOpen = () => { const r = db.prepare("SELECT value FROM settings WHERE key = 'suppliers_open'").get(); return !r || r.value !== '0'; };
+    if (p === '/api/config' && req.method === 'GET') {
+      return send(res, 200, { suppliersOpen: suppliersOpen() });
+    }
     if (p === '/api/setup' && req.method === 'POST') {
       const c = db.prepare("SELECT COUNT(*) c FROM users WHERE role='admin'").get().c;
       if (c > 0) return send(res, 403, { error: 'تم إنشاء حساب المدير مسبقاً' });
@@ -176,6 +181,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const role = b.role;
       if (!['supplier', 'marketer', 'buyer'].includes(role)) return send(res, 400, { error: 'اختر نوع الحساب: مورد أو مسوق أو مشتري' });
+      if (role === 'supplier' && !suppliersOpen()) return send(res, 403, { error: 'تسجيل الموردين مغلق مؤقتاً — سيُفتح لاحقاً' });
       if (!b.name || !String(b.name).trim()) return send(res, 400, { error: 'الاسم مطلوب' });
       if (!sec.validPhone(b.phone || '')) return send(res, 400, { error: 'رقم هاتف غير صحيح' });
       if (!sec.strongPassword(b.password || '')) return send(res, 400, { error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' });
@@ -1141,7 +1147,15 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/admin/integrations' && req.method === 'GET') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;
-      return send(res, 200, { integrations: integ.integrationStatus(), statuses: ORDER_STATUSES });
+      return send(res, 200, { integrations: integ.integrationStatus(), statuses: ORDER_STATUSES, suppliersOpen: suppliersOpen() });
+    }
+    if (p === '/api/admin/integrations/suppliers' && req.method === 'POST') {
+      const s = requireAuth(req, res, ['admin']); if (!s) return;
+      const b = await readBody(req);
+      const open = b.open === true;
+      db.prepare("INSERT INTO settings(key,value) VALUES('suppliers_open',?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(open ? '1' : '0');
+      audit(s.userId, open ? 'suppliers_opened' : 'suppliers_closed', 'settings', null, 'from admin panel');
+      return send(res, 200, { ok: true, suppliersOpen: open });
     }
     if (p === '/api/admin/integrations/telegram' && req.method === 'POST') {
       const s = requireAuth(req, res, ['admin']); if (!s) return;

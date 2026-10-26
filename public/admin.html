@@ -275,7 +275,10 @@ async function renderSettlements(box) {
 
 async function renderIntegrations(box) {
   const [integ, notifs] = await Promise.all([api('/api/admin/integrations'), api('/api/admin/notifications')]);
-  box.innerHTML = `<div class="card"><h3>🤖 بوت إشعارات تيليغرام — @PromotionDizadPlatformBot</h3>
+  box.innerHTML = `<div class="card"><h3>🏭 تسجيل الموردين</h3>
+    <p class="muted small">الحالة الآن: <strong>${integ.suppliersOpen ? 'مفتوح ✅' : 'مغلق 🔒'}</strong> — عند الإغلاق يختفي زر «مورّد» من نموذج التسجيل وزر «سجّل كمورّد» من الرئيسية، ويُرفض أي تسجيل مورّد جديد. المورّدون الحاليون ومنتجاتهم وطلباتهم لا يتأثرون أبداً.</p>
+    <p><button class="btn" id="supToggle" type="button">${integ.suppliersOpen ? '🔒 إغلاق تسجيل الموردين' : '🔓 فتح تسجيل الموردين'}</button></p></div>
+  <div class="card"><h3>🤖 بوت إشعارات تيليغرام — @PromotionDizadPlatformBot</h3>
     <p class="muted small">التوكن يُحفظ في قاعدة بيانات المنصة نفسها (لا في الكود ولا في أسرار الاستضافة) فيبقى فعّالاً حتى لو نام الخادم أو تبدّلت الاستضافة. التوكن عندك في محادثتك مع BotFather في تيليغرام.</p>
     <form id="tgForm" class="stack">
       <label class="small">توكن البوت — ${integ.integrations.telegram.tokenSet ? '<strong>محفوظ ✅</strong> (اترك الحقل فارغاً للإبقاء عليه، أو الصق توكناً جديداً للتبديل)' : '<strong>غير محفوظ بعد ⚠️</strong>'}</label>
@@ -288,6 +291,10 @@ async function renderIntegrations(box) {
   <div class="card"><h3>حالة التكاملات</h3>
     ${Object.entries(integ.integrations).map(([k, v]) => `<p><strong>${esc(k)}</strong>: ${v.configured ? '✅ مضبوط' : '⚠️ غير مضبوط'} — ${esc(v.note)}<br><span class="muted small">فاشلة/في الطابور: ${v.failedCount}${v.last ? ' · آخر محاولة: ' + esc(v.last.status) : ''}</span></p>`).join('')}
     <h4>الإشعارات الأخيرة</h4>${notifs.notifications.slice(0, 15).map((n) => `<p class="small">#${n.id} ${esc(n.channel)} · ${esc(n.type)} · ${esc(n.status)} · محاولات ${n.attempts}${n.last_error ? ' · ' + esc(n.last_error) : ''} <button class="btn small light" data-retry="${n.id}">إعادة المحاولة</button></p>`).join('')}</div>`;
+  $('#supToggle').addEventListener('click', async () => {
+    try { const r = await api('/api/admin/integrations/suppliers', { method: 'POST', body: { open: !integ.suppliersOpen } }); toast(r.suppliersOpen ? 'فُتح تسجيل الموردين ✅' : 'أُغلق تسجيل الموردين 🔒'); render(); }
+    catch (err) { toast(err.message, true); }
+  });
   $('#tgForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const body = { chatId: $('#tgChat').value.trim() };
