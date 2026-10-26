@@ -51,6 +51,21 @@ async function api(path, opts = {}) {
   if (!res.ok) { const e = new Error(data.error || ('خطأ ' + res.status)); e.data = data; e.status = res.status; throw e; }
   return data;
 }
+// ---------- صلابة الاتصال: فشل نداء واحد لا يقتل التطبيق كله، والفشل يظهر للمستخدم بدل فراغ صامت ----------
+const WILAYAS_FALLBACK = [[1, 'أدرار'], [2, 'الشلف'], [3, 'الأغواط'], [4, 'أم البواقي'], [5, 'باتنة'], [6, 'بجاية'], [7, 'بسكرة'], [8, 'بشار'], [9, 'البليدة'], [10, 'البويرة'], [11, 'تمنراست'], [12, 'تبسة'], [13, 'تلمسان'], [14, 'تيارت'], [15, 'تيزي وزو'], [16, 'الجزائر'], [17, 'الجلفة'], [18, 'جيجل'], [19, 'سطيف'], [20, 'سعيدة'], [21, 'سكيكدة'], [22, 'سيدي بلعباس'], [23, 'عنابة'], [24, 'قالمة'], [25, 'قسنطينة'], [26, 'المدية'], [27, 'مستغانم'], [28, 'المسيلة'], [29, 'معسكر'], [30, 'ورقلة'], [31, 'وهران'], [32, 'البيض'], [33, 'إليزي'], [34, 'برج بوعريريج'], [35, 'بومرداس'], [36, 'الطارف'], [37, 'تندوف'], [38, 'تيسمسيلت'], [39, 'الوادي'], [40, 'خنشلة'], [41, 'سوق أهراس'], [42, 'تيبازة'], [43, 'ميلة'], [44, 'عين الدفلى'], [45, 'النعامة'], [46, 'عين تموشنت'], [47, 'غرداية'], [48, 'غليزان'], [49, 'تيميمون'], [50, 'برج باجي مختار'], [51, 'أولاد جلال'], [52, 'بني عباس'], [53, 'عين صالح'], [54, 'عين قزام'], [55, 'تقرت'], [56, 'جانت'], [57, 'المغير'], [58, 'المنيعة']].map(([code, name_ar]) => ({ code, name_ar }));
+function setConnError(on) { const b = $('#connBar'); if (b) b.hidden = !on; }
+async function tryApi(path, tries = 2) {
+  let last;
+  for (let i = 0; i < tries; i++) { try { return await api(path); } catch (e) { last = e; if (i + 1 < tries) await new Promise((r) => setTimeout(r, 1200)); } }
+  throw last;
+}
+function fillWilayaSelects() {
+  for (const sel of ['#coWilaya', '#rgWilaya']) {
+    const el = $(sel); if (!el) continue;
+    const first = el.querySelector('option'); el.innerHTML = ''; if (first) el.appendChild(first);
+    for (const w of WILAYAS) { const o = document.createElement('option'); o.value = w.code; o.textContent = w.code + ' — ' + w.name_ar; el.appendChild(o); }
+  }
+}
 function show(view) {
   for (const v of ['home', 'page', 'auth', 'dash', 'track']) $('#view-' + v).hidden = v !== view;
   window.scrollTo({ top: 0 });
@@ -805,8 +820,8 @@ async function renderMarketer(box) {
       <button class="btn gold" type="submit" ${wallet.balance > 0 ? '' : 'disabled'}>إرسال طلب السحب</button>
       <p class="muted small">الدفع الفعلي يتم خارج المنصة بوسيلتك (بريدي موب / CCP / Flexy…) — تُعالج الإدارة طلبك وتوثّق الدفع هنا بالطريقة ومرجع العملية. العمولة لا تتجزأ: قد يُعدَّل المبلغ ليطابق عمولاتك كاملة ويظهر لك رقمه النهائي.</p>
     </form>
-    ${payoutReqs.length ? `<h4>📨 طلبات سحبي</h4>${payoutReqs.slice(0, 5).map((r) => `<p class="small">#${r.id} — ${fmt(r.amount)} — ${r.state === 'pending' ? 'قيد المعالجة ⏳' : r.state === 'paid' ? `مدفوع ✅ عبر ${esc(r.admin_method || r.method)}${r.admin_reference ? ' · مرجع: ' + esc(r.admin_reference) : ''}` : 'مرفوض ❌' + (r.admin_note ? ' — ' + esc(r.admin_note) : '')} <span class="muted">${new Date(r.created_at).toLocaleDateString('ar-DZ')}</span></p>`).join('')}` : ''}
-    ${(() => { const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i)); const sum = commissions.filter((c) => c.state !== 'cancelled' && new Date(c.created_at) >= d && new Date(c.created_at) < new Date(d.getTime() + 86400e3)).reduce((a, c) => a + c.amount, 0); return { d, sum }; }); const max = Math.max(1, ...days.map((x) => x.sum)); return `<h4>📈 أداء المبيعات — آخر 7 أيام</h4><div style="display:flex;gap:6px;align-items:flex-end;height:90px">${days.map((x) => `<div style="flex:1;text-align:center"><div title="${fmt(x.sum)}" style="background:var(--gold);border-radius:6px 6px 0 0;height:${Math.max(4, Math.round(x.sum / max * 56))}px"></div><span class="muted small">${x.d.toLocaleDateString('ar-DZ', { weekday: 'short' })}</span><br><span class="small">${x.sum ? fmt(x.sum) : '—'}</span></div>`).join('')}</div>`; })()}
+    ${payoutReqs.length ? `<h4>📨 طلبات سحبي</h4>${payoutReqs.slice(0, 5).map((r) => `<div class="po-row"><div class="po-top"><b>#${r.id} — ${fmt(r.amount)}</b><span class="muted small">${new Date(r.created_at).toLocaleDateString('ar-DZ')}</span></div><div class="small">${r.state === 'pending' ? 'قيد المعالجة ⏳' : r.state === 'paid' ? `مدفوع ✅ عبر ${esc(r.admin_method || r.method)}${r.admin_reference ? ' · مرجع: ' + esc(r.admin_reference) : ''}` : 'مرفوض ❌' + (r.admin_note ? ' — ' + esc(r.admin_note) : '')}</div></div>`).join('')}` : ''}
+    ${(() => { const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i)); const sum = commissions.filter((c) => c.state !== 'cancelled' && new Date(c.created_at) >= d && new Date(c.created_at) < new Date(d.getTime() + 86400e3)).reduce((a, c) => a + c.amount, 0); return { d, sum }; }); const max = Math.max(1, ...days.map((x) => x.sum)); return `<h4>📈 أداء المبيعات — آخر 7 أيام</h4><div style="display:flex;gap:6px;align-items:flex-end;height:90px">${days.map((x) => `<div style="flex:1;text-align:center"><div title="${fmt(x.sum)}" style="background:var(--gold);border-radius:6px 6px 0 0;height:${Math.max(4, Math.round(x.sum / max * 56))}px"></div><span class="muted" style="font-size:10px;white-space:nowrap;display:block">${x.d.toLocaleDateString('ar-DZ', { weekday: 'short' })}</span><br><span class="small">${x.sum ? fmt(x.sum) : '—'}</span></div>`).join('')}</div>`; })()}
     <h4>🧾 سجل المدفوعات الموثّقة</h4>
     ${settlements.length ? settlements.map((s) => `<p>#${s.id} — ${fmt(s.amount)} — مدفوعة ✅${s.method ? ' · ' + esc(s.method) : ''}${s.reference ? ' · مرجع: ' + esc(s.reference) : ''} <span class="muted small">${new Date(s.created_at).toLocaleDateString('ar-DZ')}</span></p>`).join('') : '<p class="muted small">لا مدفوعات موثّقة بعد — أول دفعة تصلك خارج المنصة تظهر هنا بطريقتها ومرجعها.</p>'}
   </div>
@@ -1232,18 +1247,31 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
   } catch (e) { /* بيئة بلا تخزين محلي */ }
   const params = new URLSearchParams(location.search);
   if (params.get('inv')) localStorage.setItem('pd_inv', params.get('inv'));
-  const { wilayas } = await api('/api/wilayas'); WILAYAS = wilayas;
-  for (const sel of ['#coWilaya', '#rgWilaya']) {
-    const el = $(sel); const first = el.querySelector('option'); el.innerHTML = ''; if (first) el.appendChild(first);
-    for (const w of WILAYAS) { const o = document.createElement('option'); o.value = w.code; o.textContent = w.code + ' — ' + w.name_ar; el.appendChild(o); }
-  }
-  const { categories } = await api('/api/categories'); CATEGORIES = categories;
-  for (const c of CATEGORIES) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; $('#catFilter').appendChild(o); }
-  await refreshMe();
-  const st = await api('/api/setup/status');
-  if (st.needsSetup) { $('#setupCard').hidden = false; openAuth('login'); }
   selectRole('buyer');
   renderCartBadge();
-  await loadProducts();
-  if (params.get('product')) openProduct(Number(params.get('product'))).catch(() => {});
+  await initLoads(params);
+  const rb = $('#connRetry'); if (rb) rb.addEventListener('click', () => initLoads(params));
 })();
+
+// تحميلات البداية — كل خطوة مستقلة: فشل واحدة لا يمنع الباقي، وأي فشل يظهر في شريط الاتصال بدل واجهة فارغة صامتة
+async function initLoads(params) {
+  let failed = false;
+  try { const { wilayas } = await tryApi('/api/wilayas'); WILAYAS = wilayas; } catch { failed = true; if (!WILAYAS.length) WILAYAS = WILAYAS_FALLBACK; }
+  fillWilayaSelects();
+  try {
+    const { categories } = await tryApi('/api/categories'); CATEGORIES = categories;
+    const cf = $('#catFilter'); const keep = cf.value;
+    cf.querySelectorAll('option:not(:first-child)').forEach((o) => o.remove());
+    for (const c of CATEGORIES) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; cf.appendChild(o); }
+    if (keep) cf.value = keep;
+  } catch { failed = true; }
+  try { await refreshMe(); } catch { failed = true; }
+  try { const st = await api('/api/setup/status'); if (st.needsSetup) { $('#setupCard').hidden = false; openAuth('login'); } } catch { failed = true; }
+  try { await loadProducts(); } catch {
+    failed = true;
+    $('#productGrid').innerHTML = '<div class="card" style="text-align:center"><p>⚠️ تعذّر تحميل المنتجات — الخادم لا يرد حالياً.</p><button class="btn" type="button" onclick="location.reload()">إعادة المحاولة</button></div>';
+    $('#secCats').hidden = true; $('#secNew').hidden = true; $('#secTop').hidden = true;
+  }
+  setConnError(failed);
+  if (params && params.get('product')) openProduct(Number(params.get('product'))).catch(() => {});
+}
