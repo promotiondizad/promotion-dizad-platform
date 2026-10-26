@@ -1,8 +1,8 @@
 :root{
-  /* الثيم الافتراضي: أخضر داكن × ذهبي فاخر (لوحة SOUQAR المرجعية) */
-  --navy:#06392b; --navy2:#031a12; --navysoft:#0e4d36;
-  --gold:#c9a227; --gold2:#e9c767;
-  --bg:#04231a; --surface:#0a3a29; --surface2:#0d4632; --ink:#f7f3e6; --ink2:#a9bfa9; --line:#17573d;
+  /* الثيم الافتراضي: أخضر داكن × ذهبي فاخر (لوحة SOUQAR Premium) */
+  --navy:#06392b; --navy2:#02150e; --navysoft:#0e4d36;
+  --gold:#d9a92c; --gold2:#FFD45A;
+  --bg:#03291F; --surface:#0a3a29; --surface2:#0d4632; --ink:#f7f3e6; --ink2:#a9bfa9; --line:#17573d;
   --green:#2fdc8a; --danger:#ff7a6b;
   --shadow:0 2px 10px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.4);
   --radius:16px;
@@ -386,7 +386,9 @@ body { background: radial-gradient(900px 480px at 50% -8%, #0a4a33 0%, var(--bg)
 [data-theme="light"] body { background: var(--bg); }
 .topbar { background: linear-gradient(180deg, #0a4a33, #04231a); border-bottom: 1px solid rgba(201,162,39,.45); }
 [data-theme="light"] .topbar { background: var(--navy); border-bottom: none; }
-.brand-name { color: var(--gold2); font-size: 20px; letter-spacing: .6px; text-shadow: 0 1px 10px rgba(233,199,103,.35); }
+.brand-name { font-size: 20px; letter-spacing: .6px; background: linear-gradient(100deg, #b8860b 0%, #FFD45A 30%, #fff3c4 50%, #FFD45A 70%, #b8860b 100%); background-size: 220% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: goldShine 7s linear infinite; }
+@keyframes goldShine { to { background-position: 220% center; } }
+[data-theme="light"] .brand-name { background: none; color: var(--gold2); -webkit-background-clip: initial; background-clip: initial; animation: none; text-shadow: 0 1px 10px rgba(47, 220, 138, .35); }
 .brand-sub { color: #d8e8d2; }
 .main-nav a { color: #d8e8d2; font-weight: 700; }
 .main-nav a:hover { color: var(--gold2); }
@@ -475,9 +477,9 @@ html:not([data-theme="light"]) .pcard h3 { color: #16222e; }
 html:not([data-theme="light"]) .pcard .muted { color: #5c6b5e; }
 .pcard .price { color: #0e9f5a; }
 .pcard-media, .pcard h3 { cursor: pointer; }
-.add-cart-btn { background: linear-gradient(180deg, #1cb56b, #0d8a4c); color: #fff; border-color: #0d8a4c; width: 100%; margin-top: 8px; }
+.add-cart-btn { background: linear-gradient(180deg, #0aa866, #087F55); color: #fff; border-color: #087F55; width: 100%; margin-top: 8px; box-shadow: 0 6px 16px rgba(8, 127, 85, .35); }
 .add-cart-btn:disabled { opacity: .5; }
-[data-theme="light"] .add-cart-btn { background: linear-gradient(180deg, #1cb56b, #0d8a4c); color: #fff; border-color: #0d8a4c; }
+[data-theme="light"] .add-cart-btn { background: linear-gradient(180deg, #0aa866, #087F55); color: #fff; border-color: #087F55; }
 html:not([data-theme="light"]) #view-product { color: #16222e; background: #f8f7f2; --surface: #ffffff; --surface2: #f0eee3; --ink: #16222e; --ink2: #5c6b5e; --line: #e3dfcd; }
 html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 #view-product .price { color: #0e9f5a; font-size: 26px; }
@@ -493,3 +495,15 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 .pp-feats span { font-size: 12px; color: var(--ink2); }
 .cat-circle { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 10px 4px 8px; width: 96px; }
 .cat-circle .cc-img { border-radius: 16px; width: 72px; height: 72px; }
+
+/* ===== لمسات Premium: لمعان وتوهج وانتقالات واحترام تقليل الحركة ===== */
+.promo-banner h1 .gold { background: linear-gradient(100deg, #b8860b 0%, #FFD45A 30%, #fff3c4 50%, #FFD45A 70%, #b8860b 100%); background-size: 220% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: goldShine 7s linear infinite; }
+.btn.gold, .buy-now { box-shadow: 0 6px 18px rgba(255, 212, 90, .35); }
+.pcard, .btn, .chip, .cat-circle, .bnav button { transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease; }
+.pcard:hover { transform: translateY(-3px); }
+.search-hero { padding-top: 14px; padding-bottom: 0; }
+.search-hero input { width: 100%; padding: 13px 18px; border-radius: 999px; border: 2px solid rgba(255, 212, 90, .55); background: var(--navy2); color: var(--ink); font-size: 15px; box-shadow: 0 0 0 3px rgba(255, 212, 90, .08), 0 8px 22px rgba(0, 0, 0, .35); }
+[data-theme="light"] .search-hero input { background: #fff; color: #16222e; border-color: var(--gold); box-shadow: 0 2px 10px rgba(11, 34, 57, .08); }
+.see-all { margin-inline-start: auto; background: none; border: none; color: var(--gold2); font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; padding: 6px 2px; }
+@media (max-width: 760px) { body { padding-bottom: 74px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

@@ -1156,6 +1156,8 @@ $('#searchInput').addEventListener('input', () => loadProducts().catch(() => {})
 $('#catFilter').addEventListener('change', () => loadProducts().catch(() => {}));
 $('#priceFilter').addEventListener('change', () => loadProducts().catch(() => {}));
 $('#sortSel').addEventListener('change', () => loadProducts().catch(() => {}));
+$('#allTop').addEventListener('click', () => { $('#sortSel').value = 'sold'; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); });
+$('#allNew').addEventListener('click', () => { $('#sortSel').value = ''; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); });
 $('#favToggle').addEventListener('click', () => {
   FAV_ONLY = !FAV_ONLY;
   $('#favToggle').textContent = FAV_ONLY ? '❤️ مفضلتي (معروضة)' : '🤍 مفضلتي';

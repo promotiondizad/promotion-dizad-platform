@@ -28,7 +28,7 @@ function chunk(type, data) {
 
 function iconPNG(size) {
   if (cache.has(size)) return cache.get(size);
-  const fg = [233, 199, 103];
+  const fg = [255, 212, 90];
   const px = new Uint8Array(size * size * 4);
   const set = (x, y, c) => { if (x < 0 || y < 0 || x >= size || y >= size) return; const i = (y * size + x) * 4; px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = 255; };
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const t = y / size; set(x, y, [Math.round(6 + 7 * t), Math.round(57 + 33 * t), Math.round(43 + 22 * t)]); }

@@ -34,7 +34,7 @@
       <span class="logo-mark" aria-hidden="true">
         <svg viewBox="0 0 120 120" focusable="false">
           <defs>
-            <linearGradient id="lg-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0d060"/><stop offset="1" stop-color="#c9a227"/></linearGradient>
+            <linearGradient id="lg-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD45A"/><stop offset="1" stop-color="#d9a92c"/></linearGradient>
           </defs>
           <path d="M12 24h15l11 54h47l13-40H35" fill="none" stroke="url(#lg-gold)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
           <circle cx="47" cy="95" r="8.5" fill="url(#lg-gold)"/>
@@ -69,6 +69,10 @@
 </div>
 
 <main id="view-home">
+  <section class="wrap search-hero">
+    <input id="searchInput" type="search" placeholder="🔍 ابحث عن منتج، ماركة أو فئة…">
+  </section>
+
   <section class="wrap" style="padding-top:14px">
     <div class="promo-banner">
       <div class="promo-txt">
@@ -100,12 +104,12 @@
   </section>
 
   <section class="wrap" id="secNew" hidden>
-    <div class="section-head"><h2>🆕 وصل حديثاً</h2></div>
+    <div class="section-head"><h2>🆕 وصل حديثاً</h2><button class="see-all" id="allNew" type="button">عرض الكل ‹</button></div>
     <div id="railNew" class="rail"></div>
   </section>
 
   <section class="wrap" id="secTop" hidden>
-    <div class="section-head"><h2>🔥 الأكثر طلباً</h2></div>
+    <div class="section-head"><h2>🔥 الأكثر مبيعاً</h2><button class="see-all" id="allTop" type="button">عرض الكل ‹</button></div>
     <div id="railTop" class="rail"></div>
   </section>
 
@@ -114,7 +118,6 @@
       <h2>كل المنتجات المعتمدة</h2>
       <div class="chips" id="catChips"></div>
       <div class="filters">
-        <input id="searchInput" type="search" placeholder="ابحث عن منتج…">
         <select id="catFilter"><option value="">كل التصنيفات</option></select>
         <select id="priceFilter">
           <option value="">كل الأسعار</option>
