@@ -298,7 +298,7 @@ function productCard(p) {
           <button class="add-btn" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''} aria-label="أضف إلى السلة">🛒</button>
         </div>
         ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="stock-ok">● متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
-        <button class="btn light small" data-view="${p.id}" type="button" style="width:100%;margin-top:8px">عرض التفاصيل</button>
+        <button class="btn gold small" data-view="${p.id}" type="button" style="width:100%;margin-top:8px">عرض التفاصيل ←</button>
       </div>
     </article>`;
 }
@@ -1124,6 +1124,7 @@ $$('#mobileNav [data-mnav]').forEach((b) => b.addEventListener('click', async ()
   else if (k === 'cats') { show('home'); const el = document.getElementById('secCats').hidden ? document.getElementById('products') : document.getElementById('secCats'); el.scrollIntoView({ behavior: 'smooth' }); }
   else if (k === 'cart') { $('#cartDrawer').hidden = false; await renderCart(); }
   else if (k === 'dash') { if (ME) renderDash(); else openAuth('login'); }
+  else if (k === 'fav') { FAV_ONLY = !FAV_ONLY; $('#favToggle').textContent = FAV_ONLY ? '❤️ مفضلتي (معروضة)' : '🤍 مفضلتي'; show('home'); loadProducts().catch(() => {}); window.scrollTo({ top: 0, behavior: 'smooth' }); toast(FAV_ONLY ? 'تعرض مفضلتك فقط ❤️' : 'تعرض كل المنتجات'); }
   else if (k === 'more') { $('#moreSheet').hidden = false; }
 }));
 $('#closeMore').addEventListener('click', () => { $('#moreSheet').hidden = true; });
@@ -1154,15 +1155,16 @@ $('#favToggle').addEventListener('click', () => {
   $('#favToggle').textContent = FAV_ONLY ? '❤️ مفضلتي (معروضة)' : '🤍 مفضلتي';
   loadProducts().catch(() => {});
 });
-// الوضع المظلم
-if (localStorage.getItem('pd_theme') === 'dark') document.documentElement.dataset.theme = 'dark';
-$('#themeBtn').textContent = document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙';
+// الثيم الافتراضي: أخضر داكن × ذهبي (لوحة SOUQAR) — والفاتح اختياري من الزر
+if (localStorage.getItem('pd_theme') === 'light') document.documentElement.dataset.theme = 'light';
+$('#themeBtn').textContent = document.documentElement.dataset.theme === 'light' ? '🌙' : '☀️';
 $('#themeBtn').addEventListener('click', () => {
-  const dark = document.documentElement.dataset.theme !== 'dark';
-  document.documentElement.dataset.theme = dark ? 'dark' : '';
-  localStorage.setItem('pd_theme', dark ? 'dark' : 'light');
-  $('#themeBtn').textContent = dark ? '☀️' : '🌙';
+  const light = document.documentElement.dataset.theme !== 'light';
+  if (light) document.documentElement.dataset.theme = 'light'; else document.documentElement.removeAttribute('data-theme');
+  localStorage.setItem('pd_theme', light ? 'light' : 'dark');
+  $('#themeBtn').textContent = light ? '🌙' : '☀️';
 });
+$('#menuBtn').addEventListener('click', () => { $('#moreSheet').hidden = false; });
 // جرس الإشعارات داخل التطبيق
 function bindBellChips() {
     $$('#bellChips .chip').forEach((ch) => ch.addEventListener('click', () => {
