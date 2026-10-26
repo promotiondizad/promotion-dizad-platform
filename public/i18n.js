@@ -107,7 +107,7 @@ const I18N_FR = {
   '✏️ تعديل منتج:': '✏️ Modifier le produit :',
   // أسماء الأقسام (بيانات — تُترجم كواجهة)
   'مطبخ وطعام': 'Cuisine & Alimentation', 'أجهزة كهرومنزلية وتكييف': 'Électroménager & Climatisation', 'مستلزمات الدراجات والشتاء': 'Moto & Hiver', 'المنزل والتنظيم': 'Maison & Rangement', 'إلكترونيات وصوتيات': 'Électronique & Audio', 'أطفال ورضّع': 'Enfants & Bébés', 'ملابس وإكسسوارات': 'Vêtements & Accessoires', 'صحة وجمال': 'Santé & Beauté', 'عام': 'Divers',
-  '● متوفر': '● Disponible', '❤️ المفضلة': '❤️ Favoris', '🔎 عرض مُصفّى — أقسام المتجر مخفية مؤقتاً': '🔎 Affichage filtré — les sections sont masquées temporairement', '✕ إظهار كل شيء': '✕ Tout afficher', 'تعرض كل المنتجات والأقسام': 'Tous les produits et sections affichés',
+  '● متوفر': '● Disponible', '❤️ المفضلة': '❤️ Favoris', 'كل الأقسام': 'Toutes les catégories', '🔎 عرض مُصفّى — أقسام المتجر مخفية مؤقتاً': '🔎 Affichage filtré — les sections sont masquées temporairement', '✕ إظهار كل شيء': '✕ Tout afficher', 'تعرض كل المنتجات والأقسام': 'Tous les produits et sections affichés',
   // عملة
   'دج': 'DA', 'الكمية': 'Quantité', 'نُسخ رابط المنتج ✓': 'Lien du produit copié ✓',
   // الولايات

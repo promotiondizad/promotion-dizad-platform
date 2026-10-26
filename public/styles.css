@@ -546,3 +546,58 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 .pcard-media .noimg { background: linear-gradient(145deg, #0a4a33, #03291F); }
 .filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: #fdf3e3; color: #7a4d00; border: 1px solid #ecd9ae; border-radius: 12px; padding: 9px 13px; margin-bottom: 12px; font-size: 13.5px; font-weight: 700; }
 .filter-bar[hidden] { display: none; }
+
+/* ===== تنظيم الواجهة كيما لوحة المؤسس الاحترافية (2026-10-26) ===== */
+/* الترويسة: اسم كبير واضح وأزرار مرتبة بلا التفاف */
+.topbar-in { flex-wrap: nowrap; }
+.topbar-actions { flex-wrap: nowrap; align-items: center; }
+.brand-name { font-size: 26px; }
+.logo-mark { width: 50px; height: 50px; }
+#accountBtn { display: none; }
+@media (max-width: 760px) {
+  .topbar-actions #authBtn, .topbar-actions #dashBtn, .topbar-actions #logoutBtn { display: none; }
+  #accountBtn { display: inline-flex; }
+  .cart-word { display: none; }
+  .topbar-actions { gap: 6px; }
+  .topbar-actions .icon-btn { padding: 7px 9px; }
+  .brand-name { font-size: 23px; }
+  .logo-mark { width: 42px; height: 42px; }
+  .brand-sub { display: block; font-size: 10.5px; }
+  .logo { gap: 7px; }
+}
+/* شرائح الأقسام تحت البحث */
+.catchips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 2px; scrollbar-width: none; }
+.catchips::-webkit-scrollbar { display: none; }
+.catchip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255, 212, 90, .45); background: rgba(255, 255, 255, .05); color: #eaf5ec; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.catchip.on { background: linear-gradient(180deg, #0aa866, #087F55); border-color: #FFD45A; color: #fff; box-shadow: 0 4px 14px rgba(8, 127, 85, .45); }
+[data-theme="light"] .catchip { color: #14342a; background: #fff; border-color: #cfdccf; }
+[data-theme="light"] .catchip.on { color: #fff; border-color: #FFD45A; }
+/* البانر: الصورة ظاهرة فعلياً (عنصر صورة بسطوع) والتدرج فوقها من جهة النص فقط */
+.wrap .promo-banner, [dir="ltr"] .promo-banner { background-image: none; }
+.promo-banner .promo-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 74% 50%; filter: brightness(1.16) saturate(1.07); border-radius: 0; box-shadow: none; }
+.promo-banner::after { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(to right, rgba(3, 41, 31, .92) 30%, rgba(3, 41, 31, .48) 58%, rgba(3, 41, 31, .03) 85%); }
+[dir="rtl"] .promo-banner { flex-direction: row-reverse; }
+.promo-banner .promo-txt { position: relative; z-index: 2; }
+.promo-dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 2; }
+.promo-dots i { width: 7px; height: 7px; border-radius: 99px; background: rgba(255, 255, 255, .35); }
+.promo-dots i.on { width: 20px; background: var(--gold2); }
+/* بطاقات داكنة فاخرة: سعر ذهبي كبير وزر سلة دائري */
+#view-home .pcard, #view-product .pcard { background: linear-gradient(180deg, #0b4030, #06231a); border: 1px solid rgba(255, 212, 90, .35); color: #f2f7f2; }
+#view-home .pcard h3, #view-product .pcard h3 { color: #fff; }
+#view-home .pcard .muted, #view-product .pcard .muted { color: #a9c4b2; }
+#view-home .pcard .price, #view-product .pcard .price { color: var(--gold2); font-size: 19px; font-weight: 900; }
+#view-home .pcard .stock-ok, #view-product .pcard .stock-ok { color: #7be495; }
+#view-home .fav-btn, #view-product .fav-btn { background: rgba(3, 26, 18, .55); border: 1px solid rgba(255, 255, 255, .35); }
+.pcard-buyrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.cart-round { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 50%; border: 1.5px solid var(--gold2); background: rgba(255, 212, 90, .12); color: var(--gold2); font-size: 17px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.cart-round:disabled { opacity: .45; }
+.details-btn { border-radius: 999px; border-color: var(--gold2); color: var(--gold2); background: transparent; }
+.details-btn:hover { background: rgba(255, 212, 90, .14); }
+/* الشريط السفلي: أيقونات خطية نظيفة */
+#mobileNav button svg { width: 22px; height: 22px; display: block; }
+#mobileNav button.on svg { filter: drop-shadow(0 0 6px rgba(255, 212, 90, .85)); }
+#mobileNav button b { position: absolute; top: 1px; inset-inline-start: calc(50% + 3px); background: #e5484d; color: #fff; font-size: 10px; min-width: 17px; height: 17px; border-radius: 99px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+#mobileNav button b[hidden] { display: none; }
+.brand-sub { white-space: nowrap; }
+#accountBtn svg { width: 20px; height: 20px; display: block; }
+@media (max-width: 760px) { .brand-sub { font-size: 10px; } }

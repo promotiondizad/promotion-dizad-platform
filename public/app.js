@@ -297,11 +297,8 @@ function productCard(p) {
       <div class="pcard-body">
         <h3 data-view="${p.id}" title="عرض التفاصيل">${esc(p.name)}</h3>
         ${p.rating_count ? starsHtml(p.rating_avg, p.rating_count) : `<span class="muted small">${esc(p.category_name || '')}</span>`}
-        <div class="pcard-foot">
-          ${priceHtml(p)}
-        </div>
         ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="stock-ok">● متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
-        <button class="btn add-cart-btn" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
+        <div class="pcard-buyrow">${priceHtml(p)}<button class="cart-round" data-add="${p.id}" type="button" aria-label="أضف إلى السلة" ${p.stock <= 0 ? 'disabled' : ''}>🛒</button></div>
         <button class="btn details-btn" data-view="${p.id}" type="button">عرض التفاصيل ←</button>
       </div>
     </article>`;
@@ -320,6 +317,15 @@ function resetAllFilters() {
   if (FAV_ONLY) { FAV_ONLY = false; $('#favToggle').textContent = '🤍 مفضلتي'; }
   return loadProducts();
 }
+const CAT_ICONS_TOP = [['إلكترون', '💻'], ['هواتف', '📱'], ['أزياء', '👕'], ['ملابس', '👗'], ['جمال', '💄'], ['صحة', '💊'], ['منزل', '🏠'], ['مطبخ', '🍳'], ['رياضة', '🏋️'], ['لياقة', '🏋️'], ['أطفال', '🧸'], ['رضع', '🍼'], ['غذائ', '🛒'], ['أدوات', '🔧'], ['سيارات', '🚗'], ['حيوان', '🐾'], ['كتب', '📚'], ['ألعاب', '🎮'], ['ساعات', '⌚'], ['أحذية', '👟'], ['حقائب', '👜'], ['عطور', '🌸'], ['نظارات', '🕶️'], ['بيت', '🏠'], ['دراج', '🏍️'], ['شتاء', '🧣'], ['كهرومنزل', '🔌'], ['تكييف', '❄️'], ['تنظيم', '🗄️'], ['صوتيات', '🎧']];
+function catIconFor(name) { for (const [k, ic] of CAT_ICONS_TOP) if (name.includes(k)) return ic; return '🛍️'; }
+function renderCatChipsTop(cat) {
+  const box = $('#catChipsTop'); if (!box) return;
+  const withN = CATEGORIES.map((c) => ({ c, n: PRODUCTS.filter((p) => p.category_id === c.id).length })).filter((x) => x.n);
+  box.innerHTML = `<button class="catchip ${!cat ? 'on' : ''}" data-ct="" type="button"><span aria-hidden="true">🛒</span> كل الأقسام</button>` +
+    withN.map(({ c }) => `<button class="catchip ${String(c.id) === String(cat) ? 'on' : ''}" data-ct="${c.id}" type="button"><span aria-hidden="true">${catIconFor(c.name)}</span> ${esc(c.name)}</button>`).join('');
+  $$('#catChipsTop [data-ct]').forEach((b) => b.addEventListener('click', () => { $('#catFilter').value = b.dataset.ct; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
+}
 async function loadProducts() {
   const q = $('#searchInput').value.trim(), cat = $('#catFilter').value;
   const data = await api('/api/products?' + new URLSearchParams({ search: q, category: cat, sort: $('#sortSel').value }));
@@ -332,6 +338,7 @@ async function loadProducts() {
   // أقسام الرئيسية + شرائح الفئات — تظهر في العرض الافتراضي فقط (بلا بحث/فلترة)
   const plain = !q && !cat && !$('#priceFilter').value && !FAV_ONLY;
   const fbEl = $('#filterBar'); if (fbEl) fbEl.hidden = plain;
+  renderCatChipsTop(cat);
   const newest = [...PRODUCTS].sort((a, b) => b.id - a.id).slice(0, 4);
   const top = [...PRODUCTS].filter((p) => p.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 4);
   $('#secNew').hidden = !(plain && newest.length);
@@ -1150,6 +1157,7 @@ $('#logoutBtn').addEventListener('click', async () => { await api('/api/auth/log
 $$('[data-authtab]').forEach((t) => t.addEventListener('click', () => openAuth(t.dataset.authtab)));
 $$('.role-tabs .tab').forEach((t) => t.addEventListener('click', () => selectRole(t.dataset.role)));
 $('#cartBtn').addEventListener('click', async () => { $('#cartDrawer').hidden = false; await renderCart(); });
+$('#accountBtn').addEventListener('click', () => { if (ME) renderDash(); else openAuth('login'); });
 // شريط التنقل السفلي (الجوال) كيما نموذج التطبيق
 $$('#mobileNav [data-mnav]').forEach((b) => b.addEventListener('click', async () => {
   const k = b.dataset.mnav;
