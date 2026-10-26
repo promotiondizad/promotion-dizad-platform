@@ -8,7 +8,7 @@ let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
 let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
 // تحديث تلقائي: مقارنة نسخة البناء مع الخادم دورياً — صفحة مفتوحة قديماً لا تبقى عالقة أبداً
-const CLIENT_VERSION = 'v2026.10.26-11';
+const CLIENT_VERSION = 'v2026.10.26-12';
 async function checkForUpdate() {
   try {
     const r = await fetch('/api/config', { cache: 'no-store' });
@@ -359,6 +359,7 @@ async function loadProducts() {
   const top = [...PRODUCTS].filter((p) => p.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 4);
   $('#secNew').hidden = !(plain && newest.length);
   $('#secTop').hidden = !(plain && top.length);
+  const ssEl = $('#secShip'); if (ssEl) ssEl.hidden = !plain;
   if (plain) {
     $('#railNew').innerHTML = newest.map(productCard).join(''); wireCards('railNew');
     $('#railTop').innerHTML = top.map(productCard).join(''); wireCards('railTop');
@@ -377,6 +378,7 @@ async function loadProducts() {
     $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
     $$('#catTiles [data-all]').forEach((t) => t.addEventListener('click', () => { resetAllFilters().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); toast('تعرض كل المنتجات والأقسام'); }));
     $$('#catTiles [data-tile]').forEach((t) => t.classList.toggle('on', String(t.dataset.tile) === String($('#catFilter').value)));
+    const ctEl = $('#catTiles'); if (ctEl) ctEl.scrollLeft = 0;
   } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
 // وصف عربي جاهز لأي منتج وصفه الأصلي فارغ (بيانات المتجر بلا أوصاف) — عام وصادق بلا اختراع مواصفات

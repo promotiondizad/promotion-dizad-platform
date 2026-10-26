@@ -107,7 +107,7 @@ const I18N_FR = {
   '✏️ تعديل منتج:': '✏️ Modifier le produit :',
   // أسماء الأقسام (بيانات — تُترجم كواجهة)
   'مطبخ وطعام': 'Cuisine & Alimentation', 'أجهزة كهرومنزلية وتكييف': 'Électroménager & Climatisation', 'مستلزمات الدراجات والشتاء': 'Moto & Hiver', 'المنزل والتنظيم': 'Maison & Rangement', 'إلكترونيات وصوتيات': 'Électronique & Audio', 'أطفال ورضّع': 'Enfants & Bébés', 'ملابس وإكسسوارات': 'Vêtements & Accessoires', 'صحة وجمال': 'Santé & Beauté', 'عام': 'Divers',
-  '● متوفر': '● Disponible', '❤️ المفضلة': '❤️ Favoris', 'كل الأقسام': 'Toutes les catégories', 'ماركات عالمية': 'Marques internationales', 'ضمان حقيقي': 'Garantie réelle', 'توصيل سريع': 'Livraison rapide', 'تسوق الآن ‹': 'Acheter ›', '🛒 أضف إلى السلة': '🛒 Ajouter au panier', 'ابحث عن منتج، ماركة أو فئة…': 'Rechercher un produit, une marque ou un rayon…', 'المظهر: داكن / فاتح': 'Apparence : sombre / clair', 'حسابي / دخول': 'Mon compte / Connexion', 'تسوّق من منتجات المورّدين وتابع طلباتك': 'Achetez les produits des fournisseurs et suivez vos commandes', 'سوّق المنتجات واربح عمولات حرة': 'Vendez les produits et gagnez des commissions libres', '📣 سجّل كمسوّق واربح عمولة': '📣 Inscrivez-vous comme vendeur et gagnez des commissions', '🔎 عرض مُصفّى — أقسام المتجر مخفية مؤقتاً': '🔎 Affichage filtré — les sections sont masquées temporairement', '✕ إظهار كل شيء': '✕ Tout afficher', 'تعرض كل المنتجات والأقسام': 'Tous les produits et sections affichés',
+  '● متوفر': '● Disponible', '❤️ المفضلة': '❤️ Favoris', 'كل الأقسام': 'Toutes les catégories', 'دفع آمن': 'Paiement sécurisé', 'خدمة عملاء مميزة': 'Service client premium', 'تسوق الآن ←': 'Acheter ←', 'توصيل سريع لجميع الولايات': 'Livraison rapide vers toutes les wilayas', 'توصلك أينما كنت': 'Nous livrons où que vous soyez', 'ماركات عالمية': 'Marques internationales', 'ضمان حقيقي': 'Garantie réelle', 'توصيل سريع': 'Livraison rapide', 'تسوق الآن ‹': 'Acheter ›', '🛒 أضف إلى السلة': '🛒 Ajouter au panier', 'ابحث عن منتج، ماركة أو فئة…': 'Rechercher un produit, une marque ou un rayon…', 'المظهر: داكن / فاتح': 'Apparence : sombre / clair', 'حسابي / دخول': 'Mon compte / Connexion', 'تسوّق من منتجات المورّدين وتابع طلباتك': 'Achetez les produits des fournisseurs et suivez vos commandes', 'سوّق المنتجات واربح عمولات حرة': 'Vendez les produits et gagnez des commissions libres', '📣 سجّل كمسوّق واربح عمولة': '📣 Inscrivez-vous comme vendeur et gagnez des commissions', '🔎 عرض مُصفّى — أقسام المتجر مخفية مؤقتاً': '🔎 Affichage filtré — les sections sont masquées temporairement', '✕ إظهار كل شيء': '✕ Tout afficher', 'تعرض كل المنتجات والأقسام': 'Tous les produits et sections affichés',
   // عملة
   'دج': 'DA', 'الكمية': 'Quantité', 'نُسخ رابط المنتج ✓': 'Lien du produit copié ✓',
   // الولايات
@@ -179,7 +179,7 @@ function setLang(l) {
   document.documentElement.lang = PD_LANG;
   document.documentElement.dir = PD_LANG === 'fr' ? 'ltr' : 'rtl';
   const b = document.getElementById('langBtn');
-  if (b) b.textContent = PD_LANG === 'fr' ? '🌐 عربي' : '🌐 FR';
+  if (b) b.textContent = PD_LANG === 'fr' ? '🌐 FR ▾' : '🌐 AR ▾';
   if (PD_LANG === 'fr') applyI18n(); else _restoreAr();
 }
 document.addEventListener('DOMContentLoaded', () => {

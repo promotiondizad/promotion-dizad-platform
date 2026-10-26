@@ -1,8 +1,8 @@
 :root{
   /* الثيم الافتراضي: أخضر داكن × ذهبي فاخر (لوحة SOUQAR Premium) */
   --navy:#06392b; --navy2:#02150e; --navysoft:#0e4d36;
-  --gold:#d9a92c; --gold2:#FFD45A;
-  --bg:#03291F; --surface:#0a3a29; --surface2:#0d4632; --ink:#f7f3e6; --ink2:#a9bfa9; --line:#17573d;
+  --gold:#d9a92c; --gold2:#ffc83d;
+  --bg:#001a12; --surface:#0a3a29; --surface2:#0d4632; --ink:#f7f3e6; --ink2:#a9bfa9; --line:#17573d;
   --green:#2fdc8a; --danger:#ff7a6b;
   --shadow:0 2px 10px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.4);
   --radius:16px;
@@ -654,3 +654,49 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 }
 
 .rail .add-wide { font-size: 13.5px; padding: 9px 4px; white-space: nowrap; }
+
+/* ===== مواصفات المؤسس الدقيقة 2026-10-26: ألوان ومقاسات اللوحة المرجعية ===== */
+.topbar { background: #021f16; }
+#langBtn { min-width: 70px; min-height: 44px; border: 1px solid var(--gold2); border-radius: 24px; background: transparent; color: var(--gold2); font-size: 15px; font-weight: 700; padding: 8px 14px; white-space: nowrap; line-height: 1; }
+#accountBtn { background: linear-gradient(180deg, #ffd968, #e9b93b); color: #231a00; border: 0; border-radius: 50%; width: 43px; height: 43px; padding: 0; display: flex; align-items: center; justify-content: center; }
+#accountBtn svg { width: 22px; height: 22px; }
+.search-pill { border: 1px solid rgba(0, 138, 96, .9); border-radius: 30px; min-height: 52px; padding: 0 14px; }
+.promo-banner { border: 1px solid rgba(255, 200, 61, .65); border-radius: 22px; }
+.hero-seal { position: absolute; top: 14px; inset-inline-end: 14px; width: 76px; height: 76px; border-radius: 50%; border: 1.6px solid var(--gold2); background: rgba(0, 26, 18, .55); color: var(--gold2); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; z-index: 3; text-align: center; line-height: 1.2; }
+.hero-seal b { font-size: 9.5px; letter-spacing: .4px; }
+.hero-seal span { font-size: 8.5px; }
+.promo-feats { flex-direction: row; flex-wrap: wrap; gap: 9px 20px; }
+.promo-feats span { gap: 7px; font-size: 14px; }
+.promo-feats .pf-ic { font-size: 19px; }
+.cat-circles { gap: 12px; padding: 4px 2px 12px; }
+.cat-circle { flex: 0 0 112px; width: 112px; min-height: 120px; border-radius: 22px; border: 1px solid rgba(0, 138, 96, .7); gap: 10px; padding: 10px 6px; }
+.cat-circle .cc-emoji { font-size: 30px; }
+.cat-circle b { font-size: 13px; }
+.cat-circle.on { border-color: var(--gold2); box-shadow: 0 0 0 2px rgba(255, 200, 61, .55), 0 6px 16px rgba(0, 0, 0, .3); }
+#view-home .pcard, #view-product .pcard { border-radius: 16px; padding: 8px; }
+#view-home .pcard-media img, #view-product .pcard-media img { aspect-ratio: 1.5 / 1; height: auto; width: 100%; object-fit: cover; border-radius: 12px; }
+#view-home .pcard-media .noimg, #view-product .pcard-media .noimg { aspect-ratio: 1.5 / 1; height: auto; border-radius: 12px; }
+#view-home .pcard-body, #view-product .pcard-body { padding: 10px 6px 6px; }
+#view-home .pcard .price, #view-product .pcard .price { color: #008a60; }
+.add-wide { background: #008a60; border-radius: 24px; min-height: 46px; }
+.ship-strip { display: flex; align-items: center; gap: 12px; background: linear-gradient(90deg, #0a3a29, #06392b); border: 1px solid rgba(0, 138, 96, .6); border-radius: 18px; padding: 13px 16px; color: var(--ink); text-decoration: none; }
+.ss-ic { font-size: 27px; }
+.ss-txt { flex: 1; display: flex; flex-direction: column; }
+.ss-txt small { color: var(--ink2); }
+.ss-go { color: var(--gold2); font-size: 22px; }
+#mobileNav { border-top: 1px solid rgba(0, 138, 96, .55); min-height: 70px; }
+@media (max-width: 760px) {
+  .topbar-in { display: flex; flex-wrap: nowrap; gap: 9px; }
+  .topbar-in .logo { margin-inline-end: auto; }
+  #themeBtn, #cartBtn { display: none; }
+  #langBtn { display: inline-flex; align-items: center; }
+  #accountBtn { display: flex; }
+  #menuBtn, #bellBtn { background: none; border: 0; box-shadow: none; color: var(--gold2); font-size: 21px; padding: 6px; }
+}
+
+.promo-banner .promo-txt { max-width: 56%; }
+@media (max-width: 760px) { .hero-seal { width: 64px; height: 64px; font-size: 13px; top: 10px; inset-inline-end: 10px; } }
+
+.hero-seal { top: auto; bottom: 42px; inset-inline-end: auto; inset-inline-start: 12px; }
+[dir="ltr"] .hero-seal { inset-inline-start: auto; inset-inline-end: 12px; }
+@media (max-width: 760px) { .hero-seal { top: auto; bottom: 40px; inset-inline-end: auto; inset-inline-start: 10px; } [dir="ltr"] .hero-seal { inset-inline-start: auto; inset-inline-end: 10px; } }

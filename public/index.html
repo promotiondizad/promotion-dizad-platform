@@ -54,7 +54,7 @@
     </nav>
     <div class="topbar-actions">
       <button class="icon-btn" id="themeBtn" type="button" title="الوضع المظلم / الفاتح">🌙</button>
-      <button class="icon-btn" id="langBtn" type="button" title="اللغة / Langue">🌐 FR</button>
+      <button class="icon-btn" id="langBtn" type="button" title="اللغة / Langue">🌐 AR ▾</button>
       <span style="position:relative"><button class="icon-btn" id="bellBtn" type="button" hidden title="إشعاراتي">🔔<span id="bellBadge" class="bell-badge" hidden></span></button><span id="bellPanel" hidden></span></span>
       <button class="icon-btn" id="accountBtn" type="button" title="حسابي"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.3-3.3 3.9-5 7-5s5.7 1.7 7 5"/></svg></button>
       <button class="icon-btn" id="cartBtn" type="button">🛒<span class="cart-word"> السلة</span> <span class="cart-count" id="cartCount" hidden>0</span></button>
@@ -82,11 +82,12 @@
       <div class="promo-txt">
         <h1>كل ما تحتاجه <span class="gold">في مكان واحد</span></h1>
         <p>منتجات أصلية .. أسعار مميزة</p>
-        <div class="promo-feats"><span><i>✓</i> ماركات عالمية</span><span><i>✓</i> ضمان حقيقي</span><span><i>✓</i> توصيل سريع</span></div>
-        <a class="btn gold" href="#products">تسوق الآن ‹</a>
+        <div class="promo-feats"><span><span class="pf-ic">🚚</span> توصيل سريع</span><span><span class="pf-ic">🛡️</span> دفع آمن</span><span><span class="pf-ic">🎧</span> خدمة عملاء مميزة</span></div>
+        <a class="btn gold" href="#products">تسوق الآن ←</a>
       </div>
+      <div class="hero-seal" aria-hidden="true">👑<b>BEST QUALITY</b><span>★★★</span></div>
       <img id="promoImg" alt="" hidden>
-      <div class="promo-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+      <div class="promo-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div>
     </div>
     <div class="join-row">
       <button class="btn light" id="joinMarketer" type="button">📣 سجّل كمسوّق واربح عمولة</button>
@@ -100,6 +101,10 @@
   <section class="wrap" id="secTop" hidden>
     <div class="section-head"><h2>🔥 الأكثر مبيعاً</h2><button class="see-all" id="allTop" type="button">عرض الكل ‹</button></div>
     <div id="railTop" class="rail"></div>
+  </section>
+
+  <section class="wrap" id="secShip" hidden>
+    <a class="ship-strip" href="#" data-nav="delivery"><span class="ss-ic">🚚</span><span class="ss-txt"><b>توصيل سريع لجميع الولايات</b><small>توصلك أينما كنت</small></span><span class="ss-go">‹</span></a>
   </section>
 
   <section class="wrap" id="secNew" hidden>
@@ -314,8 +319,8 @@
   <button data-mnav="home" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg><span>الرئيسية</span></button>
   <button data-mnav="cats" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg><span>الأقسام</span></button>
   <button data-mnav="cart" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.3 11h9.9l1.9-8H7"/><circle cx="9.5" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/></svg><span>السلة</span><b id="mCartCount" hidden></b></button>
+  <button data-mnav="fav" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.2S4.6 15.9 2.9 11.6C1.8 8.8 3.6 5.6 6.6 5.6c2 0 3.9 1.3 5.4 3.4 1.5-2.1 3.4-3.4 5.4-3.4 3 0 4.8 3.2 3.7 6-1.7 4.3-9.1 8.6-9.1 8.6z"/></svg><span>المفضلة</span></button>
   <button data-mnav="dash" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.3-3.3 3.9-5 7-5s5.7 1.7 7 5"/></svg><span>حسابي</span></button>
-  <button data-mnav="more" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="1.7"/><circle cx="12" cy="5" r="1.7"/><circle cx="19" cy="5" r="1.7"/><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/><circle cx="5" cy="19" r="1.7"/><circle cx="12" cy="19" r="1.7"/><circle cx="19" cy="19" r="1.7"/></svg><span>المزيد</span></button>
 </nav>
 <div id="moreSheet" hidden>
   <div class="more-box">
