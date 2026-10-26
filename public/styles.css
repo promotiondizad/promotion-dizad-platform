@@ -700,3 +700,16 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 .hero-seal { top: auto; bottom: 42px; inset-inline-end: auto; inset-inline-start: 12px; }
 [dir="ltr"] .hero-seal { inset-inline-start: auto; inset-inline-end: 12px; }
 @media (max-width: 760px) { .hero-seal { top: auto; bottom: 40px; inset-inline-end: auto; inset-inline-start: 10px; } [dir="ltr"] .hero-seal { inset-inline-start: auto; inset-inline-end: 10px; } }
+/* جولة الصورة المعتمدة v13 (2026-10-26): ترويسة باتجاه الصورة المعتمدة، بانر داكن بعنوان سطرين، أيقونات ذهبية خطّية، بلا صف انضمام في الرئيسية */
+@media (max-width: 760px) { .topbar-in { direction: ltr; } .logo-text { text-align: center; } }
+.join-row { display: none; }
+.promo-txt h1 { line-height: 1.35; }
+.promo-banner .promo-txt p { white-space: nowrap; }
+@media (max-width: 380px) { .promo-banner .promo-txt p { font-size: 14px; } }
+.promo-feats .pf-ic { color: var(--gold2); display: inline-flex; }
+.promo-feats .pf-ic svg { width: 21px; height: 21px; }
+.cat-circle .cc-emoji { color: var(--gold2); display: flex; justify-content: center; font-size: 0; }
+.cat-circle .cc-emoji svg { width: 30px; height: 30px; }
+.promo-photo { object-position: 68% center; }
+.hero-seal { top: 12px; bottom: auto; }
+[dir="ltr"] .hero-seal { inset-inline-start: auto; inset-inline-end: 12px; }
