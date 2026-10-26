@@ -604,3 +604,53 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 
 /* التفاف ثنائي الاتجاه: نص عربي داخل الوضع الفرنسي يُعرض باتجاهه الصحيح */
 [dir="ltr"] :where(p, span, small, strong, b, em, h1, h2, h3, h4, h5, h6, button, a, label, option, li, td, th) { unicode-bidi: plaintext; }
+
+/* ===== طلب المؤسس 2026-10-26: اسم أكبر ذهبي احترافي + زر لغة مدمج + بلاطات أقسام صغيرة ===== */
+.brand-name { font-size: 31px; font-weight: 900; letter-spacing: .8px; }
+.logo-mark { width: 52px; height: 52px; }
+#langBtn { white-space: nowrap; line-height: 1; font-size: 12.5px; padding: 8px 10px; }
+.cat-circle { width: 66px; min-height: 74px; border-radius: 15px; padding: 6px 3px; gap: 4px; }
+.cat-circle .cc-emoji { font-size: 22px; }
+.cat-circle b { font-size: 11px; }
+.cat-tiles { grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 9px; }
+.cat-tile { padding: 10px 4px; border-radius: 14px; }
+.cat-tile .ic { font-size: 23px; margin-bottom: 3px; }
+.cat-tile b { font-size: 12.5px; }
+@media (max-width: 760px) {
+  .brand-name { font-size: 27px; }
+  .logo-mark { width: 46px; height: 46px; }
+  .topbar-in { gap: 7px; }
+}
+
+/* ===== جولة اللوحة الاحترافية 2026-10-26: ترويسة نظيفة + بحث ذهبي + بطاقات بيضاء ===== */
+.search-pill { display: flex; align-items: center; gap: 9px; background: rgba(2, 32, 24, .78); border: 1.6px solid var(--gold); border-radius: 99px; padding: 10px 15px; box-shadow: 0 6px 20px rgba(0, 0, 0, .28); }
+.search-pill .sp-ic { color: var(--gold); display: flex; flex: 0 0 auto; }
+.search-pill .sp-ic svg { width: 20px; height: 20px; }
+.search-pill #searchInput { flex: 1; min-width: 0; width: auto; background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; color: var(--ink); font-size: 15px; outline: 0; }
+.search-pill #searchInput::placeholder { color: #b9cdc4; }
+.sp-scan { background: none; border: 0; color: var(--gold); display: flex; padding: 2px; cursor: pointer; flex: 0 0 auto; }
+.sp-scan svg { width: 21px; height: 21px; }
+#catChipsTop { display: none; }
+.promo-feats { flex-direction: column; gap: 8px; align-items: flex-start; }
+.promo-feats span { display: flex; align-items: center; gap: 9px; background: none; color: #fff; font-size: 14.5px; font-weight: 700; padding: 0; }
+.promo-feats i { font-style: normal; width: 21px; height: 21px; border-radius: 50%; background: rgba(255, 212, 90, .16); border: 1.4px solid var(--gold); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 12.5px; flex: 0 0 auto; }
+.promo-banner .btn.gold { border-radius: 99px; padding: 11px 27px; font-size: 15.5px; }
+#secCats { padding-top: 4px; }
+.cat-circle.on { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 212, 90, .6), 0 6px 16px rgba(0, 0, 0, .3); }
+#view-home .pcard, #view-product .pcard { background: #fff; border: 1px solid #e6ede9; border-radius: 18px; box-shadow: 0 8px 20px rgba(3, 41, 31, .16); color: #14261e; }
+#view-home .pcard-body h3, #view-product .pcard-body h3 { color: #14261e; }
+#view-home .pcard .price, #view-product .pcard .price { color: #0a8a5f; font-size: 18px; }
+#view-home .pcard .muted, #view-product .pcard .muted { color: #7b8a83; }
+#view-home .fav-btn, #view-product .fav-btn { background: rgba(255, 255, 255, .95); border: none; }
+.pcard-buyrow { margin-top: 6px; }
+.add-wide { width: 100%; margin-top: 9px; background: linear-gradient(180deg, #0d9d63, #087f55); color: #fff; border: 0; border-radius: 12px; padding: 11px; font-size: 15px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.add-wide:disabled { opacity: .45; }
+.details-link { width: 100%; background: none; border: 0; color: #a07d10; font-weight: 700; font-size: 12.5px; padding: 7px 0 2px; cursor: pointer; }
+@media (max-width: 760px) {
+  .topbar-in { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: 8px; }
+  .topbar-in .logo { justify-self: center; }
+  .topbar-actions { display: flex; gap: 6px; align-items: center; }
+  #themeBtn, #langBtn, #accountBtn, #cartBtn { display: none; }
+}
+
+.rail .add-wide { font-size: 13.5px; padding: 9px 4px; white-space: nowrap; }

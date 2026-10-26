@@ -8,7 +8,7 @@ let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
 let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
 // تحديث تلقائي: مقارنة نسخة البناء مع الخادم دورياً — صفحة مفتوحة قديماً لا تبقى عالقة أبداً
-const CLIENT_VERSION = 'v2026.10.26-9';
+const CLIENT_VERSION = 'v2026.10.26-11';
 async function checkForUpdate() {
   try {
     const r = await fetch('/api/config', { cache: 'no-store' });
@@ -313,8 +313,9 @@ function productCard(p) {
         <h3 data-view="${p.id}" title="عرض التفاصيل">${esc(p.name)}</h3>
         ${p.rating_count ? starsHtml(p.rating_avg, p.rating_count) : `<span class="muted small">${esc(p.category_name || '')}</span>`}
         ${p.stock > 0 ? (p.stock <= 3 ? '<span class="badge out">بقي ' + p.stock + ' فقط</span>' : '<span class="stock-ok">● متوفر</span>') : '<span class="badge out">نفد المخزون</span>'}
-        <div class="pcard-buyrow">${priceHtml(p)}<button class="cart-round" data-add="${p.id}" type="button" aria-label="أضف إلى السلة" ${p.stock <= 0 ? 'disabled' : ''}>🛒</button></div>
-        <button class="btn details-btn" data-view="${p.id}" type="button">عرض التفاصيل ←</button>
+        <div class="pcard-buyrow">${priceHtml(p)}</div>
+        <button class="add-wide" data-add="${p.id}" type="button" ${p.stock <= 0 ? 'disabled' : ''}>🛒 أضف إلى السلة</button>
+        <button class="details-link" data-view="${p.id}" type="button">عرض التفاصيل ←</button>
       </div>
     </article>`;
 }
@@ -375,6 +376,7 @@ async function loadProducts() {
     const pi = $('#promoImg'); const fpp = PRODUCTS.find((x) => x.images && x.images.length); if (pi && fpp) { pi.src = fpp.images[0]; pi.hidden = false; }
     $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
     $$('#catTiles [data-all]').forEach((t) => t.addEventListener('click', () => { resetAllFilters().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); toast('تعرض كل المنتجات والأقسام'); }));
+    $$('#catTiles [data-tile]').forEach((t) => t.classList.toggle('on', String(t.dataset.tile) === String($('#catFilter').value)));
   } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
 // وصف عربي جاهز لأي منتج وصفه الأصلي فارغ (بيانات المتجر بلا أوصاف) — عام وصادق بلا اختراع مواصفات
@@ -1186,6 +1188,10 @@ $('#closeMore').addEventListener('click', () => { $('#moreSheet').hidden = true;
 $('#moreSheet').addEventListener('click', (e) => { if (e.target.id === 'moreSheet') $('#moreSheet').hidden = true; });
 $$('#moreSheet a').forEach((a) => a.addEventListener('click', () => { $('#moreSheet').hidden = true; }));
 $('#moreTrack').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; openTrack(); });
+$('#scanBtn').addEventListener('click', () => { $('#searchInput').focus(); });
+$('#moreLang').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; $('#langBtn').click(); });
+$('#moreTheme').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; $('#themeBtn').click(); });
+$('#moreAccount').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; $('#accountBtn').click(); });
 $('#moreFav').addEventListener('click', (e) => { e.preventDefault(); $('#moreSheet').hidden = true; if (!FAV_ONLY) $('#favToggle').click(); show('home'); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); });
 $('#closeCart').addEventListener('click', () => { $('#cartDrawer').hidden = true; });
 $('#goCheckout').addEventListener('click', () => openCheckout());

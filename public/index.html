@@ -72,7 +72,7 @@
 
 <main id="view-home">
   <section class="wrap search-hero">
-    <input id="searchInput" type="search" placeholder="🔍 ابحث عن منتج، ماركة أو فئة…">
+    <div class="search-pill"><span class="sp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg></span><input id="searchInput" type="search" placeholder="ابحث عن منتج، ماركة أو فئة…"><button class="sp-scan" id="scanBtn" type="button" aria-label="مسح"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/></svg></button></div>
     <div class="catchips" id="catChipsTop"></div>
   </section>
 
@@ -82,7 +82,7 @@
       <div class="promo-txt">
         <h1>كل ما تحتاجه <span class="gold">في مكان واحد</span></h1>
         <p>منتجات أصلية .. أسعار مميزة</p>
-        <div class="promo-feats"><span>🚚 توصيل سريع</span><span>🛡️ دفع آمن</span><span>🎧 خدمة عملاء مميزة</span></div>
+        <div class="promo-feats"><span><i>✓</i> ماركات عالمية</span><span><i>✓</i> ضمان حقيقي</span><span><i>✓</i> توصيل سريع</span></div>
         <a class="btn gold" href="#products">تسوق الآن ‹</a>
       </div>
       <img id="promoImg" alt="" hidden>
@@ -93,28 +93,18 @@
     </div>
   </section>
 
-  <section class="wrap">
-    <div class="feat-strip">
-      <div class="feat"><span>🚚</span><div><b>توصيل لـ58 ولاية</b><small>منزل أو مكتب، حسب ولايتك وبلديتك</small></div></div>
-      <div class="feat"><span>💵</span><div><b>دفع آمن عند الاستلام</b><small>لا تدفع شيئاً قبل وصول طلبك</small></div></div>
-      <div class="feat"><span>📦</span><div><b>تتبّع طلبك في كل مرحلة</b><small>من التأكيد حتى التسليم والتحصيل</small></div></div>
-      <div class="feat"><span>👥</span><div><b>حسابات منفصلة لكل دور</b><small>مورد · تاجر جملة · مسوّق · زبون</small></div></div>
-    </div>
-  </section>
-
   <section class="wrap" id="secCats" hidden>
-    <div class="section-head"><h2>🗂️ تسوق حسب القسم</h2></div>
     <div id="catTiles" class="cat-circles"></div>
-  </section>
-
-  <section class="wrap" id="secNew" hidden>
-    <div class="section-head"><h2>🆕 وصل حديثاً</h2><button class="see-all" id="allNew" type="button">عرض الكل ‹</button></div>
-    <div id="railNew" class="rail"></div>
   </section>
 
   <section class="wrap" id="secTop" hidden>
     <div class="section-head"><h2>🔥 الأكثر مبيعاً</h2><button class="see-all" id="allTop" type="button">عرض الكل ‹</button></div>
     <div id="railTop" class="rail"></div>
+  </section>
+
+  <section class="wrap" id="secNew" hidden>
+    <div class="section-head"><h2>🆕 وصل حديثاً</h2><button class="see-all" id="allNew" type="button">عرض الكل ‹</button></div>
+    <div id="railNew" class="rail"></div>
   </section>
 
   <section class="wrap" id="products">
@@ -324,8 +314,8 @@
   <button data-mnav="home" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg><span>الرئيسية</span></button>
   <button data-mnav="cats" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg><span>الأقسام</span></button>
   <button data-mnav="cart" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.3 11h9.9l1.9-8H7"/><circle cx="9.5" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/></svg><span>السلة</span><b id="mCartCount" hidden></b></button>
-  <button data-mnav="fav" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.2S4.6 15.9 2.9 11.6C1.8 8.8 3.6 5.6 6.6 5.6c2 0 3.9 1.3 5.4 3.4 1.5-2.1 3.4-3.4 5.4-3.4 3 0 4.8 3.2 3.7 6-1.7 4.3-9.1 8.6-9.1 8.6z"/></svg><span>المفضلة</span></button>
   <button data-mnav="dash" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.3-3.3 3.9-5 7-5s5.7 1.7 7 5"/></svg><span>حسابي</span></button>
+  <button data-mnav="more" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="1.7"/><circle cx="12" cy="5" r="1.7"/><circle cx="19" cy="5" r="1.7"/><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/><circle cx="5" cy="19" r="1.7"/><circle cx="12" cy="19" r="1.7"/><circle cx="19" cy="19" r="1.7"/></svg><span>المزيد</span></button>
 </nav>
 <div id="moreSheet" hidden>
   <div class="more-box">
@@ -338,6 +328,9 @@
     <a href="#" data-nav="contact">✉️ الدعم والتواصل</a>
     <a href="#" id="moreTrack">📦 تتبع طلبي</a>
     <a href="#" id="moreFav">❤️ المفضلة</a>
+    <a href="#" id="moreLang">🌐 اللغة / Langue</a>
+    <a href="#" id="moreTheme">🌙 المظهر: داكن / فاتح</a>
+    <a href="#" id="moreAccount">👤 حسابي / دخول</a>
   </div>
 </div>
 
