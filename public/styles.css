@@ -601,3 +601,6 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 .brand-sub { white-space: nowrap; }
 #accountBtn svg { width: 20px; height: 20px; display: block; }
 @media (max-width: 760px) { .brand-sub { font-size: 10px; } }
+
+/* التفاف ثنائي الاتجاه: نص عربي داخل الوضع الفرنسي يُعرض باتجاهه الصحيح */
+[dir="ltr"] :where(p, span, small, strong, b, em, h1, h2, h3, h4, h5, h6, button, a, label, option, li, td, th) { unicode-bidi: plaintext; }

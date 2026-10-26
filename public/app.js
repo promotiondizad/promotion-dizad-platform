@@ -7,12 +7,21 @@ let CSRF = null, ME = null, WILAYAS = [], CATEGORIES = [], PRODUCTS = [];
 let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
 let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
-let SUPPLIERS_OPEN = true; // يُحدَّث من /api/config — إغلاق الموردين من الإدارة يخفي أزرارهم فقط
-function applySuppliersGate() {
-  const jb = $('#joinSupplier'); if (jb) jb.hidden = !SUPPLIERS_OPEN;
-  const st = document.querySelector('.role-tabs .tab[data-role="supplier"]'); if (st) st.hidden = !SUPPLIERS_OPEN;
-  if (!SUPPLIERS_OPEN && regRole === 'supplier') selectRole('buyer');
+// تحديث تلقائي: مقارنة نسخة البناء مع الخادم دورياً — صفحة مفتوحة قديماً لا تبقى عالقة أبداً
+const CLIENT_VERSION = 'v2026.10.26-9';
+async function checkForUpdate() {
+  try {
+    const r = await fetch('/api/config', { cache: 'no-store' });
+    const d = await r.json();
+    if (d.version && d.version !== CLIENT_VERSION && sessionStorage.getItem('pd_vr') !== d.version) {
+      sessionStorage.setItem('pd_vr', d.version);
+      toast('وصل تحديث جديد — تُحدَّث الصفحة الآن…');
+      setTimeout(() => location.reload(), 700);
+    }
+  } catch {}
 }
+setInterval(checkForUpdate, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
 
 function toast(msg, err = false) {
   const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false;
@@ -689,11 +698,9 @@ const ROLE_HINTS = {
   supplier: 'حساب مورد: تُراجع الإدارة حسابك أولاً، ثم تنشر منتجاتك وتستقبل الطلبات الموجهة إليك آلياً.'
 };
 function selectRole(r) {
-  if (r === 'supplier' && !SUPPLIERS_OPEN) { toast('تسجيل الموردين مغلق مؤقتاً', true); r = 'buyer'; }
   regRole = r;
   $$('.role-tabs .tab').forEach((t) => t.classList.toggle('active', t.dataset.role === r));
   $('#roleHint').textContent = ROLE_HINTS[r];
-  $('#supplierFields').hidden = r !== 'supplier';
   $('#marketerFields').hidden = r !== 'marketer';
   const em = $('#rgEmail');
   em.required = false;
@@ -1158,7 +1165,6 @@ document.addEventListener('click', (e) => {
 { const tg = document.getElementById('tgLink'); if (tg) tg.href = 'https://t.me/share/url?url=' + encodeURIComponent(location.origin + '/') + '&text=' + encodeURIComponent('SOUQAR — سوق واحد، تجارة تجمع الجميع'); }
 $('#authBtn').addEventListener('click', () => openAuth('login'));
 $('#joinMarketer').addEventListener('click', () => openAuth('register', 'marketer'));
-$('#joinSupplier').addEventListener('click', () => openAuth('register', 'supplier'));
 $('#dashBtn').addEventListener('click', renderDash);
 $('#logoutBtn').addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST', body: {} }).catch(() => {}); ME = null; CSRF = null; await refreshMe(); show('home'); toast('تم تسجيل الخروج'); });
 $$('[data-authtab]').forEach((t) => t.addEventListener('click', () => openAuth(t.dataset.authtab)));
@@ -1291,9 +1297,7 @@ $('#registerForm').addEventListener('submit', async (e) => {
       role: regRole, name: $('#rgName').value, phone: $('#rgPhone').value, email: $('#rgEmail').value || undefined,
       password: $('#rgPass').value, passwordConfirm: $('#rgPass2').value,
       wilaya: $('#rgWilaya').value ? Number($('#rgWilaya').value) : undefined,
-      businessName: $('#rgBusiness').value || undefined, activity: $('#rgActivity').value || undefined,
-      address: $('#rgAddress').value || undefined,
-      telegramChatId: (regRole === 'supplier' ? $('#rgTelegram').value : $('#rgTelegramM').value) || undefined,
+      telegramChatId: $('#rgTelegramM').value || undefined,
       inviteCode: localStorage.getItem('pd_inv') || undefined,
       terms: $('#rgTerms').checked
     } });
@@ -1361,7 +1365,7 @@ async function initLoads(params) {
   } catch { failed = true; }
   try { await refreshMe(); } catch { failed = true; }
   try { const st = await api('/api/setup/status'); if (st.needsSetup) { $('#setupCard').hidden = false; openAuth('login'); } } catch { failed = true; }
-  try { const cfg = await api('/api/config'); SUPPLIERS_OPEN = cfg.suppliersOpen !== false; applySuppliersGate(); } catch {}
+  try { const cfg = await api('/api/config'); if (cfg.version && cfg.version !== CLIENT_VERSION && sessionStorage.getItem('pd_vr') !== cfg.version) { sessionStorage.setItem('pd_vr', cfg.version); location.reload(); return; } } catch {}
   try { await loadProducts(); } catch {
     failed = true;
     $('#productGrid').innerHTML = '<div class="card" style="text-align:center"><p>⚠️ تعذّر تحميل المنتجات — الخادم لا يرد حالياً.</p><button class="btn" type="button" onclick="location.reload()">إعادة المحاولة</button></div>';

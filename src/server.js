@@ -14,6 +14,8 @@ try {
   }
 } catch {}
 const { db, DATA_DIR, audit } = require('./db');
+// نسخة البناء: الواجهة تقارنها دورياً وتعيد التحميل تلقائياً عند أي تحديث — حتى لا يبقى أي هاتف عالقاً على بناء قديم
+const BUILD_VERSION = 'v2026.10.26-9';
 const sec = require('./security');
 const integ = require('./integrations');
 const { iconPNG } = require('./icon');
@@ -161,7 +163,7 @@ const server = http.createServer(async (req, res) => {
     // إعدادات عامة للواجهة — تسجيل الموردين يُغلق/يُفتح من الإدارة (مغلق الآن بأمر المؤسس حتى الحاجة)
     const suppliersOpen = () => { const r = db.prepare("SELECT value FROM settings WHERE key = 'suppliers_open'").get(); return !r || r.value !== '0'; };
     if (p === '/api/config' && req.method === 'GET') {
-      return send(res, 200, { suppliersOpen: suppliersOpen() });
+      return send(res, 200, { suppliersOpen: suppliersOpen(), version: BUILD_VERSION });
     }
     if (p === '/api/setup' && req.method === 'POST') {
       const c = db.prepare("SELECT COUNT(*) c FROM users WHERE role='admin'").get().c;
