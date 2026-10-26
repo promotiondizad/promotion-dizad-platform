@@ -6,6 +6,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('fr-DZ') + ' دج';
 let CSRF = null, ME = null, WILAYAS = [], CATEGORIES = [], PRODUCTS = [];
 let CART = JSON.parse(localStorage.getItem('pd_cart') || '[]');
 let checkoutKey = sessionStorage.getItem('pd_checkout_key') || null;
+let CO_ITEMS = null; // «اشترِ الآن»: مصدر إتمام طلب مؤقت بمنتج واحد — لا يلمس السلة أبداً
 
 function toast(msg, err = false) {
   const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false;
@@ -70,6 +71,7 @@ function show(view) {
   for (const v of ['home', 'page', 'auth', 'dash', 'track', 'product', 'checkout']) $('#view-' + v).hidden = v !== view;
   const cd = $('#cartDrawer'); if (cd) cd.hidden = true;
   const ms = $('#moreSheet'); if (ms) ms.hidden = true;
+  if (view !== 'checkout') CO_ITEMS = null;
   if (view === 'product' || view === 'checkout') window.scrollTo(0, 0);
   window.scrollTo({ top: 0 });
 }
@@ -313,6 +315,11 @@ function wireCards(root) {
     saveFavs(); loadProducts().catch(() => {});
   }));
 }
+function resetAllFilters() {
+  $('#searchInput').value = ''; $('#catFilter').value = ''; $('#priceFilter').value = ''; $('#sortSel').value = '';
+  if (FAV_ONLY) { FAV_ONLY = false; $('#favToggle').textContent = '🤍 مفضلتي'; }
+  return loadProducts();
+}
 async function loadProducts() {
   const q = $('#searchInput').value.trim(), cat = $('#catFilter').value;
   const data = await api('/api/products?' + new URLSearchParams({ search: q, category: cat, sort: $('#sortSel').value }));
@@ -324,6 +331,7 @@ async function loadProducts() {
   wireCards('productGrid');
   // أقسام الرئيسية + شرائح الفئات — تظهر في العرض الافتراضي فقط (بلا بحث/فلترة)
   const plain = !q && !cat && !$('#priceFilter').value && !FAV_ONLY;
+  const fbEl = $('#filterBar'); if (fbEl) fbEl.hidden = plain;
   const newest = [...PRODUCTS].sort((a, b) => b.id - a.id).slice(0, 4);
   const top = [...PRODUCTS].filter((p) => p.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 4);
   $('#secNew').hidden = !(plain && newest.length);
@@ -344,7 +352,7 @@ async function loadProducts() {
     $('#catTiles').innerHTML = tiles.map(({ c }) => `<button class="cat-circle" data-tile="${c.id}" type="button"><span class="cc-emoji">${iconFor(c.name)}</span><b>${esc(c.name)}</b></button>`).join('') + `<button class="cat-circle" data-all="1" type="button"><span class="cc-emoji">⊞</span><b>المزيد</b></button>`;
     const pi = $('#promoImg'); const fpp = PRODUCTS.find((x) => x.images && x.images.length); if (pi && fpp) { pi.src = fpp.images[0]; pi.hidden = false; }
     $$('#catTiles [data-tile]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = t.dataset.tile; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
-    $$('#catTiles [data-all]').forEach((t) => t.addEventListener('click', () => { $('#catFilter').value = ''; loadProducts().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }));
+    $$('#catTiles [data-all]').forEach((t) => t.addEventListener('click', () => { resetAllFilters().catch(() => {}); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); toast('تعرض كل المنتجات والأقسام'); }));
   } else { $('#catChips').innerHTML = ''; $('#secCats').hidden = true; }
 }
 // وصف عربي جاهز لأي منتج وصفه الأصلي فارغ (بيانات المتجر بلا أوصاف) — عام وصادق بلا اختراع مواصفات
@@ -365,7 +373,7 @@ async function openProduct(id) {
   const pageUrl = location.origin + '/?product=' + p.id;
   box.innerHTML = `
     ${p.images.length ? `<div class="pp-media"><img class="main-img pp-main" id="pmMain" src="${esc(p.images[0])}" alt="${esc(p.name)}" title="اضغط للتكبير"><span class="img-count" id="pmCount">1 / ${p.images.length}</span><div class="pm-topbar"><button class="pm-tb" id="ppBack" type="button" aria-label="رجوع">→</button><span class="pm-tb-group"><button class="pm-tb" id="pmShare" type="button" aria-label="مشاركة">↗</button><button class="pm-tb" id="pmCartGo" type="button" aria-label="السلة">🛒</button></span></div></div>
-    <div class="gallery">${p.images.map((im, i) => `<img src="${esc(im)}" data-g="${i}" class="${i === 0 ? 'sel' : ''}" alt="">`).join('')}</div>` : '<div class="drawer-head"><button class="icon-btn dark" id="ppBack" type="button">→ رجوع</button></div><div class="noimg" style="height:200px;display:flex;align-items:center;justify-content:center;font-size:60px;background:#eef2f5;border-radius:13px">📦</div>'}
+    <div class="gallery">${p.images.map((im, i) => `<img src="${esc(im)}" data-g="${i}" class="${i === 0 ? 'sel' : ''}" alt="">`).join('')}</div>` : `<div class="pp-media"><div class="noimg pp-noimg">📦</div><div class="pm-topbar"><button class="pm-tb" id="ppBack" type="button" aria-label="رجوع">→</button><span class="pm-tb-group"><button class="pm-tb" id="pmShare" type="button" aria-label="مشاركة">↗</button><button class="pm-tb" id="pmCartGo" type="button" aria-label="السلة">🛒</button></span></div></div>`}
     <h3 class="pp-title" dir="auto">${esc(p.name)}</h3>
     <p>${priceHtml(p)}</p>
     <p>${p.stock > 0 ? '<span class="badge pp-stock">✔ متوفر في المخزون — بقي ' + p.stock + '</span>' : '<span class="badge out">نفد المخزون</span>'}</p>
@@ -445,8 +453,8 @@ async function openProduct(id) {
     addToCart(p.id, Number($('#pmQty').value) || 1, selSize, selColor);
   });
   $('#pmBuyNow').addEventListener('click', async () => {
-    addToCart(p.id, Number($('#pmQty').value) || 1, selSize, selColor);
-    openCheckout();
+    // شراء فوري بمنتج واحد — دون إضافة للسلة (طلب مكرر كان يحدث سابقاً)
+    openCheckout([{ productId: p.id, qty: Number($('#pmQty').value) || 1, size: selSize, color: selColor, name: p.name, price: p.customer_price, image: p.images && p.images.length ? p.images[0] : null, supplier_id: p.supplier_id }]);
   });
   $('#pmCopyDesc').addEventListener('click', async () => {
     const isMk = ME && ME.role === 'marketer';
@@ -510,18 +518,19 @@ async function renderCart() {
   $$('#cartItems [data-sell]').forEach((inp) => inp.addEventListener('change', () => { CART[+inp.dataset.sell].sellPrice = Number(inp.value) || null; saveCart(); renderCart(); }));
   await updateTotals();
 }
-async function updateTotals() {
+async function updateTotals(items) {
+  const SRC = items || CART;
   $('#coTotals').hidden = false;
   const w = Number($('#coWilaya').value);
   const isMk = ME && ME.role === 'marketer';
-  const subtotal = CART.reduce((a, i) => a + sellOf(i) * i.qty, 0);
+  const subtotal = SRC.reduce((a, i) => a + sellOf(i) * i.qty, 0);
   let html = `<div>مجموع المنتجات: <strong>${fmt(subtotal)}</strong></div>`;
-  if (isMk) html += `<div>💰 عمولتك المتوقعة من هذا الطلب: <strong>${fmt(CART.reduce((a, i) => a + (sellOf(i) - i.price) * i.qty, 0))}</strong></div>`;
+  if (isMk) html += `<div>💰 عمولتك المتوقعة من هذا الطلب: <strong>${fmt(SRC.reduce((a, i) => a + (sellOf(i) - i.price) * i.qty, 0))}</strong></div>`;
   if (w) {
     try {
       const fees = {};
       const office = $('#coDelType') && $('#coDelType').value === 'office';
-      for (const i of CART) {
+      for (const i of SRC) {
         const { product } = await api('/api/products/' + i.productId);
         const cov = product.coverage.find((c) => c.wilaya_code === w);
         fees[product.supplier_id] = cov ? (office && cov.fee_office != null ? cov.fee_office : cov.delivery_fee) : null;
@@ -538,8 +547,9 @@ async function updateTotals() {
 // ---------- صفحة إتمام الطلب (مستقلة، كيما متاجر AliExpress) ----------
 function renderCheckoutItems() {
   const box = $('#coItems');
-  if (!CART.length) { box.innerHTML = '<p class="muted">السلة فارغة.</p>'; return; }
-  box.innerHTML = '<div class="card"><h4>🛍️ ملخص الطلب</h4>' + CART.map((i) => `
+  const SRC = CO_ITEMS || CART;
+  if (!SRC.length) { box.innerHTML = '<p class="muted">السلة فارغة.</p>'; return; }
+  box.innerHTML = '<div class="card"><h4>🛍️ ملخص الطلب</h4>' + SRC.map((i) => `
     <div class="cart-item">
       ${i.image ? `<img src="${esc(i.image)}" alt="">` : ''}
       <div class="ci-main"><strong class="ci-name" dir="auto">${esc(i.name)}</strong>
@@ -547,12 +557,14 @@ function renderCheckoutItems() {
       <strong>${fmt(sellOf(i) * i.qty)}</strong>
     </div>`).join('') + '</div>';
 }
-function openCheckout() {
-  if (!CART.length) return toast('السلة فارغة — أضف منتجاً أولاً', true);
+function openCheckout(items) {
+  CO_ITEMS = Array.isArray(items) && items.length ? items : null;
+  const SRC = CO_ITEMS || CART;
+  if (!SRC.length) return toast('السلة فارغة — أضف منتجاً أولاً', true);
   $('#cartDrawer').hidden = true;
   renderCheckoutItems();
   show('checkout');
-  updateTotals();
+  updateTotals(SRC);
 }
 
 // ---------- تفاصيل الطلبية الكاملة ----------
@@ -1180,6 +1192,7 @@ $('#favToggle').addEventListener('click', () => {
   $('#favToggle').textContent = FAV_ONLY ? '❤️ مفضلتي (معروضة)' : '🤍 مفضلتي';
   loadProducts().catch(() => {});
 });
+$('#resetFilters').addEventListener('click', () => { resetAllFilters().catch(() => {}); const sc = document.getElementById('secCats'); if (sc) sc.scrollIntoView({ behavior: 'smooth' }); });
 // الثيم الافتراضي: أخضر داكن × ذهبي (لوحة SOUQAR) — والفاتح اختياري من الزر
 if (localStorage.getItem('pd_theme') === 'light') document.documentElement.dataset.theme = 'light';
 $('#themeBtn').textContent = document.documentElement.dataset.theme === 'light' ? '🌙' : '☀️';
@@ -1214,16 +1227,18 @@ document.addEventListener('click', (e) => { if (!e.target.closest('#bellBtn') &&
 
 $('#checkoutForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!CART.length) return toast('السلة فارغة', true);
+  const SRC = CO_ITEMS || CART;
+  if (!SRC.length) return toast('السلة فارغة', true);
   const btn = $('#checkoutBtn'); btn.disabled = true; btn.textContent = 'جارٍ إنشاء الطلب…';
   try {
     if (!checkoutKey) { checkoutKey = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); sessionStorage.setItem('pd_checkout_key', checkoutKey); }
     const r = await api('/api/orders', { method: 'POST', body: {
       customer: { name: $('#coName').value, phone: $('#coPhone').value, wilaya: Number($('#coWilaya').value), commune: $('#coCommune').value, address: $('#coAddress').value, deliveryType: $('#coDelType').value },
-      items: CART.map((i) => ({ productId: i.productId, qty: i.qty, size: i.size, color: i.color, sellPrice: ME && ME.role === 'marketer' ? sellOf(i) : undefined })),
+      items: SRC.map((i) => ({ productId: i.productId, qty: i.qty, size: i.size, color: i.color, sellPrice: ME && ME.role === 'marketer' ? sellOf(i) : undefined })),
       idempotencyKey: checkoutKey
     } });
-    CART = []; checkoutKey = null; sessionStorage.removeItem('pd_checkout_key'); saveCart();
+    if (CO_ITEMS) CO_ITEMS = null; else CART = [];
+    checkoutKey = null; sessionStorage.removeItem('pd_checkout_key'); saveCart();
     $('#cartDrawer').hidden = true;
     toast('تم إنشاء طلبك بنجاح: ' + r.orders.map((o) => o.ref + ' (' + fmt(o.total) + ')').join(' · '));
     $('#trackRef').value = r.orders[0].ref; $('#trackPhone').value = $('#coPhone').value;

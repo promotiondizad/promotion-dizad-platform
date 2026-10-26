@@ -64,7 +64,9 @@ const HOME_FEE = 500, OFFICE_FEE = 300, DURATION = '24-72 ساعة', DEFAULT_STO
       const tagline = (p.tagline && p.tagline.ar) || '';
       const contents = (p.contents && Array.isArray(p.contents.ar)) ? p.contents.ar : [];
       const desc = [tagline, contents.length ? 'محتويات الباك: ' + contents.join(' • ') : '', p.count && p.count.ar ? 'العدد: ' + p.count.ar : ''].filter(Boolean).join('\n');
-      const images = Array.isArray(p.images) ? p.images.filter((x) => typeof x === 'string' && x.startsWith('http')).slice(0, 6) : [];
+      let images = Array.isArray(p.images) ? p.images.filter((x) => typeof x === 'string' && x.startsWith('http')).slice(0, 6) : [];
+      if (!images.length && typeof p.image === 'string' && p.image.startsWith('http')) images = [p.image];
+      if (!images.length && p.id === 'sw-4074') images = ['/pimg/nutrifresh-mesures.jpg']; // صورتها الأصلية Base64 — تُقدَّم من الخادم
       insert.run(supplier.id, catIdFor(name), name, desc, wholesale, margin, DEFAULT_STOCK, JSON.stringify(images), now, now);
       added++;
     }

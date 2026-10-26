@@ -538,3 +538,11 @@ html:not([data-theme="light"]) #view-product .buy-bar { background: #ffffff; }
 /* ===== زر عرض التفاصيل في البطاقة (أُرجع بطلب المؤسس) ===== */
 .details-btn { width: 100%; margin-top: 6px; background: transparent; border: 1.5px solid #c9a227; color: #7c5f10; font-weight: 800; }
 .details-btn:hover { background: rgba(201, 162, 39, .12); }
+
+/* ===== إصلاحات جولة الأخطاء الحية (2026-10-26) ===== */
+.totals { color: #17323d; }
+.totals .muted { color: #5c6f77; }
+.pp-noimg { height: min(94vw, 400px); display: flex; align-items: center; justify-content: center; font-size: 84px; background: linear-gradient(145deg, #0a4a33, #03291F); border-radius: 14px; }
+.pcard-media .noimg { background: linear-gradient(145deg, #0a4a33, #03291F); }
+.filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: #fdf3e3; color: #7a4d00; border: 1px solid #ecd9ae; border-radius: 12px; padding: 9px 13px; margin-bottom: 12px; font-size: 13.5px; font-weight: 700; }
+.filter-bar[hidden] { display: none; }

@@ -105,6 +105,9 @@ const I18N_FR = {
   'معرف محادثة تيليغرام Chat ID لإشعارات الطلبات (اختياري)': 'Chat ID Telegram pour les notifications de commandes (optionnel)',
   'وضع التعديل — عدّل ثم اضغط «حفظ التعديلات» (تغيير الاسم أو السعر يعيد المنتج لمراجعة الإدارة، والمخزون وحده لا يعيده)': 'Mode édition — modifiez puis touchez « Enregistrer » (changer le nom ou le prix renvoie le produit en validation ; le stock seul ne le fait pas)',
   '✏️ تعديل منتج:': '✏️ Modifier le produit :',
+  // أسماء الأقسام (بيانات — تُترجم كواجهة)
+  'مطبخ وطعام': 'Cuisine & Alimentation', 'أجهزة كهرومنزلية وتكييف': 'Électroménager & Climatisation', 'مستلزمات الدراجات والشتاء': 'Moto & Hiver', 'المنزل والتنظيم': 'Maison & Rangement', 'إلكترونيات وصوتيات': 'Électronique & Audio', 'أطفال ورضّع': 'Enfants & Bébés', 'ملابس وإكسسوارات': 'Vêtements & Accessoires', 'صحة وجمال': 'Santé & Beauté', 'عام': 'Divers',
+  '● متوفر': '● Disponible', '❤️ المفضلة': '❤️ Favoris', '🔎 عرض مُصفّى — أقسام المتجر مخفية مؤقتاً': '🔎 Affichage filtré — les sections sont masquées temporairement', '✕ إظهار كل شيء': '✕ Tout afficher', 'تعرض كل المنتجات والأقسام': 'Tous les produits et sections affichés',
   // عملة
   'دج': 'DA', 'الكمية': 'Quantité', 'نُسخ رابط المنتج ✓': 'Lien du produit copié ✓',
   // الولايات
@@ -123,8 +126,12 @@ function _trValue(raw) {
   if (Object.prototype.hasOwnProperty.call(I18N_FR, t)) {
     return raw.replace(t, I18N_FR[t]);
   }
-  const m = t.match(/^([\d][\d\s.,]*)\s*دج$/);
-  if (m) return raw.replace(t, m[1].trim() + ' DA');
+  const rng = t.match(/^([\d][\d\s.,–-]*)\s*دج$/);
+  if (rng) return raw.replace(t, rng[1].trim() + ' DA');
+  const left = t.match(/^بقي ([\d\s]+) فقط$/);
+  if (left) return raw.replace(t, 'Plus que ' + left[1].trim());
+  const cnt = t.match(/^(.+?) \(([\d\s]+)\)$/);
+  if (cnt && Object.prototype.hasOwnProperty.call(I18N_FR, cnt[1])) return raw.replace(t, I18N_FR[cnt[1]] + ' (' + cnt[2] + ')');
   return null;
 }
 function _walkFr(root) {
